@@ -232,7 +232,8 @@ class Server:
             t2 = trio.current_time()
             if t2-t1 > 0.1:
                 logger.info("LAG %f",t2-t1)
-            await trio.sleep(10)
+            await trio.sleep(3)
+            # Mudlet may time out after 4 or 5 seconds
 
     @asynccontextmanager
     async def events(self, event="any"):
