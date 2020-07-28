@@ -106,10 +106,15 @@ cancelled.
 
 :Note:
     Handlers and callables are started directly from the server's main loop.
-    If you want to call to Mudlet from them, you **must** do this from a
-    separate task. Use ``self.main.start_soon()`` to start it.
+    If you want to call back into Mudlet from them, you **must** do this
+    from a separate task. Use ``self.main.start_soon()`` to start it. The
+    example program shows the basic structure.
 
-    Callables whichwant to return a value may so via a
+    Callables which need to return a value anyway may so via a
     ``mudlet.util.ValueEvent``. Create an instance of that in your
     callable, pass it on to your separate task, and return it.
     Just don't forget to set its value, or its error, at *some* point.
+
+    The reason why pymudles doesn't just run everything in parallel is that
+    you might care about the order things arrive in. Mixing up the lines in
+    your room descriptions is probably not a whole lot of fun.
