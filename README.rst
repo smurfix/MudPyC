@@ -56,9 +56,14 @@ connection is established.
 
 A ``PyDisconnect`` event is raised when the connection terminates.
 
-Call ``py.call(NAME, PARAMS, CALLBACK)`` to call a function on the Python
-side (needs to register, see below). ``CALLBACK`` is called with ``true``
-and the result(s), or ``false`` and an error message.
+Call ``py.call(CALLBACK, NAME, PARAMS)`` to call a function on the Python
+side (you need to register the function, see below). ``CALLBACK`` is called
+with ``true`` and the result(s), or ``false`` and an error message.
+Parameters must be json-encodeable.
+
+The author strongly recommends to use a CJSON-ified version of Mudlet
+because if you ever pass something non-encodeable to yajl by mistake,
+interesting things *will* happen.
 
 +++++++++++++++++
 Usage from Python
@@ -67,38 +72,38 @@ Usage from Python
 See ``example/basic.py`` for a simple server that emits the info of every
 room you're entering. (Requires adjustment for your MUD.)
 
-Call ``await s.mud.NAME`` to retrieve the Mudlet variable NAME. The name
+Call ``await self.mud.NAME`` to retrieve the Mudlet variable NAME. The name
 may include dots; the value must be JSON-encodeable.
 
-Call ``await s.mud.NAME._set(X)`` to set the Mudlet variable NAME to X. The
+Call ``await self.mud.NAME._set(X)`` to set the Mudlet variable NAME to X. The
 name may include dots; the value must be JSON-encodeable.
 
-Call ``await s.mud.NAME(ARGS)`` to call the Mudlet function NAME. The name
+Call ``await self.mud.NAME(ARGS)`` to call the Mudlet function NAME. The name
 may include dots; the return value(s) must be JSON-encodeable. If you
 set ``meth=True`` the function is treated as a method (in Lua: a colon
 in front of the name's last component, e.g. ``foo:bar()``). If you set
 ``dest`` to a list of names, the (first) result of the function is assigned
 to that name instead of being returned.
 
-Open an async context + async loop using ``s.events(NAME)`` to listen
+Open an async context + async loop using ``self.events(NAME)`` to listen
 for the Mudlet event ``NAME``.
 
-Call ``s.register_call(NAME, FUNC)`` to register ``FUNC`` as being callable
+Call ``self.register_call(NAME, FUNC)`` to register ``FUNC`` as being callable
 from Mudlet; see above. If the result is a list/tuple, the Lua callback
 will receive multiple arguments. Callables may be async functions.
 
-Call ``s.event(NAME, ARGS…)`` to raise an event within Mudlet.
+Call ``self.event(NAME, ARGS…)`` to raise an event within Mudlet.
 
 The server's async context terminates with an ``EOFError`` if the Mudlet
 connection ends, or a ``trio.TooSlowError`` if the server's regular Ping is
 not answered within a couple of seconds. Otherwise it continues until
 cancelled.
 
-.. note::
+.. note:
 
     Handlers and callables are started directly from the server's main loop.
     If you want to call to Mudlet from them, you **must** do this from a
-    separate task. Use ``s.main.start_soon()`` to start it.
+    separate task. Use ``self.main.start_soon()`` to start it.
 
     Callables whichwant to return a value may so via a
     ``mudlet.util.ValueEvent``. Create an instance of that in your
