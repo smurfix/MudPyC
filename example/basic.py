@@ -4,6 +4,7 @@ from mudlet import Server
 import trio
 from mudlet.util import ValueEvent
 from functools import partial
+import logging
 
 class S(Server):
     async def hello2(self, prompt,e):
@@ -32,4 +33,5 @@ class S(Server):
 async def main():
     async with S(cfg=dict(name="sample_basic")) as s:
         await s.run()
+logging.basicConfig(level=logging.INFO)
 trio.run(main)
