@@ -91,7 +91,6 @@ end
 function py.post(msg)
     msg = yajl.to_string(msg) .. "\n"
     if py.file then
-        print("writing" ..msg)
         py.file:write(string.len(msg) .. "\n" .. msg)
         py.file:flush()
     else
@@ -128,7 +127,7 @@ function py._post(msg)
 end
 
 function py.postDone(_, url, msg)
-    if url ~= py.url then print("PCMP",url) return end
+    if url ~= py.url then return end
     py.post_open = py.post_open - 1
     msg = yajl.to_value(msg)
     for _,m in ipairs(msg) do
