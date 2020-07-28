@@ -129,6 +129,7 @@ end
 function py.postDone(_, url, msg)
     if url ~= py.url then return end
     py.post_open = py.post_open - 1
+    py.backoff = 0
     msg = yajl.to_value(msg)
     for _,m in ipairs(msg) do
         py.process(m)
