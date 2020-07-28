@@ -92,21 +92,15 @@ class Server:
 
         @self.app.route("/echo", methods=['POST'])
         async def _echo_data():
-            print("ECHO 1")
             msg = await request.get_data()
-            print("ECHO 2")
             return Response(msg, content_type="application/x-fubar")
 
         @self.app.route("/json", methods=['POST'])
         async def _post_data():
-            print("Poll GET")
             msg = await request.get_data()
             if msg:
                 msg = json.loads(msg)
-                print("Poll IN",msg)
                 await self._msg_in(msg)
-            else:
-                print("Poll IN X")
             return await self._post_reply()
 
     async def _post_reply(self):
@@ -114,7 +108,6 @@ class Server:
             await self._to_send_wait.wait()
             self._to_send_wait = trio.Event()
         msg, self._to_send = self._to_send, []
-        print("Poll OUT", msg)
         msg = json.dumps(msg)
         return Response(msg, content_type="application/json")
 
@@ -127,7 +120,6 @@ class Server:
             msglen = int(line)
             msg = await f.read_all(msglen)
             msg = json.loads(msg)
-            print("Read IN",msg)
             await self._msg_in(msg)
 
     async def _msg_in(self, msg):
@@ -136,11 +128,11 @@ class Server:
             try:
                 ev = self._replies[seq]
             except KeyError:
-                print("UnknownReply",msg)
+                logger.warning("Unknown Reply %r",msg)
                 return
             else:
                 if not isinstance(ev, trio.Event):
-                    print("DupReply",msg)
+                    logger.warning("Dup Reply %r",msg)
                     return
             try:
                 self._replies[seq] = outcome.Value(msg["result"])
@@ -209,7 +201,8 @@ class Server:
             if res[0] != "Pong":
                 raise ValueError(res)
             t2 = trio.current_time()
-            print("LAG",t2-t1)
+            if t2-t1 > 0.1:
+                logger.info("LAG %f",t2-t1)
             await trio.sleep(10)
 
     @asynccontextmanager
@@ -291,7 +284,6 @@ class Server:
                 n.cancel_scope.cancel()
 
     def _send(self, data):
-        print("Queue", data)
         self._to_send.append(data)
         self._to_send_wait.set()
     
