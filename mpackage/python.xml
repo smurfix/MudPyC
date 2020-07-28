@@ -24,7 +24,7 @@ py = py or {}
 py.action = py.action or {}
 
 function py.init(port, url)
-    assert(py.handler_id_done == nil, "Already running")
+    assert(py._handler_id_post_done == nil, "Already running")
     py.handler = py.handler or {}
     py.callbacks = py.callbacks or {}
     py.put_open = false
