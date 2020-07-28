@@ -26,8 +26,7 @@ The only required parameter on the Mudlet side is the port number.
 
 Errors / exceptions are generally propagated to the caller.
 
-.. note:
-
+:Note:
 	The Python code uses `Trio <https://trio.readthedocs.io>`_. Trio is an
 	alternate async framework for Python, i.e. it is *not* compatible with
 	asyncio.
@@ -65,7 +64,7 @@ The author strongly recommends to use a CJSON-ified version of Mudlet
 because if you ever pass something non-encodeable to yajl by mistake,
 interesting things *will* happen. These can be had via
 `the forum <https://forums.mudlet.org/viewtopic.php?f=5&t=22934>`_
- (4.9.1) or `github <https://github.com/Mudlet/Mudlet/pull/4004>`_.
+(4.9.1) or `github <https://github.com/Mudlet/Mudlet/pull/4004>`_.
 
 Also, this code exposes a race condition in Python's `Hypercorn
 <https://pypi.org/project/Hypercorn/>`_ web server. The fix is `here
@@ -105,8 +104,7 @@ connection ends, or a ``trio.TooSlowError`` if the server's regular Ping is
 not answered within a couple of seconds. Otherwise it continues until
 cancelled.
 
-.. note:
-
+:Note:
     Handlers and callables are started directly from the server's main loop.
     If you want to call to Mudlet from them, you **must** do this from a
     separate task. Use ``self.main.start_soon()`` to start it.
