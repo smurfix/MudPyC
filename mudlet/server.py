@@ -314,7 +314,7 @@ class Server:
                 n.cancel_scope.cancel()
 
     def _send(self, data):
-        logger.debug("OUT %r",msg)
+        logger.debug("OUT %r",data)
         self._to_send.append(data)
         self._to_send_wait.set()
     
