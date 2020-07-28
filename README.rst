@@ -27,6 +27,19 @@ The only required paramter on the Mudlet side is the port number.
 
 Errors / exceptions are generally propagated to the caller.
 
+.. note::
+
+	The Python code uses `Trio <https://trio.readthedocs.io>`_. Trio is an
+	alternate async framework for Python, i.e. it is *not* compatible with
+	asyncio.
+
+	There is a compatibility layer, trio-asyncio, but it's an inter
+	There's another compatibility layer, anyio, but that is currently being
+	rewritten and this author doesn't like doing any work twice.
+
+	This code will become anyio-compatible, and thus will work
+	with asyncio in addition to Trio, sometime later in 2020.
+
 +++++++++++++++++
 Usage from Mudlet
 +++++++++++++++++
