@@ -26,6 +26,8 @@ DEFAULTS = attrdict(
         fifo=os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "mudlet_fifo"),
         ca_certs=None, certfile=None, keyfile=None, use_reloader=False,
     )
+if "XDG_RUNTIME_DIR" in os.environ:
+    DEFAULTS["fifo"] = os.path.join(os.environ["XDG_RUNTIME_DIR"], "mudlet_fifo")
 
 class _CallMudlet:
     def __init__(self, server, name = [], meth=None):
@@ -74,26 +76,43 @@ class Server:
         self._handlers = {}
         self._calls = {}
         
-        try:
-            os.unlink(cfg['fifo'])
-        except EnvironmentError as err:
-            if err.errno != errno.ENOENT:
-                raise
-        os.mkfifo(cfg['fifo'], 0o600)
+        if 'fifo' in cfg:
+            try:
+                os.unlink(cfg['fifo'])
+            except EnvironmentError as err:
+                if err.errno != errno.ENOENT:
+                    raise
+            try:
+                os.mkfifo(cfg['fifo'], 0o600)
+            except EnvironmentError as err:
+                logger.info("No FIFO. Using HTTP. (%r)", err)
+                del cfg['fifo']
+
 
         @self.app.route("/test", methods=['GET'])
         async def _get_test():
             msg = json.dumps(dict(hello="This is a test."))
             return Response(msg, content_type="application/json")
 
+        @self.app.route("/test", methods=['POST'])
+        async def _echo_data():
+            msg = await request.get_data()
+            return Response(msg, content_type="application/x-fubar")
+
+        # GET only fetches. PUT only sends. POST does both.
+
         @self.app.route("/json", methods=['GET'])
         async def _get_data():
             return await self._post_reply()
 
-        @self.app.route("/echo", methods=['POST'])
-        async def _echo_data():
+        @self.app.route("/json", methods=['PUT'])
+        async def _put_data():
             msg = await request.get_data()
-            return Response(msg, content_type="application/x-fubar")
+            if msg:
+                msg = json.loads(msg)
+                await self._msg_in(msg)
+            msg = json.dumps([])
+            return Response(msg, content_type="application/json")
 
         @self.app.route("/json", methods=['POST'])
         async def _post_data():
@@ -112,6 +131,9 @@ class Server:
         return Response(msg, content_type="application/json")
 
     async def _reader(self, task_status=trio.TASK_STATUS_IGNORED):
+        if 'fifo' not in self.cfg:
+            task_status.started(None)
+            return
         fx = os.open(self.cfg['fifo'], os.O_RDONLY|os.O_NDELAY)
         f = OSLineReader(fx)
         task_status.started(fx)
@@ -187,7 +209,10 @@ class Server:
         self._send(res)
 
     async def _action_init(self, msg):
-        self._send(dict(action="init", fifo=self.cfg['fifo']))
+        res = dict(action="init")
+        if 'fifo' in self.cfg:
+            res['fifo'] = self.cfg['fifo']
+        self._send(res)
 
     async def _action_up(self, msg):
         self._is_connected.set()
@@ -276,7 +301,8 @@ class Server:
                             await nn.start_soon(partial(self.rpc,action="handle", event=event))
                 yield self
             finally:
-                os.close(fx)
+                if fx is not None:
+                    os.close(fx)
                 for k,v in self._replies.items():
                     if isinstance(v,trio.Event):
                         self._replies[k] = outcome.Error(EOFError())

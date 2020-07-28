@@ -14,6 +14,7 @@ function py.init(port)
     py.post_open = 0
     py.backoff = 0
     py.seq = 0
+    py.connected = false
     
     py.url = "http://127.0.0.1:" .. port .. "/json"
     
@@ -21,6 +22,8 @@ function py.init(port)
     py.handler_id_err = registerAnonymousEventHandler("sysPostHttpError", py.postError)
     py.handler_id_gdone = registerAnonymousEventHandler("sysGetHttpDone", py.postDone)
     py.handler_id_gerr = registerAnonymousEventHandler("sysGetHttpError", py.postError)
+    py.handler_id_pdone = registerAnonymousEventHandler("sysPutHttpDone", py.postDone)
+    py.handler_id_perr = registerAnonymousEventHandler("sysPutHttpError", py.postError)
     py.post({action="init"})
 end
 
@@ -30,10 +33,14 @@ function py.exit()
         killAnonymousEventHandler(py.handler_id_err)
         killAnonymousEventHandler(py.handler_id_gdone)
         killAnonymousEventHandler(py.handler_id_gerr)
+        killAnonymousEventHandler(py.handler_id_pdone)
+        killAnonymousEventHandler(py.handler_id_perr)
         py.handler_id_done = nil
         py.handler_id_err = nil
         py.handler_id_gdone = nil
         py.handler_id_gerr = nil
+        py.handler_id_pdone = nil
+        py.handler_id_perr = nil
     end
     py._clear_callbacks()
     if py.timer then
@@ -43,7 +50,10 @@ function py.exit()
     if py.file then
         py.file:close()
         py.file = nil
+    end
+    if py.connected then
         raiseEvent("PyDisconnect", py.url)
+        py.connected = false
     end
     if py.handler then
         for _,hdl in pairs(py.handler) do
@@ -74,16 +84,23 @@ function py.post(msg)
 end
 
 function py._post(msg)
-    print("Posting",msg)
     py.post_open = py.post_open + 1
     local ok,url
     if msg == nil and getHTTP ~= nil then  -- mod by Smurf
-        ok,url = getHTTP(py.url, {["Content-Type"]="application/json"})
+        ok,url = getHTTP(py.url)
     else
         if msg == nil then
+            if py.post_open > 1 then
+                py.post_open = py.post_open - 1
+                return
+            end
             msg = yajl.to_string({action="poll"}).."\n"
         end
-        ok,url = postHTTP(msg, py.url, {["Content-Type"]="application/json"})
+        if py.post_open > 1 then
+            ok,url = putHTTP(msg, py.url, {["Content-Type"]="application/json"})
+        else
+            ok,url = postHTTP(msg, py.url, {["Content-Type"]="application/json"})
+        end
     end
     if ok then
         if url ~= "" then
@@ -128,7 +145,7 @@ function py.process(msg)
 end
 
 function py.call(name, args, callback)
-    assert(py.file, "not connected")
+    assert(py.connected, "not connected")
     seq = py.seq+1
     py.seq = seq
     py.callbacks[seq] = callback
@@ -138,10 +155,13 @@ end
 function py.postError(_, msg, url)
     if url ~= py.url then return end
     py.post_open = py.post_open - 1
+    if py.connected then
+        py.connected = false
+        raiseEvent("PyDisconnect", py.url)
+    end
     if py.file ~= nil then  -- most likely dead
         py.file:close()
         py.file = nil
-        raiseEvent("PyDisconnect", py.url)
     end
     py._clear_callbacks()
     if py.timer == nil then
@@ -157,8 +177,15 @@ function py.postRetry()
 end
 
 function py.action.init(msg)
-    if py.file then py.file:close() end
-    py.file = io.open(msg.fifo, "w")
+    if py.file then
+        py.file:close()
+        py.file = nil
+    end
+    if msg.fifo then
+        py.file = io.open(msg.fifo, "w")
+    end
+    -- otherwise use HTTP
+    py.connected = true
     py.post({action="up"})
     raiseEvent("PyConnect", py.url)
     py._poll()
