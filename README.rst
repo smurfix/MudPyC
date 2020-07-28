@@ -63,7 +63,13 @@ Parameters must be json-encodeable.
 
 The author strongly recommends to use a CJSON-ified version of Mudlet
 because if you ever pass something non-encodeable to yajl by mistake,
-interesting things *will* happen.
+interesting things *will* happen. These can be had via
+`the forum <https://forums.mudlet.org/viewtopic.php?f=5&t=22934>`_
+ (4.9.1) or `github <https://github.com/Mudlet/Mudlet/pull/4004>`_.
+
+Also, this code exposes a race condition in Python's `Hypercorn
+<https://pypi.org/project/Hypercorn/>`_ web server. The fix is `here
+<https://gitlab.com/pgjones/hypercorn/-/merge_requests/41>`_.
 
 +++++++++++++++++
 Usage from Python
