@@ -2,7 +2,31 @@
 
 from setuptools import setup, find_packages
 
-LONG_DESC = open("README.rst", encoding="utf-8").read()
+LONG_DESC = """
+Assume you are really annoyed with Lua and want to use a reasonable
+scripting language. Say, Python.
+
+This module lets you do that.
+
+It establishes a bidirectional link between Mudlet/Lua and Python and
+exchanges structured messages between the two.
+
+Mudlet can do HTTP requests in the background, so we send a "long poll" PUSH
+request to the Python server. The reply contains the incoming messages (as
+a JSON array).
+
+There are a couple of optimizations to be had:
+
+* if "httpGET" is available, we use that instead of an empty PUSH.
+
+* if the platform supports Unix FIFO nodes in the file system, we use that
+  for sending to Python, as that's faster and less expensive than a HTTP
+  request per message.
+
+The only required parameter on the Mudlet side is the port number.
+
+Errors / exceptions are generally propagated to the caller.
+"""
 
 setup(
     name="mudlet",
