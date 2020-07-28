@@ -3,6 +3,7 @@ This module contains various helper functions and classes.
 """
 from collections.abc import Mapping
 import trio
+import outcome
 import os
 
 import logging
@@ -135,4 +136,62 @@ class OSLineReader:
         while len(self.buf) < n_bytes:
             await self.fill_buf(max(1024, n_bytes.len(self.buf)))
         return await self.read(n_bytes)
+
+class CancelledError(RuntimeError):
+    pass
+
+class ValueEvent:
+    """A waitable value useful for inter-task synchronization,
+    inspired by :class:`threading.Event`.
+
+    An event object manages an internal value, which is initially
+    unset, and a task can wait for it to become True.
+
+    Args:
+      ``scope``:  A cancelation scope that will be cancelled if/when
+                  this ValueEvent is. Used for clean cancel propagation.
+
+    Note that the value can only be read once.
+    """
+
+    event = None
+    value = None
+    scope = None
+
+    def __init__(self):
+        self.event = trio.Event()
+
+    def set(self, value):
+        """Set the result to return this value, and wake any waiting task.
+        """
+        self.value = outcome.Value(value)
+        self.event.set()
+
+    def set_error(self, exc):
+        """Set the result to raise this exceptio, and wake any waiting task.
+        """
+        self.value = outcome.Error(exc)
+        self.event.set()
+
+    def is_set(self):
+        """Check whether the event has occurred.
+        """
+        return self.value is not None
+
+    async def cancel(self):
+        """Send a cancelation to the recipient.
+        """
+        if self.scope is not None:
+            self.scope.cancel()
+        await self.set_error(CancelledError())
+
+    async def get(self):
+        """Block until the value is set.
+
+        If it's already set, then this method returns immediately.
+
+        The value can only be read once.
+        """
+        await self.event.wait()
+        return self.value.unwrap()
 

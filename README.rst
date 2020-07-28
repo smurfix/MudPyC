@@ -85,7 +85,7 @@ for the Mudlet event ``NAME``.
 
 Call ``s.register_call(NAME, FUNC)`` to register ``FUNC`` as being callable
 from Mudlet; see above. If the result is a list/tuple, the Lua callback
-will receive multiple arguments.
+will receive multiple arguments. Callables may be async functions.
 
 Call ``s.event(NAME, ARGS…)`` to raise an event within Mudlet.
 
@@ -94,3 +94,13 @@ connection ends, or a ``trio.TooSlowError`` if the server's regular Ping is
 not answered within a couple of seconds. Otherwise it continues until
 cancelled.
 
+.. note::
+
+    Handlers and callables are started directly from the server's main loop.
+    If you want to call to Mudlet from them, you **must** do this from a
+    separate task. Use ``s.main.start_soon()`` to start it.
+
+    Callables whichwant to return a value may so via a
+    ``mudlet.util.ValueEvent``. Create an instance of that in your
+    callable, pass it on to your separate task, and return it.
+    Just don't forget to set its value, or its error, at *some* point.

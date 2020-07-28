@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from functools import partial
 from inspect import iscoroutine
 
-from .util import attrdict, combine_dict, OSLineReader
+from .util import attrdict, combine_dict, OSLineReader, ValueEvent
 import trio
 import os
 import errno
@@ -197,6 +197,8 @@ class Server:
             res = self._calls[msg["call"]](*msg["data"])
             if iscoroutine(res):
                 res = await res
+            if isinstance(res, ValueEvent):
+                res = await res.get()
         except Exception as e:
             logger.exception("Error calling %r", msg)
             res = dict(error=str(e))
