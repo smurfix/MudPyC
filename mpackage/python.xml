@@ -118,7 +118,6 @@ function py._do_http()
             msg = py.send_buf
             py.send_buf = {}
             for _,m in ipairs(msg) do
-        print("SEND",m)
                 m = yajl.to_string(m) .. "\n"
                 py.file:write(string.len(m) .. "\n" .. m)
             end
@@ -136,7 +135,6 @@ function py._do_http()
         end    
     end
     if not py.get_open then
-        print("DO GET",py.get_open)
         py.get_open = true
         local ok,url
         if getHTTP ~= nil then  -- mod by Smurf
@@ -153,7 +151,6 @@ function py._do_http()
 end
 
 function py._send(msg)
-    print("QUEUE",msg)
     py.send_buf[#py.send_buf+1] = msg
 end
 
@@ -169,7 +166,6 @@ function py._get_done(_, url, msg)
     if url ~= py.url then return end
     if not py.get_open then return end
     py.get_open = false
-    print("DONE GET",msg)
     
     msg = yajl.to_value(msg)
     for _,m in ipairs(msg) do
@@ -207,11 +203,8 @@ function py._put_error(_, msg, url)
 end
 
 function py._get_error(_, msg, url)
-print("A")
     if url ~= py.url then return end
-  print("B",py.get_open)
     if not py.get_open then return end
-  print("C")
     py.get_open = false
     
     py._reset_connection()
