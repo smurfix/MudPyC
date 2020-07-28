@@ -23,42 +23,44 @@
 py = py or {}
 py.action = py.action or {}
 
-function py.init(port)
+function py.init(port, url)
     assert(py.handler_id_done == nil, "Already running")
     py.handler = py.handler or {}
     py.callbacks = py.callbacks or {}
-    py.post_open = 0
+    py.put_open = false
+    py.get_open = false
     py.backoff = 0
     py.seq = 0
     py.connected = false
+    py.send_buf = {}
     
-    py.url = "http://127.0.0.1:" .. port .. "/json"
+    py.url = url or "http://127.0.0.1:" .. port .. "/json"
     
-    py.handler_id_done = registerAnonymousEventHandler("sysPostHttpDone", py.postDone)
-    py.handler_id_err = registerAnonymousEventHandler("sysPostHttpError", py.postError)
-    py.handler_id_gdone = registerAnonymousEventHandler("sysGetHttpDone", py.postDone)
-    py.handler_id_gerr = registerAnonymousEventHandler("sysGetHttpError", py.postError)
-    py.handler_id_pdone = registerAnonymousEventHandler("sysPutHttpDone", py.postDone)
-    py.handler_id_perr = registerAnonymousEventHandler("sysPutHttpError", py.postError)
-    py.post({action="init"})
+    py._handler_id_post_done = registerAnonymousEventHandler("sysPostHttpDone", py._get_done)
+    py._handler_id_post_err = registerAnonymousEventHandler("sysPostHttpError", py._get_error)
+    py._handler_id_get_done = registerAnonymousEventHandler("sysGetHttpDone", py._get_done)
+    py._handler_id_get_err = registerAnonymousEventHandler("sysGetHttpError", py._get_error)
+    py._handler_id_put_done = registerAnonymousEventHandler("sysPutHttpDone", py._put_done)
+    py._handler_id_put_err = registerAnonymousEventHandler("sysPutHttpError", py._put_error)
+    py._send({action="init"})
+    py._do_http()
 end
 
 function py.exit()
-    if py.handler_id_done then
-        killAnonymousEventHandler(py.handler_id_done)
-        killAnonymousEventHandler(py.handler_id_err)
-        killAnonymousEventHandler(py.handler_id_gdone)
-        killAnonymousEventHandler(py.handler_id_gerr)
-        killAnonymousEventHandler(py.handler_id_pdone)
-        killAnonymousEventHandler(py.handler_id_perr)
-        py.handler_id_done = nil
-        py.handler_id_err = nil
-        py.handler_id_gdone = nil
-        py.handler_id_gerr = nil
-        py.handler_id_pdone = nil
-        py.handler_id_perr = nil
+    if py._handler_id_post_done then
+        killAnonymousEventHandler(py._handler_id_post_done)
+        killAnonymousEventHandler(py._handler_id_post_err)
+        killAnonymousEventHandler(py._handler_id_get_done)
+        killAnonymousEventHandler(py._handler_id_get_err)
+        killAnonymousEventHandler(py._handler_id_put_done)
+        killAnonymousEventHandler(py._handler_id_put_err)
+        py._handler_id_post_done = nil
+        py._handler_id_post_err = nil
+        py._handler_id_get_done = nil
+        py._handler_id_get_err = nil
+        py._handler_id_put_done = nil
+        py._handler_id_put_err = nil
     end
-    py._clear_callbacks()
     if py.timer then
         killTimer(py.timer)
         py.timer = nil
@@ -77,140 +79,188 @@ function py.exit()
         end
         py.handler = {}
     end
-    py._clear_callbacks()
 end
 
-function py._clear_callbacks()
-    local cbs = py.callbacks
-    py.callbacks = {}
-    for _,cb in pairs(py.callbacks) do
-        cb(false, "Disconnected")
+function py._reset_connection()
+    if py.connected then
+        py.connected = false
+        raiseEvent("PyDisconnect", py.url)
+
+        if py.file ~= nil then  -- most likely dead
+            py.file:close()
+            py.file = nil
+        end
+        py.send_buf = {}
+
+        local cbs = py.callbacks
+        py.callbacks = {}
+        for _,cb in pairs(py.callbacks) do
+            cb(false, "Disconnected")
+        end
+    end
+    if not py.get_open and not py.put_open then 
+        py._run_timer()
     end
 end
 
-function py.post(msg)
-    msg = yajl.to_string(msg) .. "\n"
-    if py.file then
-        py.file:write(string.len(msg) .. "\n" .. msg)
-        py.file:flush()
-    else
-        py._post(msg)
+function py._run_timer()
+    if py.timer == nil then
+        py.backoff = py.backoff * 2 + 0.1
+        if py.backoff &gt; 5 then py.backoff = 5 end
+        py.timer = tempTimer(py.backoff, py._retry)
     end
+
 end
 
-function py._post(msg)
-    py.post_open = py.post_open + 1
-    local ok,url
-    if msg == nil and getHTTP ~= nil then  -- mod by Smurf
-        ok,url = getHTTP(py.url)
-    else
-        if msg == nil then
-            if py.post_open &gt; 1 then
-                py.post_open = py.post_open - 1
+function py._do_http()
+    if #py.send_buf &gt; 0 then
+        if py.file then
+            msg = py.send_buf
+            py.send_buf = {}
+            for _,m in ipairs(msg) do
+        print("SEND",m)
+                m = yajl.to_string(m) .. "\n"
+                py.file:write(string.len(m) .. "\n" .. m)
+            end
+            py.file:flush()
+        elseif not py.put_open then
+            py.put_open = true
+            msg = py.send_buf
+            py.send_buf = {}
+            msg = yajl.to_string(msg) .. "\n"
+            local ok,url = putHTTP(msg, py.url, {["Content-Type"]="application/json"})
+            if not ok then
+                py._put_error(nil,"PUT failed", py.url)
                 return
             end
-            msg = yajl.to_string({action="poll"}).."\n"
-        end
-        if py.post_open &gt; 1 then
-            ok,url = putHTTP(msg, py.url, {["Content-Type"]="application/json"})
+        end    
+    end
+    if not py.get_open then
+        print("DO GET",py.get_open)
+        py.get_open = true
+        local ok,url
+        if getHTTP ~= nil then  -- mod by Smurf
+            ok,url = getHTTP(py.url)
         else
+            msg = yajl.to_string({action="poll"}).."\n"
             ok,url = postHTTP(msg, py.url, {["Content-Type"]="application/json"})
         end
-    end
-    if ok then
-        if url ~= "" then
-            py.url = url
+        if not ok then
+            py._get_error(nil,"GET/POST failed", py.url)
+            return
         end
-    else
-        py.postError(nil, "POST failed", py.url)
     end
 end
 
-function py.postDone(_, url, msg)
+function py._send(msg)
+    print("QUEUE",msg)
+    py.send_buf[#py.send_buf+1] = msg
+end
+
+function py._put_done(_, url, msg)
     if url ~= py.url then return end
-    py.post_open = py.post_open - 1
-    py.backoff = 0
+    if not py.put_open then return end
+    py.put_open = false
+
+    py._do_http()
+end
+
+function py._get_done(_, url, msg)
+    if url ~= py.url then return end
+    if not py.get_open then return end
+    py.get_open = false
+    print("DONE GET",msg)
+    
     msg = yajl.to_value(msg)
     for _,m in ipairs(msg) do
-        py.process(m)
+        py._process(m)
     end
-    py._poll()
+
+    py._do_http()
 end
 
-function py._poll()
-    if py.post_open &gt; 0 then return end
-    py._post()
-end
-
-function py.process(msg)
+function py._process(msg)
     if msg.action then
         local res = {pcall(py.action[msg.action], msg)}
-        local r = res[1]
+        local ok = res[1]
         table.remove(res, 1)
-        if r then
-            if not msg.seq then return end
+        if ok then
+            if not msg.seq then return end -- no reply expected
             res = {result=res}
         else
             res = {error=res[1]}
         end
         res.seq = msg.seq -- no-op if missing
-        py.post(res)
-    else
-        print("PY: No idea how to handle:",msg)
+        py._send(res)
+        return
     end
+    print("PY: No idea how to handle:",msg)
 end
 
-function py.call(name, args, callback)
+
+function py._put_error(_, msg, url)
+    if url ~= py.url then return end
+    if not py.put_open then return end
+    py.put_open = false
+    
+    py._reset_connection()
+end
+
+function py._get_error(_, msg, url)
+print("A")
+    if url ~= py.url then return end
+  print("B",py.get_open)
+    if not py.get_open then return end
+  print("C")
+    py.get_open = false
+    
+    py._reset_connection()
+end
+
+function py._retry()
+    py.timer = nil
+    py._send({action="init"})
+    py._do_http()
+end
+
+-- more public methods
+
+-- call this Python method (must be registered), then
+-- call the callback with "true" and the result(s)
+--                or with "false" and the error message
+function py.call(callback, name, ...)
     assert(py.connected, "not connected")
     seq = py.seq+1
     py.seq = seq
     py.callbacks[seq] = callback
-    py.post({action="call", call=name, data=args, cseq=seq})
+    py._send({action="call", call=name, data={...}, cseq=seq})
+    py._do_http()
 end
 
-function py.postError(_, msg, url)
-    if url ~= py.url then return end
-    py.post_open = py.post_open - 1
-    if py.connected then
-        py.connected = false
-        raiseEvent("PyDisconnect", py.url)
-    end
-    if py.file ~= nil then  -- most likely dead
-        py.file:close()
-        py.file = nil
-    end
-    py._clear_callbacks()
-    if py.timer == nil then
-        py.backoff = py.backoff * 2 + 0.1
-        if py.backoff &gt; 5 then py.backoff = 5 end
-        py.timer = tempTimer(py.backoff, py.postRetry)
-    end
-end
+-- calls from python
 
-function py.postRetry()
-    py.timer = nil
-    py.post({action="init"})
-end
-
+-- setup
 function py.action.init(msg)
-    if py.file then
-        py.file:close()
-        py.file = nil
+    if py.connected then
+        print("PY: already connected??")
+        return
     end
     if msg.fifo then
         py.file = io.open(msg.fifo, "w")
     end
     -- otherwise use HTTP
     py.connected = true
-    py.post({action="up"})
+    py._send({action="up"})
     raiseEvent("PyConnect", py.url)
-    py._poll()
+    py._do_http()
 end
 
+-- keepalive
 function py.action.ping(msg)
     return "Pong"
 end
 
+-- forward an event
 function py.action.handle(msg)
     local evt = msg.event
     if py.handler[evt] then return false end
@@ -221,6 +271,7 @@ function py.action.handle(msg)
     return true
 end
 
+-- no longer forward an event
 function py.action.unhandle(msg)
     local evt = msg.event
     if not py.handler[evt] then return false end
@@ -229,6 +280,8 @@ function py.action.unhandle(msg)
     return true
 end
 
+-- call a function or method
+-- optionally store the result
 function py.action.call(msg)
     local args = msg.args or {}
     local self,func = nil,_G
@@ -237,14 +290,10 @@ function py.action.call(msg)
         self = func
         func = func[name]
     end
+    if msg.meth then table.insert(args,1,self) end
     if msg.dest then
         assert(#msg.dest &gt; 0, "no empty name!")
-        local res
-        if msg.meth then
-            res = func(self, unpack(args))
-        else
-            res = func(unpack(args))
-        end
+        local res = func(unpack(args))
         local self,old = nil,_G
         for _,name in ipairs(msg.dest) do
             self = old
@@ -252,14 +301,11 @@ function py.action.call(msg)
         end
         self[name] = msg.value
         return
-   
-    elseif msg.meth then
-        return func(self, unpack(args))
-    else
-        return func(unpack(args))
     end
+    return func(unpack(args))
 end
 
+-- get a value
 function py.action.get(msg)
     assert(#msg.name &gt; 0, "no empty name!")
     val = _G
@@ -269,6 +315,7 @@ function py.action.get(msg)
     return val
 end
 
+-- set a value
 function py.action.set(msg)
     local self,old = nil,_G
     assert(#msg.name &gt; 0, "no empty name!")
@@ -280,10 +327,12 @@ function py.action.set(msg)
     if msg.old then return old end  -- otherwise return nothing
 end
 
+-- raise an event
 function py.action.event(msg)
-    raiseEvent(msg.name, unpack(msg.args))
+    raiseEvent(msg.name, unpack(msg.args or {}))
 end
 
+-- return the result of a "py.call()"
 function py.action.result(msg)
     local seq = msg.cseq
     local cb = py.callbacks[seq]

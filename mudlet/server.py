@@ -110,7 +110,8 @@ class Server:
             msg = await request.get_data()
             if msg:
                 msg = json.loads(msg)
-                await self._msg_in(msg)
+                for m in msg:
+                    await self._msg_in(m)
             msg = json.dumps([])
             return Response(msg, content_type="application/json")
 
@@ -145,6 +146,7 @@ class Server:
             await self._msg_in(msg)
 
     async def _msg_in(self, msg):
+        logger.debug("IN %r",msg)
         seq = msg.get("seq",None)
         if seq is not None:
             try:
@@ -312,6 +314,7 @@ class Server:
                 n.cancel_scope.cancel()
 
     def _send(self, data):
+        logger.debug("OUT %r",msg)
         self._to_send.append(data)
         self._to_send_wait.set()
     
