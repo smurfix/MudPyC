@@ -14,16 +14,15 @@ Mudlet can do HTTP requests in the background, so we send a "long poll" PUSH
 request to the Python server. The reply contains the incoming messages (as
 a JSON array).
 
-The other direction does not use HTTP because that would be too expensive;
-there are a lot of messages as you walk around your MUD. Instead, we open a
-Unix FIFO and write JSON to it. Since JSON is UTF-8 and not self-delimiting,
-each message is prefixed with its length (as text) plus a linefeed.
+There are a couple of optimizations to be had:
 
-The initial message form Mudlet contains ``{action="init"}`` and is sent as
-the PUSH requests's body, as there's no FIFO yet. The server's reply
-contains the path to use.
+* if "httpGET" is available, we use that instead of an empty PUSH.
 
-The only required paramter on the Mudlet side is the port number.
+* if the platform supports Unix FIFO nodes in the file system, we use that
+  for sending to Python, as that's faster and less expensive than a HTTP
+  request per message.
+
+The only required parameter on the Mudlet side is the port number.
 
 Errors / exceptions are generally propagated to the caller.
 
@@ -33,12 +32,20 @@ Errors / exceptions are generally propagated to the caller.
 	alternate async framework for Python, i.e. it is *not* compatible with
 	asyncio.
 
-	There is a compatibility layer, trio-asyncio, but it's an inter
+	There is a compatibility layer, trio-asyncio, but it's not really good
+	for production use.
+
 	There's another compatibility layer, anyio, but that is currently being
 	rewritten and this author doesn't like doing any work twice.
 
 	This code will become anyio-compatible, and thus will work
 	with asyncio in addition to Trio, sometime later in 2020.
+
+	That being said, Trio's programming paradigm ("Structured Concurrency")
+	has a lot of advantages. You might want to look at it somewhat more
+	closely.
+
+License: GPLv3 or later.
 
 +++++++++++++++++
 Usage from Mudlet
