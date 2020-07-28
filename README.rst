@@ -26,7 +26,7 @@ The only required parameter on the Mudlet side is the port number.
 
 Errors / exceptions are generally propagated to the caller.
 
-.. note::
+.. note:
 
 	The Python code uses `Trio <https://trio.readthedocs.io>`_. Trio is an
 	alternate async framework for Python, i.e. it is *not* compatible with
