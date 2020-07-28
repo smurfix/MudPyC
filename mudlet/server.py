@@ -138,12 +138,17 @@ class Server:
         fx = os.open(self.cfg['fifo'], os.O_RDONLY|os.O_NDELAY)
         f = OSLineReader(fx)
         task_status.started(fx)
-        while True:
-            line = await f.readline()
-            msglen = int(line)
-            msg = await f.read_all(msglen)
-            msg = json.loads(msg)
-            await self._msg_in(msg)
+        try:
+            while True:
+                line = await f.readline()
+                msglen = int(line)
+                msg = await f.read_all(msglen)
+                msg = json.loads(msg)
+                await self._msg_in(msg)
+        except EnvironmentError as err:
+            if err.errno == errno.EBADF:
+                return  # closed from outside
+            raise
 
     async def _msg_in(self, msg):
         logger.debug("IN %r",msg)
@@ -178,9 +183,11 @@ class Server:
                 for q in list(qq):
                     try:
                         q.send_nowait(msg)
-                    except trio.WouldBlock:
+                    except (trio.WouldBlock,trio.ClosedResourceError):
                         await q.aclose()
                         qdel.add(q)
+                if qdel:
+                    qq -= qdel
             await _disp(self._handlers.get(event, ()))
             await _disp(self._handlers.get("any", ()))
             return
@@ -250,7 +257,10 @@ class Server:
         try:
             yield qr
         finally:
-            qq.remove(qw)
+            try:
+                qq.remove(qw)
+            except KeyError:
+                pass
             await qw.aclose()
             if not qq:
                 await self.rpc(action="unhandle", event=event)
