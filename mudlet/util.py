@@ -134,7 +134,7 @@ class OSLineReader:
 
     async def read_all(self, n_bytes):
         while len(self.buf) < n_bytes:
-            await self.fill_buf(max(1024, n_bytes.len(self.buf)))
+            await self.fill_buf(max(1024, n_bytes-len(self.buf)))
         return await self.read(n_bytes)
 
 class CancelledError(RuntimeError):
