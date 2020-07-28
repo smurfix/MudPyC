@@ -1,0 +1,76 @@
+=================
+Mudlet vs. Python
+=================
+
+Assume you are really annoyed with Lua and want to use a reasonable
+scripting language. Say, Python.
+
+This module lets you do that.
+
+It establishes a bidirectional link between Mudlet/Lua and Python and
+exchanges structured messages between the two.
+
+Mudlet can do HTTP requests in the background, so we send a "long poll" PUSH
+request to the Python server. The reply contains the incoming messages (as
+a JSON array).
+
+The other direction does not use HTTP because that would be too expensive;
+there are a lot of messages as you walk around your MUD. Instead, we open a
+Unix FIFO and write JSON to it. Since JSON is UTF-8 and not self-delimiting,
+each message is prefixed with its length (as text) plus a linefeed.
+
+The initial message form Mudlet contains ``{action="init"}`` and is sent as
+the PUSH requests's body, as there's no FIFO yet. The server's reply
+contains the path to use.
+
+The only required paramter on the Mudlet side is the port number.
+
+Errors / exceptions are generally propagated to the caller.
+
++++++++++++++++++
+Usage from Mudlet
++++++++++++++++++
+
+Call ``py.init(PORT)``. A ``PyConnect`` event is raised when the
+connection is established.
+
+A ``PyDisconnect`` event is raised when the connection terminates.
+
+Call ``py.call(NAME, PARAMS, CALLBACK)`` to call a function on the Python
+side (needs to register, see below). ``CALLBACK`` is called with ``true``
+and the result(s), or ``false`` and an error message.
+
++++++++++++++++++
+Usage from Python
++++++++++++++++++
+
+See ``example/basic.py`` for a simple server that emits the info of every
+room you're entering. (Requires adjustment for your MUD.)
+
+Call ``await s.mud.NAME`` to retrieve the Mudlet variable NAME. The name
+may include dots; the value must be JSON-encodeable.
+
+Call ``await s.mud.NAME._set(X)`` to set the Mudlet variable NAME to X. The
+name may include dots; the value must be JSON-encodeable.
+
+Call ``await s.mud.NAME(ARGS)`` to call the Mudlet function NAME. The name
+may include dots; the return value(s) must be JSON-encodeable. If you
+set ``meth=True`` the function is treated as a method (in Lua: a colon
+in front of the name's last component, e.g. ``foo:bar()``). If you set
+``dest`` to a list of names, the (first) result of the function is assigned
+to that name instead of being returned.
+
+Open an async context + async loop using ``s.events(NAME)`` to listen
+for the Mudlet event ``NAME``.
+
+Call ``s.register_call(NAME, FUNC)`` to register ``FUNC`` as being callable
+from Mudlet; see above. If the result is a list/tuple, the Lua callback
+will receive multiple arguments.
+
+Call ``s.event(NAME, ARGS…)`` to raise an event within Mudlet.
+
+The server's async context terminates with an ``EOFError`` if the Mudlet
+connection ends, or a ``trio.TooSlowError`` if the server's regular Ping is
+not answered within a couple of seconds. Otherwise it continues until
+cancelled.
+
