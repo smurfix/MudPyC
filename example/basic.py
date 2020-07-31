@@ -25,9 +25,21 @@ class S(Server):
 
         self.register_call("hello", self.hello)
 
-        async with self.events("gmcp.MG.room.info") as h:
+        async with self.event_monitor("*") as h:
             async for msg in h:
-                info = await self.mud.gmcp.MG.room.info
+                print(msg)
+
+        # example. The code below isn't reached because the loop above
+        # doesn't terminate.
+        async with self.event_monitor("gmcp.MG.room.info") as h:
+            async for msg in h:
+                args = msg.args
+                if len(args) > 2:
+                    # The event sender should add this but we'll check
+                    # anyway
+                    info = args[2]
+                else:
+                    info = await self.mud.gmcp.MG.room.info
                 print("ROOM",info)
 
 async def main():

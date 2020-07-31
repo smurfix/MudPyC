@@ -252,7 +252,7 @@ class Server:
             # Mudlet may time out after 4 or 5 seconds
 
     @asynccontextmanager
-    async def events(self, event="any"):
+    async def event_monitor(self, event="any"):
         """
         Listen to some event from Mudlet.
         """
@@ -363,6 +363,9 @@ class Server:
     def register_call(self, name, callback):
         if name in self._calls:
             raise KeyError("Already registered")
+        if hasattr(self, "called_"+name):
+            raise KeyError("Already a function")
+
         self._calls[name] = callback
 
     def unregister_call(self, name):
