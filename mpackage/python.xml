@@ -222,10 +222,21 @@ end
 --                or with "false" and the error message
 function py.call(callback, name, ...)
     assert(py.connected, "not connected")
-    seq = py.seq+1
-    py.seq = seq
-    py.callbacks[seq] = callback
-    py._send({action="call", call=name, data={...}, cseq=seq})
+    local seq
+    local data={...}
+    if type(callback) == "string" then
+        table.insert(data,1,name)
+        name=callback
+        callback=nil
+    end
+    if callback then
+        seq = py.seq+1
+        py.seq = seq
+        py.callbacks[seq] = callback
+    else
+        seq=nil
+    end
+    py._send({action="call", call=name, data=data, cseq=seq})
     py._do_http()
 end
 
