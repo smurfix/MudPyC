@@ -13,6 +13,7 @@ from functools import partial
 from inspect import iscoroutine
 
 from .util import attrdict, combine_dict, OSLineReader, ValueEvent
+from .alias import Alias
 import trio
 import os
 import errno
@@ -41,7 +42,7 @@ class _CallMudlet:
 
         return _CallMudlet(self.server, self.name+[k], self.meth)
 
-    async def __call__(self, *args, meth=None, dest=None):
+    async def __call__(self, *args, meth=None, dest=None, noreply=None):
         msg = {}
         if meth is None:
             meth = self.meth
@@ -49,7 +50,7 @@ class _CallMudlet:
             msg['meth'] = meth
         if dest is not None:
             msg['dest'] = dest
-        return await self.server.rpc(action="call", name=self.name, args=args, **msg)
+        return await self.server.rpc(action="call", name=self.name, args=args, noreply=noreply, **msg)
 
     def __await__(self):
         return self._get().__await__()
@@ -323,6 +324,7 @@ class Server:
                     async with trio.open_nursery() as nn:
                         for event in self._handlers.keys():
                             await nn.start_soon(partial(self.rpc,action="handle", event=event))
+                self.do_register_aliases()
                 yield self
             finally:
                 if fx is not None:
@@ -338,7 +340,10 @@ class Server:
         self._to_send.append(data)
         self._to_send_wait.set()
     
-    async def rpc(self, **kw):
+    async def rpc(self, noreply=False, **kw):
+        if noreply:
+            self._send(kw)
+            return
         kw['seq'] = seq = self._seq
         self._seq += 1
         self._replies[seq] = ev = trio.Event()
@@ -370,4 +375,29 @@ class Server:
 
     def unregister_call(self, name):
         del self._calls[name]
+
+    def do_register_aliases(self):
+        self.alias = ali = Alias(self, "#", "Alias shortcuts")
+        for k,v in vars(self).items():
+            if k.startswith('alias_'):
+                al = ali.at(k[6:], create=True)
+                al.helptext = v.__doc__
+                al.func = v
+
+    async def called_alias(self, cmd):
+        ali = self.alias
+        while cmd:
+            if cmd[0] == " ":
+                break
+            try:
+                ali = ali.sub[cmd[0]]
+            except KeyError:
+                if cmd[0] == "?":
+                    await ali.help()
+                else:
+                    await ali.help("Unknown alias", print_sub=True)
+                return
+            else:
+                cmd = cmd[1:]
+        await ali.run(cmd.strip())
 

@@ -3,7 +3,34 @@
 <MudletPackage version="1.001">
 	<TriggerPackage />
 	<TimerPackage />
-	<AliasPackage />
+	<AliasPackage>
+		<AliasGroup isActive="yes" isFolder="yes">
+			<name>Python</name>
+			<script></script>
+			<command></command>
+			<packageName></packageName>
+			<regex></regex>
+			<Alias isActive="yes" isFolder="no">
+				<name>Hash-anything goes to Python</name>
+				<script>local m = matches[2]
+if m == "py+" and not py.connected then
+    print("Connecting.")
+    py.init(23817)
+elseif string.sub(m,1,3) == "py+" and lua_isnumber(string.sub(m,4)) then
+    print("Connecting, port " .. string.sub(m,2))
+    py.init(0+string.sub(m,2))
+elseif m == "py-" and py.connected then
+    print("Disconnecting.")
+    py.exit()
+else
+    py.call("alias", matches[2])
+end</script>
+				<command></command>
+				<packageName></packageName>
+				<regex>^#(.*)$</regex>
+			</Alias>
+		</AliasGroup>
+	</AliasPackage>
 	<ActionPackage />
 	<ScriptPackage>
 		<ScriptGroup isActive="yes" isFolder="yes">
