@@ -41,7 +41,7 @@ class _CallMudlet:
 
         return _CallMudlet(self.server, self.name+[k], self.meth)
 
-    async def __call__(self, name, *args, meth=None, dest=None):
+    async def __call__(self, *args, meth=None, dest=None):
         msg = {}
         if meth is None:
             meth = self.meth
@@ -49,7 +49,7 @@ class _CallMudlet:
             msg['meth'] = meth
         if dest is not None:
             msg['dest'] = dest
-        return await self.server.rpc(action="call_fn", fn=self.name, args=args, **msg)
+        return await self.server.rpc(action="call", name=self.name, args=args, **msg)
 
     def __await__(self):
         return self._get().__await__()
