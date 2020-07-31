@@ -156,7 +156,7 @@ end
 
 function py._put_done(_, url, msg)
     if url ~= py.url then return end
-    if not py.put_open then return end
+    if not py.put_open then print("PY: putHTTP without PUT?") return end
     py.put_open = false
 
     py._do_http()
@@ -164,14 +164,13 @@ end
 
 function py._get_done(_, url, msg)
     if url ~= py.url then return end
-    if not py.get_open then return end
+    if not py.get_open then print("PY: getHTTP without GET?") return end
     py.get_open = false
     
     msg = yajl.to_value(msg)
     for _,m in ipairs(msg) do
         py._process(m)
     end
-
     py._do_http()
 end
 
