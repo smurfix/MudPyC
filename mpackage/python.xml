@@ -258,7 +258,8 @@ function py.action.handle(msg)
     local evt = msg.event
     if py.handler[evt] then return false end
     local function hdl(...)
-        py.post({event=evt, args={...}})
+        py._send({event=evt, args={...}})
+        py._do_http()
     end
     py.handler[hdl] = registerAnonymousEventHandler(evt, hdl)
     return true
