@@ -268,7 +268,12 @@ function py.action.handle(msg)
     local evt = msg.event
     if py.handler[evt] then return false end
     local function hdl(...)
-        py._send({event=evt, args={...}})
+        local args = {...}
+        if py.url == args[2] then return end -- do not send my events
+        if string.sub(args[1],1,5) == "gmcp." then -- missing
+            args[#args+1] = loadstring(args[1])()
+        end
+        py._send({event=evt, args=args})
         py._do_http()
     end
     py.handler[hdl] = registerAnonymousEventHandler(evt, hdl)
