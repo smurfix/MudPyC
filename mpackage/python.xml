@@ -115,7 +115,7 @@ end
 function py._do_http()
     if #py.send_buf &gt; 0 then
         if py.file then
-            msg = py.send_buf
+            local msg = py.send_buf
             py.send_buf = {}
             for _,m in ipairs(msg) do
                 m = yajl.to_string(m) .. "\n"
@@ -124,7 +124,7 @@ function py._do_http()
             py.file:flush()
         elseif not py.put_open then
             py.put_open = true
-            msg = py.send_buf
+            local msg = py.send_buf
             py.send_buf = {}
             msg = yajl.to_string(msg) .. "\n"
             local ok,url = putHTTP(msg, py.url, {["Content-Type"]="application/json"})
