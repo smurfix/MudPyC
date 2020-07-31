@@ -294,7 +294,7 @@ end
 function py.action.call(msg)
     local args = msg.args or {}
     local self,func = nil,_G
-    assert(#name &gt; (msg.meth and 1 or 0), "no empty name!")
+    assert(#msg.name &gt; (msg.meth and 1 or 0), "no empty name!")
     for _,name in ipairs(msg.name) do
         self = func
         func = func[name]
