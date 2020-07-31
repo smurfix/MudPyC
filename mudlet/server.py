@@ -201,9 +201,13 @@ class Server:
         pass
 
     async def _action_call(self, msg):
-        seq = msg["cseq"]
+        seq = msg.get("cseq", None)
         try:
-            res = self._calls[msg["call"]](*msg["data"])
+            data = msg["data"] or []
+            res = getattr(self, "called_"+msg["call"], None)
+            if res is None:
+                res = self._calls[msg["call"]]
+            res = res(*data)
             if iscoroutine(res):
                 res = await res
             if isinstance(res, ValueEvent):
@@ -211,13 +215,18 @@ class Server:
         except Exception as e:
             logger.exception("Error calling %r", msg)
             res = dict(error=str(e))
+            if seq is None:
+                logger.exception("Ignored error: %r", msg, exc_info=e)
+            else:
+                logger.warning("Error (sent to Lua): %r", msg, exc_info=e)
         else:
             if not isinstance(res, (list, tuple)):
                 res = [res]
             res = dict(result=res)
-        res["cseq"] = seq
-        res["action"] = "result"
-        self._send(res)
+        if seq is not None:
+            res["cseq"] = seq
+            res["action"] = "result"
+            self._send(res)
 
     async def _action_init(self, msg):
         res = dict(action="init")
