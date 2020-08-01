@@ -50,13 +50,21 @@
 			<Alias isActive="yes" isFolder="no">
 				<name>Hash-anything goes to Python</name>
 				<script>local m = matches[2]
-if m == "py+" and not py.connected then
-    print("Connecting.")
-    py.init(23817)
+if m == "py+" then
+    if not py.connected then
+        print("Connecting.")
+        py.init(23817)
+    else
+        print("Already connected.")
+    end
 elseif string.sub(m,1,3) == "py+" and lua_isnumber(string.sub(m,4)) then
-    print("Connecting, port " .. string.sub(m,2))
-    py.init(0+string.sub(m,2))
-elseif m == "py-" and py.connected then
+    if not py.connected then
+        print("Connecting, port " .. string.sub(m,4))
+        py.init(0+string.sub(m,4))
+    else
+        print("Already connected.")
+    end
+elseif m == "py-" then
     print("Disconnecting.")
     py.exit()
 else
@@ -88,7 +96,10 @@ py = py or {}
 py.action = py.action or {}
 
 function py.init(port, url)
-    assert(py._handler_id_post_done == nil, "Already running")
+    if py._handler_id_post_done ~= nil then
+        py.dbg("Already running")
+        return false
+    end
     py.handler = py.handler or {}
     py.callbacks = py.callbacks or {}
     py.put_open = false
@@ -96,10 +107,14 @@ function py.init(port, url)
     py.backoff = 0
     py.seq = 0
     py.connected = false
+    py.debug = py.debug or 0
     py.send_buf = {}
     
     py.url = url or "http://127.0.0.1:" .. port .. "/json"
-    
+    py.url_get = py.url
+    py.url_put = py.url
+    py.set_debug()
+    py.dbg("Setting up handlers")
     py._handler_id_post_done = registerAnonymousEventHandler("sysPostHttpDone", py._get_done)
     py._handler_id_post_err = registerAnonymousEventHandler("sysPostHttpError", py._get_error)
     py._handler_id_get_done = registerAnonymousEventHandler("sysGetHttpDone", py._get_done)
@@ -108,10 +123,28 @@ function py.init(port, url)
     py._handler_id_put_err = registerAnonymousEventHandler("sysPutHttpError", py._put_error)
     py._send({action="init"})
     py._do_http()
+    return true
 end
 
+function py.set_debug(val)
+    if val == nil then val = py.debug else py.debug = val end
+    if val == 0 then
+        py.dbg = function(...) end
+        py.dbg2 = function(...) end
+    elseif val == 1 then
+        py.dbg = function(...) end
+        py.dbg2 = function(...) debugc(...) end
+    else
+        py.dbg = function(...) debugc(...) end
+        py.dbg2 = function(...) debugc(...) end
+    end
+end
+py.set_debug()
+
 function py.exit()
+    py.dbg("Shutting down")
     if py._handler_id_post_done then
+        print("Disconnected.")
         killAnonymousEventHandler(py._handler_id_post_done)
         killAnonymousEventHandler(py._handler_id_post_err)
         killAnonymousEventHandler(py._handler_id_get_done)
@@ -125,28 +158,23 @@ function py.exit()
         py._handler_id_put_done = nil
         py._handler_id_put_err = nil
     end
-    if py.timer then
-        killTimer(py.timer)
-        py.timer = nil
-    end
-    if py.file then
-        py.file:close()
-        py.file = nil
-    end
-    if py.connected then
-        raiseEvent("PyDisconnect", py.url)
-        py.connected = false
-    end
     if py.handler then
         for _,hdl in pairs(py.handler) do
             killAnonymousEventHandler(hdl)
         end
         py.handler = {}
     end
+    if py.timer then
+        killTimer(py.timer)
+        py.timer = nil
+    end
+    py._reset_connection(true)
 end
 
-function py._reset_connection()
+function py._reset_connection(no_timer)
     if py.connected then
+        py.dbg("Reset!")
+        print("Disconnected. Retrying.")
         py.connected = false
         raiseEvent("PyDisconnect", py.url)
 
@@ -162,7 +190,7 @@ function py._reset_connection()
             cb(false, "Disconnected")
         end
     end
-    if not py.get_open and not py.put_open then 
+    if not no_timer and not py.get_open and not py.put_open then 
         py._run_timer()
     end
 end
@@ -182,7 +210,8 @@ function py._do_http()
             local msg = py.send_buf
             py.send_buf = {}
             for _,m in ipairs(msg) do
-                m = yajl.to_string(m) .. "\n"
+                m = yajl.to_string(m)
+                py.dbg("SendFile",m)
                 py.file:write(string.len(m) .. "\n" .. m)
             end
             py.file:flush()
@@ -190,10 +219,13 @@ function py._do_http()
             py.put_open = true
             local msg = py.send_buf
             py.send_buf = {}
-            msg = yajl.to_string(msg) .. "\n"
+            msg = yajl.to_string(msg)
+            py.dbg("SendPut",msg)
             local ok,url = putHTTP(msg, py.url, {["Content-Type"]="application/json"})
-            if not ok then
-                py._put_error(nil,"PUT failed", py.url)
+            if ok then
+                py.url_put = url
+            else
+                py._put_error(nil,"PUT failed", py.url_put)
                 return
             end
         end    
@@ -202,13 +234,17 @@ function py._do_http()
         py.get_open = true
         local ok,url
         if getHTTP ~= nil then  -- mod by Smurf
+            py.dbg("StartGet")
             ok,url = getHTTP(py.url)
         else
-            msg = yajl.to_string({action="poll"}).."\n"
+            msg = yajl.to_string({action="poll"})
+            py.dbg("StartPost")
             ok,url = postHTTP(msg, py.url, {["Content-Type"]="application/json"})
         end
-        if not ok then
-            py._get_error(nil,"GET/POST failed", py.url)
+        if ok then
+            py.url_get = url
+        else
+            py._get_error(nil,"GET/POST failed", py.url_get)
             return
         end
     end
@@ -219,16 +255,18 @@ function py._send(msg)
 end
 
 function py._put_done(_, url, msg)
-    if url ~= py.url then return end
-    if not py.put_open then print("PY: putHTTP without PUT?") return end
+    if url ~= py.url_put then return end
+    if not py.put_open then py.dbg2("PY: putHTTP without PUT?") return end
+    py.dbg2("put done")
     py.put_open = false
 
     py._do_http()
 end
 
 function py._get_done(_, url, msg)
-    if url ~= py.url then return end
-    if not py.get_open then print("PY: getHTTP without GET?") return end
+    if url ~= py.url_get then return end
+    if not py.get_open then py.dbg("PY: getHTTP without GET?") return end
+    py.dbg2("get done")
     py.get_open = false
     
     msg = yajl.to_value(msg)
@@ -240,6 +278,7 @@ end
 
 function py._process(msg)
     if msg.action then
+        py.dbg("Process", yajl.to_string(msg))
         local res = {pcall(py.action[msg.action], msg)}
         local ok = res[1]
         table.remove(res, 1)
@@ -253,21 +292,23 @@ function py._process(msg)
         py._send(res)
         return
     end
-    print("PY: No idea how to handle:",msg)
+    py.dbg("PY: No idea how to handle:",yajl.to_string(msg))
 end
 
 
 function py._put_error(_, msg, url)
-    if url ~= py.url then return end
-    if not py.put_open then return end
+    if url ~= py.url_put then return end
+    if not py.put_open then py.dbg2("PUT err but not open?",msg) return end
+    py.dbg2("PUT error", msg)
     py.put_open = false
     
     py._reset_connection()
 end
 
 function py._get_error(_, msg, url)
-    if url ~= py.url then return end
-    if not py.get_open then return end
+    if url ~= py.url_get then return end
+    if not py.get_open then py.dbg2("GET err but not open?") return end
+    py.dbg2("GET error", msg)
     py.get_open = false
     
     py._reset_connection()
@@ -285,13 +326,17 @@ end
 -- call the callback with "true" and the result(s)
 --                or with "false" and the error message
 function py.call(callback, name, ...)
-    assert(py.connected, "not connected")
     local seq
     local data={...}
     if type(callback) == "string" then
         table.insert(data,1,name)
         name=callback
         callback=nil
+    end
+    if not py.connected then
+        py.dbg("Not connected calling",name)
+        if callback ~= nil then callback(false,"not connected") end
+        return
     end
     if callback then
         seq = py.seq+1
@@ -309,7 +354,7 @@ end
 -- setup
 function py.action.init(msg)
     if py.connected then
-        print("PY: already connected??")
+        py.dbg("init but already connected??")
         return
     end
     if msg.fifo then
@@ -319,6 +364,7 @@ function py.action.init(msg)
     py.connected = true
     py._send({action="up"})
     raiseEvent("PyConnect", py.url)
+    print("Connected!")
     py._do_http()
 end
 
@@ -327,20 +373,36 @@ function py.action.ping(msg)
     return "Pong"
 end
 
+local function getvalue(s)
+    local val = _G
+    local sep = "."
+    for w in string.gmatch(s,"%w+") do
+        val = val[w]
+        if val == nil then return end
+    end
+    return val
+end
+
 -- forward an event
 function py.action.handle(msg)
     local evt = msg.event
     if py.handler[evt] then return false end
+    
     local function hdl(...)
         local args = {...}
-        if py.url == args[2] then return end -- do not send my events
-        if string.sub(args[1],1,5) == "gmcp." then -- missing
-            args[#args+1] = loadstring(args[1])()
+        if not py.connected then return end
+        if py.url_get == args[2] then return end -- do not send my events
+        if py.url_put == args[2] then return end -- do not send my events
+        
+        if string.sub(args[1],9) == "HttpError" then py.dbg2("Err",py.url,yajl.to_string(args)) return end
+        if string.sub(args[1],1,5) == "gmcp." then -- add the value to the event
+            -- TODO they're generated with increasing detail. Only send the last one.
+            args[#args+1] = getvalue(args[1])
         end
         py._send({event=evt, args=args})
         py._do_http()
     end
-    py.handler[hdl] = registerAnonymousEventHandler(evt, hdl)
+    py.handler[evt] = registerAnonymousEventHandler(evt, hdl)
     return true
 end
 
@@ -348,8 +410,8 @@ end
 function py.action.unhandle(msg)
     local evt = msg.event
     if not py.handler[evt] then return false end
-    killAnonymousEventHandler(py.handler[hdl])
-    py.handler[hdl] = nil
+    killAnonymousEventHandler(py.handler[evt])
+    py.handler[evt] = nil
     return true
 end
 
