@@ -214,7 +214,6 @@ class Server:
             if isinstance(res, ValueEvent):
                 res = await res.get()
         except Exception as e:
-            logger.exception("Error calling %r", msg)
             res = dict(error=str(e))
             if seq is None:
                 logger.exception("Ignored error: %r", msg, exc_info=e)
