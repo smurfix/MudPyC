@@ -70,7 +70,7 @@ class Alias:
         """collect my prompt"""
         return (self.parent.prompt if self.parent else "") + self.cmd
 
-    async def print_help(self, err=None, print_sub=None):
+    async def print_help(self, err=None, with_sub=None):
         """
         Print a (sub) command's help text,
         including one-liners for direct subcommands.
@@ -78,7 +78,7 @@ class Alias:
         Params:
             err:
                 error message, printed before the help text if given.
-            print_sub:
+            with_sub:
                 controls whether to print one-liners for subcommands.
                 Defaults to True iff no error message is used.
         """
@@ -86,22 +86,22 @@ class Alias:
         p = self.prompt
         if err:
             ht.append(p + "  : " + err)
-        if print_sub is None:
-            print_sub = err is None
-        if self.helptest:
+        if with_sub is None:
+            with_sub = err is None
+        if self.helptext:
             ht.append(p + "  : " + self.helptext.replace("\n","\n"+" "*len(p)+"  : "))
 
-        if print_sub and self.sub:
+        if with_sub and self.sub:
             p = self.prompt
             ht.append("Subcommands:")
             for k,v in self.sub.items():
                 vh = v.helptext.split("\n",1)[0] if v.helptext else "(no help text known)"
-                ht.apend(f"{p+k} : {vh}")
-        await self.mud.print("\n".join(ht), noreply=True)
+                ht.append(f"{p+k} : {vh}")
+        await self.s.mud.print("\n".join(ht), noreply=True)
 
     async def __call__(self, cmd):
         """Call the function associated with this subcommand."""
         if self.func:
             return await self.func(cmd)
-        await self.help("No command defined.", print_sub=True)
+        await self.print_help(with_sub=True)
 

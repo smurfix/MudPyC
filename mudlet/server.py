@@ -376,9 +376,10 @@ class Server:
         del self._calls[name]
 
     def do_register_aliases(self):
-        self.alias = ali = Alias(self, "#", "Alias shortcuts")
-        for k,v in vars(self).items():
+        self.alias = ali = Alias(self, "#", helptext="Alias shortcuts")
+        for k in dir(self):
             if k.startswith('alias_'):
+                v = getattr(self, k)
                 al = ali.at(k[6:], create=True)
                 al.helptext = v.__doc__
                 al.func = v
@@ -392,11 +393,11 @@ class Server:
                 ali = ali.sub[cmd[0]]
             except KeyError:
                 if cmd[0] == "?":
-                    await ali.help()
+                    await ali.print_help()
                 else:
-                    await ali.help("Unknown alias", print_sub=True)
+                    await ali.print_help("Unknown alias", with_sub=True)
                 return
             else:
                 cmd = cmd[1:]
-        await ali.run(cmd.strip())
+        await ali(cmd)
 
