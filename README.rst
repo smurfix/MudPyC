@@ -51,7 +51,9 @@ Usage from Mudlet
 +++++++++++++++++
 
 Call ``py.init(PORT)``. A ``PyConnect`` event is raised when the
-connection is established.
+connection is established. The alias ``#py+`` does this; ``#py-`` turns the
+connector off, all other strings starting with ``#`` will be forwarded to
+the alias handler on th Python side.
 
 A ``PyDisconnect`` event is raised when the connection terminates.
 
@@ -100,6 +102,11 @@ the result is a list/tuple, the Lua callback will receive multiple
 arguments. Callables may be async functions.
 
 Call ``self.event(NAME, ARGS…)`` to raise an event within Mudlet.
+
+Add ``alias_xy(STRING)`` methods to recognize the input ``#xy STRING``.
+Do ``self.alias.at("x").helptext = "XX Handling"`` to add an info text
+that's printed when the user just types ``#`` or ``#x?``. By default the
+list of submenus contains the help text's first line.
 
 The server's async context terminates with an ``EOFError`` if the Mudlet
 connection ends, or a ``trio.TooSlowError`` if the server's regular Ping is
