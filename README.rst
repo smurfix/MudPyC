@@ -58,7 +58,8 @@ A ``PyDisconnect`` event is raised when the connection terminates.
 Call ``py.call(CALLBACK, NAME, PARAMS)`` to call a function on the Python
 side (you need to register the function, see below). ``CALLBACK`` is called
 with ``true`` and the result(s), or ``false`` and an error message.
-Parameters must be json-encodeable.
+Parameters must be json-encodeable. You can skip the `CALLBACK` if you
+don't want to get a result back.
 
 The author strongly recommends to use a CJSON-ified version of Mudlet
 because if you ever pass something non-encodeable to yajl by mistake,
@@ -93,9 +94,10 @@ to that name instead of being returned.
 Open an async context + async loop using ``self.events(NAME)`` to listen
 for the Mudlet event ``NAME``.
 
-Call ``self.register_call(NAME, FUNC)`` to register ``FUNC`` as being callable
-from Mudlet; see above. If the result is a list/tuple, the Lua callback
-will receive multiple arguments. Callables may be async functions.
+Either create a "called_NAME" method, or call ``self.register_call(NAME,
+FUNC)`` to register ``FUNC`` as being callable from Mudlet; see above. If
+the result is a list/tuple, the Lua callback will receive multiple
+arguments. Callables may be async functions.
 
 Call ``self.event(NAME, ARGS…)`` to raise an event within Mudlet.
 
