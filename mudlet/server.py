@@ -58,7 +58,10 @@ class _CallMudlet:
     async def _get(self):
         if self.meth:
             raise RuntimeError("Only for method calls")
-        return (await self.server.rpc(action="get", name=self.name))[0]
+        res = await self.server.rpc(action="get", name=self.name)
+        if not res:
+            return None  # nil, Lua can't store that in a table
+        return res[0]
 
     async def _set(self, value):
         if self.meth:
