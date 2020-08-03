@@ -1,3 +1,5 @@
+from functools import partial
+
 class Alias:
     """
     This class implements an iterative alias processor for PyMudlet.

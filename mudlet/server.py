@@ -23,12 +23,18 @@ import logging
 logger = logging.getLogger(__name__)
 
 DEFAULTS = attrdict(
+        server=attrdict(
         host="127.0.0.1", port=23817,
         fifo=os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "mudlet_fifo"),
         ca_certs=None, certfile=None, keyfile=None, use_reloader=False,
+        )
     )
 if "XDG_RUNTIME_DIR" in os.environ:
     DEFAULTS["fifo"] = os.path.join(os.environ["XDG_RUNTIME_DIR"], "mudlet_fifo")
+
+def run_in_task(x):
+    x.run_in_task = True
+    return x
 
 class _CallMudlet:
     def __init__(self, server, name = [], meth=None):
@@ -211,9 +217,23 @@ class Server:
             res = getattr(self, "called_"+msg["call"], None)
             if res is None:
                 res = self._calls[msg["call"]]
-            res = res(*data)
-            if iscoroutine(res):
-                res = await res
+            if getattr(res,"run_in_task", False):
+                evt = ValueEvent()
+                async def capture(res, fn, data):
+                    try:
+                        r = res(*data)
+                        if iscoroutine(r):
+                            r = await r
+                    except Exception as r:
+                        res.set_error(r)
+                    else:
+                        res.set(r)
+                self.main.start_soon(capture, res, *data)
+                res = evt
+            else:
+                res = res(*data)
+                if iscoroutine(res):
+                    res = await res
             if isinstance(res, ValueEvent):
                 res = await res.get()
         except Exception as e:
@@ -391,6 +411,7 @@ class Server:
                 al.helptext = v.__doc__
                 al.func = v
 
+    @run_in_task
     async def called_alias(self, cmd):
         ali = self.alias
         while cmd:
