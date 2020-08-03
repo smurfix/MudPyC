@@ -142,10 +142,10 @@ class Server:
         return Response(msg, content_type="application/json")
 
     async def _reader(self, task_status=trio.TASK_STATUS_IGNORED):
-        if 'fifo' not in self.cfg:
+        if 'fifo' not in self.cfg.server:
             task_status.started(None)
             return
-        fx = os.open(self.cfg['fifo'], os.O_RDONLY|os.O_NDELAY)
+        fx = os.open(self.cfg.server['fifo'], os.O_RDONLY|os.O_NDELAY)
         f = OSLineReader(fx)
         task_status.started(fx)
         try:
@@ -253,8 +253,8 @@ class Server:
 
     async def _action_init(self, msg):
         res = dict(action="init")
-        if 'fifo' in self.cfg:
-            res['fifo'] = self.cfg['fifo']
+        if 'fifo' in self.cfg.server:
+            res['fifo'] = self.cfg.server['fifo']
         self._send(res)
 
     async def _action_up(self, msg):
@@ -322,7 +322,7 @@ class Server:
         self._is_connected = trio.Event()
 
         config = HyperConfig()
-        cfg = self.cfg
+        cfg = self.cfg.server
         config.access_log_format = "%(h)s %(r)s %(s)s %(b)s %(D)s"
         config.access_logger = create_serving_logger()  # type: ignore
         config.bind = [f"{cfg['host']}:{cfg['port']}"]
