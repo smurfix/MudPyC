@@ -359,6 +359,7 @@ class Server:
 
     def _send(self, data):
         logger.debug("OUT %r",data)
+        json.dumps(data)  # functional no-op but catches errors early
         self._to_send.append(data)
         self._to_send_wait.set()
     
