@@ -383,7 +383,11 @@ class Server:
         for k in dir(self):
             if k.startswith('alias_'):
                 v = getattr(self, k)
-                al = ali.at(k[6:], create=True)
+                try:
+                    k = getattr(v,"real_alias")
+                except AttributeError:
+                    k = k[6:]
+                al = ali.at(k, create=True)
                 al.helptext = v.__doc__
                 al.func = v
 

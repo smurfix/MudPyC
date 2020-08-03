@@ -105,3 +105,15 @@ class Alias:
             return await self.func(cmd)
         await self.print_help(with_sub=True)
 
+
+def with_alias(x):
+    """
+    Ability to set an alias name that can't be expressed as function name,
+    like 'mx-'.
+    """
+
+    def fn(y):
+        y.real_alias = x
+        return y 
+    return fn
+
