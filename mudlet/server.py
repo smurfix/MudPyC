@@ -20,9 +20,6 @@ import os
 import errno
 import json
 
-import gettext
-_ = gettext.gettext
-
 import logging
 logger = logging.getLogger(__name__)
 

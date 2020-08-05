@@ -20,9 +20,6 @@ from .const import SignalThis, SkipRoute, SkipSignal
 from .const import ENV_OK,ENV_STD,ENV_SPECIAL,ENV_UNMAPPED
 from .walking import Walker, PathGenerator
 
-import gettext
-_ = gettext.gettext
-
 import logging
 logger = logging.getLogger(__name__)
 
@@ -568,7 +565,7 @@ class S(Server):
             elif res is False:
                 res = SkipRoute
             if res is SignalThis or res is SkipSignal:
-                await self.mud.print(_("#gu {d+1} : {r.id_str} {r.name} ({len(h)})").format(r=r))
+                await self.mud.print(_("#gu {d} : {r.id_str} {r.name} ({lh})").format(r=r,lh=len(h),d=d+1))
             return res
 
         await self.clear_gen()
@@ -770,7 +767,7 @@ class S(Server):
             seen = False
             for sk in db.q(db.Skiplist).all():
                 seen = True
-                await self.mud.print(_("{sk.name}: {lsk)} rooms").format(sk=sk, lsk=len(sk.rooms)))
+                await self.mud.print(_("{sk.name}: {lsk} rooms").format(sk=sk, lsk=len(sk.rooms)))
             if not seen:
                 await self.mud.print(_("No skiplists found"))
             return

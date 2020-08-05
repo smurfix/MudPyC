@@ -5,9 +5,6 @@ from inspect import iscoroutine
 
 from .const import SignalThis, SkipRoute, SkipSignal
 
-import gettext
-_ = gettext.gettext
-
 class PathGenerator:
     _scope: trio.CancelScope = None
     _result_wait: trio.Event = None
@@ -228,7 +225,7 @@ class Walker:
             self.state = _("No map going to {exit.dst.id_str}").format(exit=exit)
             await self.s.mud.print(_("step to {exit.dst.id_str}: no map").format(exit=exit))
             return
-        self.state = _("step to {exit.dst.id_str}: {':'.join(exit.moves)}").format(exit=exit)
+        self.state = _("step to {exit.dst.id_str}: {jxm}").format(exit=exit, jxm=':'.join(exit.moves))
         await self.s.send_commands(*exit.moves, err_str = _("walking from {self.s.room.id_str} to {exit.dst.id_str}").format(self=self,exit=exit))
 
 

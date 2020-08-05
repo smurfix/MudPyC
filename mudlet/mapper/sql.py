@@ -12,13 +12,10 @@ from sqlalchemy.schema import CreateTable, DropTable
 from .const import SignalThis, SkipRoute, SkipSignal
 from .const import ENV_OK,ENV_STD,ENV_SPECIAL,ENV_UNMAPPED
 
-import gettext
-_ = gettext.gettext
-
 class NoData(RuntimeError):
     def __str__(self):
         if self.args:
-            return _("‹NoData:{':'.join(self.args)}›").format(self=self)
+            return _("‹NoData:{jsa}›").format(jsa=':'.join(self.args))
         return "‹NoData›"
     pass
 
