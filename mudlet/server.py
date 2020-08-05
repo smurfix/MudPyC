@@ -11,6 +11,7 @@ import outcome
 from contextlib import asynccontextmanager
 from functools import partial
 from inspect import iscoroutine
+import shlex
 
 from .util import attrdict, combine_dict, OSLineReader, ValueEvent
 from .alias import Alias
@@ -415,6 +416,7 @@ class Server:
     @run_in_task
     async def called_alias(self, cmd):
         ali = self.alias
+        ocmd = cmd
         while cmd:
             if cmd[0] == " ":
                 break
@@ -428,5 +430,52 @@ class Server:
                 return
             else:
                 cmd = cmd[1:]
-        await ali(cmd)
+        try:
+            await ali(cmd)
+        except Exception as err:
+            logger.warning("Error in alias %r", ocmd, exc_info=err)
+            await self.mud.print(f"Error: {err !r}")
+
+    def _cmdfix_i(self, cmd):
+        return int(cmd)
+
+    def _cmdfix_f(self, cmd):
+        return float(cmd)
+
+    def _cmdfix_w(self, cmd):
+        if cmd == "":
+            raise ValueError("Empty names are not allowed.")
+        return cmd
+
+    def cmdfix(self, types, cmd, min_words=0):
+        """
+        Split the command for an alias into words.
+
+        Understands shell-like quoting and escapes and whatnot.
+        """
+        res = []
+        cmd = shlex.split(cmd)
+
+        for x in types:  
+            if not cmd:
+                break
+
+            if x == "*":
+                res.append(" ".join(cmd))
+                return res
+
+            v = cmd[0]
+            cmd = cmd[1:]
+
+            try:
+                f = getattr(self,"_cmdfix_"+x)
+            except AttributeError:
+                raise RuntimeError(f"cmdfix:{x} unknown!")
+            res.append(f(v))
+        else:
+            if cmd:
+                raise ValueError("Too many parameters")
+        if len(res) < min_words:
+            raise ValueError("Too few parameters")
+        return res
 
