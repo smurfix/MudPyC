@@ -50,6 +50,18 @@ DEFAULT_CFG=attrdict(
             ),
         )
 
+CFG_HELP=attrdict(
+        use_mg_area=_("Use the MUD's area name"),
+        force_area=_("Modify existing rooms' area when visiting them"),
+        add_reverse=_("Link back when creating an exit"),
+        dir_use_z=_("Allow new rooms in Z direction"),
+        label_shift_x=_("X shift, moving room labels"),
+        label_shift_y=_("Y shift, moving room labels"),
+        pos_x_delta=_("X offset, new rooms"),
+        pos_y_delta=_("Y offset, new rooms"),
+        pos_small_delta=_("Diagonal offset, new rooms"),
+        )
+
 _itl2loc = {
         "up":"oben", "down":"unten", "in":"rein", "out":"raus",
         "north":"norden", "south":"sueden", "east":"osten", "west":"westen",
@@ -222,14 +234,14 @@ class S(Server):
     def do_register_aliases(self):
         super().do_register_aliases()
 
-        self.alias.at("m").helptext = "Mapping"
-        self.alias.at("mu").helptext = "Find unmapped rooms/exits"
-        self.alias.at("g").helptext = "Walking, paths"
-        self.alias.at("mc").helptext = "Map Colors"
-        self.alias.at("r").helptext = "Rooms"
-        self.alias.at("v").helptext = "View Map"
-        self.alias.at("cf").helptext = "Change boolean settings"
-        self.alias.at("co").helptext = "Room and name positioning"
+        self.alias.at("m").helptext = _("Mapping")
+        self.alias.at("mu").helptext = _("Find unmapped rooms/exits")
+        self.alias.at("g").helptext = _("Walking, paths")
+        self.alias.at("mc").helptext = _("Map Colors")
+        self.alias.at("r").helptext = _("Rooms")
+        self.alias.at("v").helptext = _("View Map")
+        self.alias.at("cf").helptext = _("Change boolean settings")
+        self.alias.at("co").helptext = _("Room and name positioning")
     
     def _cmdfix_r(self,v):
         return self.db.r_mudlet(int(v))
@@ -250,20 +262,24 @@ class S(Server):
                 await self.mud.print(_("{cmd} = {v}.").format(v=v, cmd=cmd))
 
         else:
-            for k,v in self.conf.items():
-                await self.mud.print(_("{k} = {v}.").format(v=v, k=k))
+            for k,vt in DEFAULT_CFG.settings.items():
+                # we do it this way because dicts are sorted
+                v = self.conf[k]
+                if isinstance(vt,bool):
+                    v=_("AN") if v else _("aus")
+                await self.mud.print(f"{str(v):>5} = {CFG_HELP[k]}")
 
     @doc(_(
         """
-        Change setting for forcing newly visited rooms' areas
-        to what 'use_mg_area' says."""))
+        Modify existing rooms' area when visiting them
+        """))
     async def alias_cff(self, cmd):
         await self._conf_flip("force_area")
 
     @doc(_(
         """
-        Use the MUD's area name?
-        If False, use the last-visited room or 'Default'.
+        Use the MUD's area name
+        If unset, use the last-visited room's area, or 'Default'.
         """))
     async def alias_cfm(self, cmd):
         await self._conf_flip("use_mg_area")

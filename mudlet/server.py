@@ -415,7 +415,7 @@ class Server:
         del self._calls[name]
 
     def do_register_aliases(self):
-        self.alias = ali = Alias(self, "#", helptext="Alias shortcuts")
+        self.alias = ali = Alias(self, "#", helptext=_("Alias shortcuts"))
         for k in dir(self):
             if k.startswith('alias_'):
                 v = getattr(self, k)
@@ -440,7 +440,7 @@ class Server:
                 if cmd[0] == "?":
                     await ali.print_help()
                 else:
-                    await ali.print_help("Unknown alias", with_sub=True)
+                    await ali.print_help(_("Unknown alias"), with_sub=True)
                 return
             else:
                 cmd = cmd[1:]

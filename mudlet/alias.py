@@ -99,7 +99,7 @@ class Alias:
             ht.append("Subcommands:")
             for k,v in self.sub.items():
                 vh = cleandoc(v.helptext).split("\n",1)[0] if v.helptext else "(no help text known)"
-                ht.append(f"{p+k} : {vh}")
+                ht.append(f"{p+k} {'*' if v.sub else ':'} {vh}")
         await self.s.mud.print("\n".join(ht), noreply=True)
 
     async def __call__(self, cmd):
