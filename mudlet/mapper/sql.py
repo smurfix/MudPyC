@@ -70,12 +70,12 @@ def SQL(cfg):
         @property
         def info_str(self):
             if self.dst_id:
-                res = _("‹{self.__class__.__name__}: {self.src.id_str} via {self.dir} {self.dst.id_str}›").format(self=self)
+                res = _("Exit: {self.src.id_str} via {self.dir} {self.dst.id_str}").format(self=self)
             else:
-                res = _("‹{self.__class__.__name__}: {self.src.id_str} via {self.dir}›").format(self=self)
+                res = _("Exit: {self.src.id_str} via {self.dir}").format(self=self)
             if self.steps:
                 res += _(" ({lsm})").format(lsm=len(self.moves))
-            return res
+            return "‹"+res+"›"
 
         @property
         def moves(self):
@@ -111,7 +111,7 @@ def SQL(cfg):
 
         @property
         def info_str(self):
-            return _("‹{self.__class__.__name__}: {self.id_str} {self.exit_str} {self.name}›").format(self=self)
+            return _("‹Room: {self.id_str} {self.exit_str} {self.name}›").format(self=self)
 
         @property
         def id_str(self):

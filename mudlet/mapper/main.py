@@ -637,7 +637,7 @@ class S(Server):
         elif cmd < len(self.path_gen.results):
             self.walker = Walker(self, self.path_gen.results[cmd[0]-1][1])
         else:
-            await self.mud.print(_("I only have {lgr)} results.").format(lgr=len(self.path_gen.results)))
+            await self.mud.print(_("I only have {lgr} results.").format(lgr=len(self.path_gen.results)))
             return
 
         self.clear_gen()

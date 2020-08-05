@@ -5,7 +5,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"POT-Creation-Date: 2020-08-05 17:36+0200\n"
+"POT-Creation-Date: 2020-08-05 18:02+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -39,6 +39,18 @@ msgstr ""
 msgid "{k} = {v}."
 msgstr ""
 
+#: mudlet/mapper/main.py:272
+msgid "No active room."
+msgstr ""
+
+#: mudlet/mapper/main.py:278
+msgid "No area/domain set."
+msgstr ""
+
+#: mudlet/mapper/main.py:303
+msgid "No alternate area/domain known."
+msgstr ""
+
 #: mudlet/mapper/main.py:316
 msgid "Setting '{name}' {set}."
 msgstr ""
@@ -59,8 +71,53 @@ msgstr ""
 msgid "Setting '{name}' is {v}."
 msgstr ""
 
+#: mudlet/mapper/main.py:368
+msgid "Usage: #x- exitname"
+msgstr ""
+
+#: mudlet/mapper/main.py:374 mudlet/mapper/main.py:403
+#: mudlet/mapper/main.py:423
+msgid "Exit unknown."
+msgstr ""
+
+#: mudlet/mapper/main.py:378
+msgid "Removed."
+msgstr ""
+
+#: mudlet/mapper/main.py:418
+msgid "Missing arguments. You want '#xs'."
+msgstr ""
+
+#: mudlet/mapper/main.py:427
+msgid "Steps:"
+msgstr ""
+
+#: mudlet/mapper/main.py:431
+msgid "Deleted."
+msgstr ""
+
+#: mudlet/mapper/main.py:433
+msgid "This exit doesn't have specials."
+msgstr ""
+
+#: mudlet/mapper/main.py:436
+msgid "Added."
+msgstr ""
+
+#: mudlet/mapper/main.py:452
+msgid "Exit name cleared."
+msgstr ""
+
 #: mudlet/mapper/main.py:455
 msgid "Exit name '{self.named_exit}' set."
+msgstr ""
+
+#: mudlet/mapper/main.py:466
+msgid "Usage: #xt new_name"
+msgstr ""
+
+#: mudlet/mapper/main.py:471
+msgid "I don't know where I am or where I came from."
 msgstr ""
 
 #: mudlet/mapper/main.py:479
@@ -75,12 +132,52 @@ msgstr ""
 msgid "This exit already has steps:"
 msgstr ""
 
+#: mudlet/mapper/main.py:502
+msgid "I have no idea where you were."
+msgstr ""
+
+#: mudlet/mapper/main.py:505
+msgid "I have no idea how you got here."
+msgstr ""
+
 #: mudlet/mapper/main.py:571
 msgid "#gu {d+1} : {r.id_str} {r.name} ({len(h)})"
 msgstr ""
 
+#: mudlet/mapper/main.py:582
+msgid "Maybe more results: #gn"
+msgstr ""
+
+#: mudlet/mapper/main.py:584
+msgid "No more results."
+msgstr ""
+
 #: mudlet/mapper/main.py:590
 msgid "#gg {n} :d{lh} f{room.info_str}"
+msgstr ""
+
+#: mudlet/mapper/main.py:603
+msgid "No active walk."
+msgstr ""
+
+#: mudlet/mapper/main.py:607
+msgid "No active path generator."
+msgstr ""
+
+#: mudlet/mapper/main.py:618
+msgid "No path generator is active."
+msgstr ""
+
+#: mudlet/mapper/main.py:626
+msgid "No route search active"
+msgstr ""
+
+#: mudlet/mapper/main.py:630
+msgid "No route search results yet"
+msgstr ""
+
+#: mudlet/mapper/main.py:632
+msgid "No route search results. Sorry."
 msgstr ""
 
 #: mudlet/mapper/main.py:640
@@ -91,16 +188,56 @@ msgstr ""
 msgid "{n}: {r.id_str} {r.name}"
 msgstr ""
 
+#: mudlet/mapper/main.py:654
+msgid "No rooms yet remembered."
+msgstr ""
+
 #: mudlet/mapper/main.py:671
 msgid "Room {cmd.id_str} is already on the list."
+msgstr ""
+
+#: mudlet/mapper/main.py:686
+msgid "Skip list is empty."
 msgstr ""
 
 #: mudlet/mapper/main.py:689
 msgid "{r.id_str}:{r.name}"
 msgstr ""
 
+#: mudlet/mapper/main.py:709 mudlet/mapper/main.py:729
+msgid "No current room known"
+msgstr ""
+
+#: mudlet/mapper/main.py:713
+msgid "Room {cmd.id_str} already is on the list."
+msgstr ""
+
+#: mudlet/mapper/main.py:716
+msgid "Room {cmd.id_str} added."
+msgstr ""
+
+#: mudlet/mapper/main.py:736
+msgid "Room {cmd.id_str} is not on the list."
+msgstr ""
+
+#: mudlet/mapper/main.py:738
+msgid "Room {cmd.id_str} removed."
+msgstr ""
+
+#: mudlet/mapper/main.py:752
+msgid "List {cmd} doesn't exist"
+msgstr ""
+
+#: mudlet/mapper/main.py:759
+msgid "List cleared."
+msgstr ""
+
 #: mudlet/mapper/main.py:773
 msgid "{sk.name}: {lsk)} rooms"
+msgstr ""
+
+#: mudlet/mapper/main.py:775
+msgid "No skiplists found"
 msgstr ""
 
 #: mudlet/mapper/main.py:783
@@ -119,12 +256,24 @@ msgstr ""
 msgid "skiplist '{cmd}' merged, now {nr} rooms (+{nnr})."
 msgstr ""
 
+#: mudlet/mapper/main.py:816
+msgid "Usage: #gt Kneipe / Kirche / Laden"
+msgstr ""
+
 #: mudlet/mapper/main.py:872
 msgid "{d} - unknown"
 msgstr ""
 
 #: mudlet/mapper/main.py:874
 msgid "{d} = {dst.info_str}"
+msgstr ""
+
+#: mudlet/mapper/main.py:885
+msgid "No room selected."
+msgstr ""
+
+#: mudlet/mapper/main.py:904
+msgid "No current room known!"
 msgstr ""
 
 #: mudlet/mapper/main.py:941
@@ -139,6 +288,14 @@ msgstr ""
 msgid "Dunno what to do with {d !r} {err_str}"
 msgstr ""
 
+#: mudlet/mapper/main.py:1085
+msgid "NEXT"
+msgstr ""
+
+#: mudlet/mapper/main.py:1129
+msgid "MAP: I do not know this room."
+msgstr ""
+
 #: mudlet/mapper/main.py:1162
 msgid ""
 "CHAN:{chan} : {player}\n"
@@ -150,23 +307,43 @@ msgid "CHAN:{chan} : {player} {txt}"
 msgstr ""
 
 #: mudlet/mapper/main.py:1178
-msgid "Not in mudlet? but we know mudlet {id_mudlet} at {offset_room.id_str}/{offset_dir}"
+msgid "Not in mudlet? but we know mudlet# {id_mudlet} at {offset_room.id_str}/{offset_dir}"
 msgstr ""
 
 #: mudlet/mapper/main.py:1180
-msgid "Not in mudlet? but we know mudlet {id_mudlet}"
+msgid "Not in mudlet? but we know mudlet# {id_mudlet}"
 msgstr ""
 
 #: mudlet/mapper/main.py:1188
 msgid "New room? but we know hash {hash} at {room.id_old}"
 msgstr ""
 
+#: mudlet/mapper/main.py:1275
+msgid "MAP: I have no idea where you are."
+msgstr ""
+
+#: mudlet/mapper/main.py:1283
+msgid "MAP: If you moved, say '#mn'."
+msgstr ""
+
 #: mudlet/mapper/main.py:1300
 msgid "MAP: Conflict! {room.id_str} vs. {room2.id_str}"
 msgstr ""
 
+#: mudlet/mapper/main.py:1329
+msgid "Way back unknown, not set"
+msgstr ""
+
 #: mudlet/mapper/main.py:1427
 msgid "No mapped room to {d}"
+msgstr ""
+
+#: mudlet/mapper/main.py:1471
+msgid "connected"
+msgstr ""
+
+#: mudlet/mapper/main.py:1503
+msgid "waiting for connection from Mudlet"
 msgstr ""
 
 #: mudlet/mapper/sql.py:21
@@ -174,19 +351,19 @@ msgid "‹NoData:{':'.join(self.args)}›"
 msgstr ""
 
 #: mudlet/mapper/sql.py:73
-msgid "‹{self.__class__.__name__}: {self.src.id_str} via {self.dir} {self.dst.id_str}›"
+msgid "Exit: {self.src.id_str} via {self.dir} {self.dst.id_str}"
 msgstr ""
 
 #: mudlet/mapper/sql.py:75
-msgid "‹{self.__class__.__name__}: {self.src.id_str} via {self.dir}›"
+msgid "Exit: {self.src.id_str} via {self.dir}"
 msgstr ""
 
 #: mudlet/mapper/sql.py:77
-msgid " ({len(self.moves)})"
+msgid " ({lsm})"
 msgstr ""
 
 #: mudlet/mapper/sql.py:114
-msgid "‹{self.__class__.__name__}: {self.id_str} {self.exit_str} {self.name}›"
+msgid "‹Room: {self.id_str} {self.exit_str} {self.name}›"
 msgstr ""
 
 #: mudlet/mapper/walking.py:140
@@ -201,43 +378,43 @@ msgstr ""
 msgid " to {self.last_room.id_str} ({self.state})"
 msgstr ""
 
-#: mudlet/mapper/walking.py:183
-msgid "Wait for movement to {self.next_room_id}"
+#: mudlet/mapper/walking.py:184
+msgid "Wait for entering room {nr.id_str}:{nr.name}"
 msgstr ""
 
-#: mudlet/mapper/walking.py:218
+#: mudlet/mapper/walking.py:219
 msgid "step to {exit.dst.id_str}"
 msgstr ""
 
-#: mudlet/mapper/walking.py:222
+#: mudlet/mapper/walking.py:223
 msgid "Cannot step from {self.s.room.id_str} to {next_room.id_str}"
 msgstr ""
 
-#: mudlet/mapper/walking.py:224
+#: mudlet/mapper/walking.py:225
 msgid "No exit from {self.s.room.id_str} to {exit.dst.id_str} ??"
 msgstr ""
 
-#: mudlet/mapper/walking.py:227
+#: mudlet/mapper/walking.py:228
 msgid "No map going to {exit.dst.id_str}"
 msgstr ""
 
-#: mudlet/mapper/walking.py:228
+#: mudlet/mapper/walking.py:229
 msgid "step to {exit.dst.id_str}: no map"
 msgstr ""
 
-#: mudlet/mapper/walking.py:230
+#: mudlet/mapper/walking.py:231
 msgid "step to {exit.dst.id_str}: {':'.join(exit.moves)}"
 msgstr ""
 
-#: mudlet/mapper/walking.py:231
+#: mudlet/mapper/walking.py:232
 msgid "walking from {self.s.room.id_str} to {exit.dst.id_str}"
 msgstr ""
 
-#: mudlet/mapper/walking.py:255
+#: mudlet/mapper/walking.py:256
 msgid "Dunno how to get back from {self.s.room.id_str} to {self.s.last_room.id_str}"
 msgstr ""
 
-#: mudlet/mapper/walking.py:257
+#: mudlet/mapper/walking.py:258
 msgid "walking back from {self.s.room.id_str} to {self.s.last_room.id_str}"
 msgstr ""
 
