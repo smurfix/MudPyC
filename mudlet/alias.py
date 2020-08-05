@@ -1,4 +1,5 @@
 from functools import partial
+from inspect import cleandoc
 
 class Alias:
     """
@@ -91,13 +92,13 @@ class Alias:
         if with_sub is None:
             with_sub = err is None
         if self.helptext:
-            ht.append(p + "  : " + self.helptext.replace("\n","\n"+" "*len(p)+"  : "))
+            ht.append(p + "  : " + cleandoc(self.helptext).replace("\n","\n"+" "*len(p)+"  : "))
 
         if with_sub and self.sub:
             p = self.prompt
             ht.append("Subcommands:")
             for k,v in self.sub.items():
-                vh = v.helptext.split("\n",1)[0] if v.helptext else "(no help text known)"
+                vh = cleandoc(v.helptext).split("\n",1)[0] if v.helptext else "(no help text known)"
                 ht.append(f"{p+k} : {vh}")
         await self.s.mud.print("\n".join(ht), noreply=True)
 
