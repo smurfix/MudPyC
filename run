@@ -1,0 +1,9 @@
+#!/usr/bin/python3
+import logging
+import sys
+import os
+sys.argv[0:1] = [sys.argv[0], "-c","mapper.cfg"]
+
+from mudlet.mapper import main
+logging.basicConfig(loglevel=logging.DEBUG)
+trio.run(main)

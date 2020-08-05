@@ -1,0 +1,4 @@
+name: Morgengrauen
+sql:
+    url: 'mysql://name:password@database.example.com/muddb'
+
