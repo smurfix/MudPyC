@@ -49,6 +49,9 @@ class _CallMudlet:
 
         return _CallMudlet(self.server, self.name+[k], self.meth)
 
+    def __getitem__(self, k):
+        return _CallMudlet(self.server, self.name+[k], self.meth)
+
     async def __call__(self, *args, meth=None, dest=None, noreply=None):
         msg = {}
         if meth is None:
