@@ -220,44 +220,48 @@ class Server:
 
     async def _action_call(self, msg):
         seq = msg.get("cseq", None)
-        try:
-            data = msg["data"] or []
-            res = getattr(self, "called_"+msg["call"], None)
-            if res is None:
-                res = self._calls[msg["call"]]
-            if getattr(res,"run_in_task", False):
-                evt = ValueEvent()
-                async def capture(res, fn, data):
-                    try:
-                        r = res(*data)
-                        if iscoroutine(r):
-                            r = await r
-                    except Exception as r:
-                        res.set_error(r)
-                    else:
-                        res.set(r)
-                self.main.start_soon(capture, res, *data)
-                res = evt
-            else:
-                res = res(*data)
-                if iscoroutine(res):
-                    res = await res
-            if isinstance(res, ValueEvent):
-                res = await res.get()
-        except Exception as e:
-            res = dict(error=str(e))
-            if seq is None:
-                logger.exception("Ignored error: %r", msg, exc_info=e)
-            else:
-                logger.warning("Error (sent to Lua): %r", msg, exc_info=e)
-        else:
+
+        def done(res):
+            if seq is not None:
+                res["cseq"] = seq
+                res["action"] = "result"
+                self._send(res)
+
+        def done_ok(res):
             if not isinstance(res, (list, tuple)):
                 res = [res]
-            res = dict(result=res)
-        if seq is not None:
-            res["cseq"] = seq
-            res["action"] = "result"
-            self._send(res)
+            done({"result":res})
+
+        def done_err(err):
+            done({"error":str(err)})
+            if seq is None:
+                logger.exception("Ignored error: %r", msg, exc_info=err)
+            else:
+                logger.warning("Error (sent to Lua): %r", msg, exc_info=err)
+
+        async def capture(fn, data):
+            try:
+                res = fn(*data)
+                if iscoroutine(res):
+                    res = await res
+            except Exception as err:
+                done_err(err)
+            else:
+                done_ok(res)
+
+        try:
+            data = msg["data"] or []
+            fn = getattr(self, "called_"+msg["call"], None)
+            if fn is None:
+                fn = self._calls[msg["call"]]
+            if getattr(fn,"run_in_task", False):
+                self.main.start_soon(capture, fn, data)
+            else:
+                await capture(fn, data)
+
+        except Exception as e:
+            done_err(e)
+
 
     async def _action_init(self, msg):
         res = dict(action="init")
