@@ -19,7 +19,7 @@ class Alias:
         async def alias_ma(self, command):
             "add a room to the map."
             if not command.strip():
-                await self.mud.print("A room needs a name!")
+                await self.mud.print(_("A room needs a name!"))
                 return
             ...  # the actual code
 

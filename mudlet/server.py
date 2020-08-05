@@ -20,6 +20,9 @@ import os
 import errno
 import json
 
+import gettext
+_ = gettext.gettext
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -448,7 +451,7 @@ class Server:
             await ali(cmd)
         except Exception as err:
             logger.warning("Error in alias %r", ocmd, exc_info=err)
-            await self.mud.print(f"Error: {err !r}")
+            await self.mud.print(_("Error: {err !r}").format(err=err))
 
     def _cmdfix_i(self, cmd):
         return int(cmd)
@@ -484,12 +487,12 @@ class Server:
             try:
                 f = getattr(self,"_cmdfix_"+x)
             except AttributeError:
-                raise RuntimeError(f"cmdfix:{x} unknown!")
+                raise RuntimeError(_("cmdfix:{x} unknown!").format(x=x))
             res.append(f(v))
         else:
             if cmd:
-                raise ValueError("Too many parameters")
+                raise ValueError(_("Too many parameters"))
         if len(res) < min_words:
-            raise ValueError("Too few parameters")
+            raise ValueError(_("Too few parameters"))
         return res
 

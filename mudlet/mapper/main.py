@@ -20,6 +20,9 @@ from .const import SignalThis, SkipRoute, SkipSignal
 from .const import ENV_OK,ENV_STD,ENV_SPECIAL,ENV_UNMAPPED
 from .walking import Walker, PathGenerator
 
+import gettext
+_ = gettext.gettext
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -199,7 +202,7 @@ class S(Server):
                 seen.remove(k)
                 continue
             # areas in the mud but not in the database
-            self.logger.info(f"SYNC: add area {v} to DB")
+            self.logger.info(_("SYNC: add area {v} to DB").format(v=v))
             area = db.Area(id=k, name=v)
             db.add(area)
             self._area_name2area[area.name.lower()] = area
@@ -207,11 +210,11 @@ class S(Server):
         for k in sorted(seen):
             # areas in the database but not in the mud
             v = self._area_id2area[k].name
-            self.logger.info(f"SYNC: add area {v} to Mudlet")
+            self.logger.info(_("SYNC: add area {v} to Mudlet").format(v=v))
             kk = (await self.mud.addAreaName(v))[0]
             if kk != k:
                 # Ugh now we have to renumber it
-                self.logger.warning(f"SYNC: renumber area {v}: {k} > {kk}")
+                self.logger.warning(_("SYNC: renumber area {v}: {k} > {kk}").format(kk=kk, k=k, v=v))
                 del self._area_id2area[k]
                 self._area_name2area[area.name.lower()] = area
                 self._area_id2area[kk] = area
@@ -242,13 +245,13 @@ class S(Server):
             try:
                 v = self.conf[cmd]
             except KeyError:
-                await self.mud.print(f"Config item '{cmd}' unknown.")
+                await self.mud.print(_("Config item '{cmd}' unknown.").format(cmd=cmd))
             else:
-                await self.mud.print(f"{cmd} = {v}.")
+                await self.mud.print(_("{cmd} = {v}.").format(v=v, cmd=cmd))
 
         else:
             for k,v in self.conf.items():
-                await self.mud.print(f"{k} = {v}.")
+                await self.mud.print(_("{k} = {v}.").format(v=v, k=k))
 
     async def alias_cff(self, cmd):
         """Change setting for forcing newly visited rooms' areas
@@ -266,13 +269,13 @@ class S(Server):
         """
         cmd = self.cmdfix("w", cmd)
         if not self.room:
-            await self.mud.print("No active room.")
+            await self.mud.print(_("No active room."))
             return
         if not cmd:
             if self.room.area:
                 await self.mud.print(self.room.area.name)
             else:
-                await self.mud.print("No area/domain set.")
+                await self.mud.print(_("No area/domain set."))
             return
 
         cmd = cmd[0]
@@ -297,7 +300,7 @@ class S(Server):
             elif self.room.info_area and self.room.info_area != self.room.area:
                 area = self.room.info_area
             else:
-                await self.mud.print("No alternate area/domain known.")
+                await self.mud.print(_("No alternate area/domain known."))
         return await self.alias_ra(area.name)
 
     async def alias_cfr(self, cmd):
@@ -310,7 +313,7 @@ class S(Server):
 
     async def _conf_flip(self, name):
         self.conf[name] = not self.conf[name]
-        await self.mud.print(f"Setting '{name}' {'set' if self.conf[name] else 'cleared'}.")
+        await self.mud.print(_("Setting '{name}' {set}.").format(name=name, set=_('set') if self.conf[name] else _('cleared')))
         await self._save_conf(name)
 
     async def alias_cox(self, cmd):
@@ -337,21 +340,21 @@ class S(Server):
         if cmd:
             v = float(cmd)
             self.conf[name] = v
-            await self.mud.print(f"Setting '{name}' to {v}.")
+            await self.mud.print(_("Setting '{name}' to {v}.").format(v=v, name=name))
             await self._save_conf(name)
         else:
             v = self.conf[name]
-            await self.mud.print(f"Setting '{name}' is {v}.")
+            await self.mud.print(_("Setting '{name}' is {v}.").format(v=v, name=name))
 
     async def _conf_int(self, name, cmd):
         if cmd:
             v = int(cmd)
             self.conf[name] = v
-            await self.mud.print(f"Setting '{name}' to {v}.")
+            await self.mud.print(_("Setting '{name}' to {v}.").format(v=v, name=name))
             await self._save_conf(name)
         else:
             v = self.conf[name]
-            await self.mud.print(f"Setting '{name}' is {v}.")
+            await self.mud.print(_("Setting '{name}' is {v}.").format(v=v, name=name))
 
     async def _save_conf(self, name):
         v = json.dumps(self.conf[name])
@@ -362,17 +365,17 @@ class S(Server):
         """Remove an exit from a room"""
         cmd = self.cmdfix("w",cmd)
         if not cmd:
-            await self.mud.print("Usage: #x- exitname")
+            await self.mud.print(_("Usage: #x- exitname"))
             return
         cmd = cmd[0]
         try:
             x = self.room.exit_at(cmd)
         except KeyError:
-            await self.mud.print("Exit unknown.")
+            await self.mud.print(_("Exit unknown."))
             return
         await self.room.set_exit(cmd.strip(), None)
         await self.mud.updateMap()
-        await self.mud.print("Removed.")
+        await self.mud.print(_("Removed."))
 
     @with_alias("x+")
     async def alias_x_p(self, cmd):
@@ -397,7 +400,7 @@ class S(Server):
             try:
                 x = self.room.exit_at(cmd[0])
             except KeyError:
-                await self.mud.print("Exit unknown.")
+                await self.mud.print(_("Exit unknown."))
                 return
             await self.mud.print(x.info_str)
             if x.steps:
@@ -412,25 +415,25 @@ class S(Server):
         """
         cmd = self.cmdfix("w*", cmd)
         if len(cmd) < 2:
-            await self.mud.print("Missing arguments. You want '#xs'.")
+            await self.mud.print(_("Missing arguments. You want '#xs'."))
         else:
             try:
                 x = self.room.exit_at(cmd[0])
             except KeyError:
-                await self.mud.print("Exit unknown.")
+                await self.mud.print(_("Exit unknown."))
                 return
             if cmd[1] == "-":
                 if x.steps:
-                    await self.mud.print("Steps:")
+                    await self.mud.print(_("Steps:"))
                     for m in x.moves:
                         await self.mud.print("… "+m)
                     x.steps = None
-                    await self.mud.print("Deleted.")
+                    await self.mud.print(_("Deleted."))
                 else:
-                    await self.mud.print("This exit doesn't have specials.")
+                    await self.mud.print(_("This exit doesn't have specials."))
             else:
                 x.steps = ((x.steps + "\n") if x.steps else "") + cmd[1]
-                await self.mud.print("Added.")
+                await self.mud.print(_("Added."))
             self.db.commit()
 
     async def alias_xn(self, cmd):
@@ -446,10 +449,10 @@ class S(Server):
         cmd = self.cmdfix("w", cmd)
         if not cmd:
             self.named_exit = None
-            await self.mud.print("Exit name cleared.")
+            await self.mud.print(_("Exit name cleared."))
         else:
             self.named_exit = cmd[0]
-            await self.mud.print(f"Exit name '{self.named_exit}' set.")
+            await self.mud.print(_("Exit name '{self.named_exit}' set.").format(self=self))
 
     async def alias_xt(self, cmd):
         """Rename the exit just taken.
@@ -460,12 +463,12 @@ class S(Server):
         """
         cmd = self.cmdfix("w",cmd)
         if not cmd:
-            await self.mud.print("Usage: #xt new_name")
+            await self.mud.print(_("Usage: #xt new_name"))
             return
         cmd = cmd[0]
 
         if not self.room or not self.last_room:
-            await self.mud.print("I don't know where I am or where I came from.")
+            await self.mud.print(_("I don't know where I am or where I came from."))
             return
 
         try:
@@ -473,17 +476,17 @@ class S(Server):
         except KeyError:
             pass
         else:
-            await self.mud.print(f"This exit already exists:")
+            await self.mud.print(_("This exit already exists:"))
             await self.alias_xs(self,x.dir)
             return
 
         try:
             x = self.last_room.exit_to(self.room)
         except KeyError:
-            await self.mud.print(f"Room {self.last_room.id_str} doesn't have an exit to {self.room.id_str}?")
+            await self.mud.print(_("Room {self.last_room.id_str} doesn't have an exit to {self.room.id_str}?").format(self=self))
             return
         if x.steps:
-            await self.mud.print(f"This exit already has steps:")
+            await self.mud.print(_("This exit already has steps:"))
             await self.alias_xs(self,x.dir)
             return
         x.steps = x.dir
@@ -496,10 +499,10 @@ class S(Server):
         Mention a room# to use that room, or leave empty to create a new room.
         """
         if not self.last_room:
-            await self.mud.print("I have no idea where you were.")
+            await self.mud.print(_("I have no idea where you were."))
             return
         if not self.last_room:
-            await self.mud.print("I have no idea how you got here.")
+            await self.mud.print(_("I have no idea how you got here."))
             return
         cmd = self.cmdfix("r", cmd)
         if cmd:
@@ -565,7 +568,7 @@ class S(Server):
             elif res is False:
                 res = SkipRoute
             if res is SignalThis or res is SkipSignal:
-                await self.mud.print(f"#gu {d+1} : {r.id_str} {r.name} ({len(h)})")
+                await self.mud.print(_("#gu {d+1} : {r.id_str} {r.name} ({len(h)})").format(r=r))
             return res
 
         await self.clear_gen()
@@ -576,15 +579,15 @@ class S(Server):
             async with PathGenerator(self, self.room, _check) as gen:
                 self.path_gen = gen
                 while await gen.wait_stalled():
-                    await self.mud.print("Maybe more results: #gn")
+                    await self.mud.print(_("Maybe more results: #gn"))
                 if self.path_gen is gen:
-                    await self.mud.print("No more results.")
+                    await self.mud.print(_("No more results."))
                 # otherwise we've been cancelled
         finally:
             self.path_gen = None
 
     async def found_path(self, n, room, h):
-        await self.mud.print(f"#gg {n} :d{len(h)} f{room.info_str}")
+        await self.mud.print(_("#gg {n} :d{lh} f{room.info_str}").format(room=room, n=n, lh=len(h)))
 
     def gen_next(self):
         evt, self._gen_next = self._gen_next, trio.Event()
@@ -597,11 +600,11 @@ class S(Server):
         if self.walker:
             await self.mud.print("Walk: "+str(self.walker))
         else:
-            await self.mud.print("No active walk.")
+            await self.mud.print(_("No active walk."))
         if self.path_gen:
             await self.mud.print("Path: "+str(self.path_gen))
         else:
-            await self.mud.print("No active path generator.")
+            await self.mud.print(_("No active path generator."))
 
     async def alias_gn(self, cmd):
         """
@@ -612,7 +615,7 @@ class S(Server):
         if self.path_gen:
             self.path_gen.make_more_results(3)
         else:
-            await self.mud.print("No path generator is active.")
+            await self.mud.print(_("No path generator is active."))
 
     async def alias_gu(self, cmd):
         """Use the first / a specific path which the generator produced
@@ -620,13 +623,13 @@ class S(Server):
         Otherwise: use the n'th result
         """
         if self.path_gen is None:
-            await self.mud.print("No route search active")
+            await self.mud.print(_("No route search active"))
             return
         if self.path_gen.results is None:
             if self.path_gen.is_running():
-                await self.mud.print("No route search results yet")
+                await self.mud.print(_("No route search results yet"))
             else:
-                await self.mud.print("No route search results. Sorry.")
+                await self.mud.print(_("No route search results. Sorry."))
             return
         cmd = self.cmdfix("i",cmd)
         if not cmd:
@@ -634,7 +637,7 @@ class S(Server):
         elif cmd < len(self.path_gen.results):
             self.walker = Walker(self, self.path_gen.results[cmd[0]-1][1])
         else:
-            await self.mud.print(f"I only have {len(self.path_gen.results)} results.")
+            await self.mud.print(_("I only have {lgr)} results.").format(lgr=len(self.path_gen.results)))
             return
 
         self.clear_gen()
@@ -646,9 +649,9 @@ class S(Server):
         if not cmd:
             if self.start_rooms:
                 for n,r in enumerate(self.start_rooms):
-                    await self.mud.print(f"{n+1}: {r.id_str} {r.name}")
+                    await self.mud.print(_("{n}: {r.id_str} {r.name}").format(r=r, n=n+1))
             else:
-                await self.mud.print("No rooms yet remembered.")
+                await self.mud.print(_("No rooms yet remembered."))
             return
         r = self.start_rooms[i-1]
         await self.run_to_room(r)
@@ -665,7 +668,7 @@ class S(Server):
         else:
             cmd = self.room
         if cmd in self.start_rooms:
-            await self.mud.print(f"Room {cmd.id_str} is already on the list.")
+            await self.mud.print(_("Room {cmd.id_str} is already on the list.").format(cmd=cmd))
             return
         self.start_rooms.appendleft(cmd)
         if len(self.start_rooms) > 10:
@@ -680,10 +683,10 @@ class S(Server):
         rl = 0
         maxlen = 100
         if not self.skiplist:
-            await self.mud.print("Skip list is empty.")
+            await self.mud.print(_("Skip list is empty."))
             return
         for r in self.skiplist:
-            rn = f"{r.id_str}:{r.name}"
+            rn = _("{r.id_str}:{r.name}").format(r=r)
             if rl+len(rn) >= maxlen:
                 await self.mud.print(" ".join(res))
                 res = []
@@ -703,14 +706,14 @@ class S(Server):
         if not cmd:
             cmd = self.room
             if not cmd:
-                await self.mud.print("No current room known")
+                await self.mud.print(_("No current room known"))
                 return
         cmd = cmd[0]
         if cmd in self.skiplist:
-            await self.mud.print("Room {cmd.id_str} already is on the list.")
+            await self.mud.print(_("Room {cmd.id_str} already is on the list."))
             return
         self.skiplist.add(cmd)
-        await self.mud.print("Room {cmd.id_str} added.")
+        await self.mud.print(_("Room {cmd.id_str} added."))
         db.commit()
 
     @with_alias("gs-")
@@ -723,16 +726,16 @@ class S(Server):
         if not cmd:
             cmd = self.room
             if not cmd:
-                await self.mud.print("No current room known")
+                await self.mud.print(_("No current room known"))
                 return
         cmd = cmd[0]
         try:
             self.skiplist.remove(cmd)
             db.commit()
         except KeyError:
-            await self.mud.print("Room {cmd.id_str} is not on the list.")
+            await self.mud.print(_("Room {cmd.id_str} is not on the list."))
         else:
-            await self.mud.print("Room {cmd.id_str} removed.")
+            await self.mud.print(_("Room {cmd.id_str} removed."))
 
     @with_alias("gs=")
     async def alias_gs_eq(self,cmd):
@@ -746,14 +749,14 @@ class S(Server):
             try:
                 sk = db.r_skiplist(cmd)
             except NoData:
-                await self.mud.print("List {cmd} doesn't exist")
+                await self.mud.print(_("List {cmd} doesn't exist"))
             else:
                 db.delete(sk)
                 db.commit()
 
         else:
             self.skiplist = set()
-            await self.mud.print("List cleared.")
+            await self.mud.print(_("List cleared."))
 
 
     async def alias_gss(self,cmd):
@@ -767,9 +770,9 @@ class S(Server):
             seen = False
             for sk in db.q(db.Skiplist).all():
                 seen = True
-                await self.mud.print(f"{sk.name}: {len(sk.rooms)} rooms")
+                await self.mud.print(_("{sk.name}: {lsk)} rooms").format(sk=sk, lsk=len(sk.rooms)))
             if not seen:
-                await self.mud.print("No skiplists found")
+                await self.mud.print(_("No skiplists found"))
             return
 
         cmd = cmd[0]
@@ -777,7 +780,7 @@ class S(Server):
         sk = db.r_skiplist(cmd, create=True)
         for room in self.skiplist:
             sk.rooms.append(room)
-        await self.mud.print(f"skiplist '{cmd}' contains {len(sk.rooms)} rooms.")
+        await self.mud.print(_("skiplist '{cmd}' contains {lsk} rooms.").format(cmd=cmd, lsk=len(sk.rooms)))
         db.commit()
 
     async def alias_gsr(self,cmd):
@@ -791,7 +794,7 @@ class S(Server):
         else:
             cmd = self.last_saved_skiplist
             if not cmd:
-                await self.mud.print(f"No last-saved skiplist.")
+                await self.mud.print(_("No last-saved skiplist."))
                 return
         try:
             sk = db.r_skiplist(cmd)
@@ -799,10 +802,10 @@ class S(Server):
             for room in sk.rooms:
                 self.skiplist.add(room)
         except NoData:
-            await self.mud.print(f"skiplist '{cmd}' not found.")
+            await self.mud.print(_("skiplist '{cmd}' not found.").format(cmd=cmd))
             return
         nr = len(self.skiplist)
-        await self.mud.print(f"skiplist '{cmd}' merged, now {nr} rooms (+{nr-onr}).")
+        await self.mud.print(_("skiplist '{cmd}' merged, now {nr} rooms (+{nnr}).").format(nr=nr, cmd=cmd, nnr=nr-onr))
 
 
 
@@ -810,7 +813,7 @@ class S(Server):
         """Go to typed room"""
         cmd = self.cmdfix("w",cmd)
         if not cmd:
-            await self.mud.print("Usage: #gt Kneipe / Kirche / Laden")
+            await self.mud.print(_("Usage: #gt Kneipe / Kirche / Laden"))
             return
         cmd = cmd[0]
 
@@ -866,9 +869,9 @@ class S(Server):
         for d,dst in exits:
             d += " "*(rl-len(d))
             if dst is None:
-                await self.mud.print(f"{d} - unknown")
+                await self.mud.print(_("{d} - unknown").format(d=d))
             else:
-                await self.mud.print(f"{d} = {dst.info_str}")
+                await self.mud.print(_("{d} = {dst.info_str}").format(dst=dst, d=d))
 
 
     async def alias_rc(self, cmd):
@@ -879,7 +882,7 @@ class S(Server):
         """Selected Rooms"""
         sel = await self.mud.getMapSelection()
         if not sel or not sel[0]:
-            await self.mud.print("No room selected.")
+            await self.mud.print(_("No room selected."))
             return
         for r in sel["rooms"]:
             room = self.db.r_mudlet(r)
@@ -898,7 +901,7 @@ class S(Server):
     async def run_to_room(self, room):
         """Run from the current room to the mentioned room."""
         if self.room is None:
-            await self.mud.print("No current room known!")
+            await self.mud.print(_("No current room known!"))
             return
 
         if not isinstance(room,int):
@@ -935,11 +938,11 @@ class S(Server):
         try:
             area = self._area_name2area[name.lower()]
             if create is True:
-                raise ValueError(f"Area '{name}' already exists")
+                raise ValueError(_("Area '{name}' already exists").format(name=name))
         except KeyError:
             # ask the MUD to make a new one
             if create is False:
-                raise ValueError(f"Area '{name} does not exist")
+                raise ValueError(_("Area '{name} does not exist").format(name=name))
             aid = await self.mud.addAreaName(name)
             area = db.Area(id=aid, name=name)
             db.add(area)
@@ -964,7 +967,7 @@ class S(Server):
                     await res
             else:
                 logger.error("Dunno what to do with %r %s",d,err_str)
-                await self.mud.print(f"Dunno what to do with {d !r} {err_str}")
+                await self.mud.print(_("Dunno what to do with {d !r} {err_str}").format(err_str=err_str, d=d))
 
     async def sync_map(self):
         db=self.db
@@ -1020,7 +1023,7 @@ class S(Server):
                 print("EXPLORE",r.id_old,r.name)
                 explore.add(r.id_old)
                 continue
-            # print(r.id_old,r.id_mudlet,r.name,":".join(f"{k}={v}" for k,v in y.items()))
+            # print(r.id_old,r.id_mudlet,r.name,":".join(f"{k}={v}" for k,v in y.items()), v=v, k=k)
             for d,nr_id in x.items():
                 nr_id = x[d]
                 if not nr_id: continue
@@ -1037,7 +1040,7 @@ class S(Server):
                 if not mid:
                     more.add((r.id_old,d))
                     continue
-                # print(f"{nr.id_old} = {mid} {d}")
+                # print(_("{nr.id_old} = {mid} {d}").format(nr=nr, d=d, mid=mid))
                 try:
                     nr.id_mudlet = mid
                     db.commit()
@@ -1079,7 +1082,7 @@ class S(Server):
             return msg
 
     def called_prompt(self, msg):
-        print("NEXT")
+        print(_("NEXT"))
         self.prompted = P_NEXT
         try:
             self._prompt_s.send_nowait(None)
@@ -1123,7 +1126,7 @@ class S(Server):
     async def event_sysManualLocationSetEvent(self, msg):
         room = self.db.r_mudlet(msg[0])
         if room is None:
-            await self.mud.print("MAP: I do not know this room.")
+            await self.mud.print(_("MAP: I do not know this room."))
         else:
             self.room = room
 
@@ -1152,16 +1155,16 @@ class S(Server):
         msg = msg[2]
         chan = msg['chan']
         player = msg['player']
-        prefix = f"[{chan}:{player}] "
+        prefix = "[{chan}:{player}] ".format(chan=chan, player=player)
         txt = msg["msg"]
         if txt.startswith(prefix):
             txt = msg["msg"].replace(prefix,"").replace("\n"," ").replace("  "," ").strip()
-            print(f"CHAN:{chan} : {player}\n    :{txt}")
+            print(_("CHAN:{chan} : {player}\n    :{txt}").format(txt=txt, player=player, chan=chan))
         else:
-            prefix = f"[{chan}:{player} "
+            prefix = "[{chan}:{player} ".format(chan=chan, player=player)
             if txt.startswith(prefix) and txt.endswith("]"):
                 txt = txt[len(prefix):-1]
-            print(f"CHAN:{chan} : {player} {txt}")
+            print(_("CHAN:{chan} : {player} {txt}").format(txt=txt, player=player, chan=chan))
 
     async def new_room(self, descr, hash=None, id_mudlet=None, offset_from=None,
             offset_dir=None, area=None):
@@ -1172,9 +1175,9 @@ class S(Server):
                 pass
             else:
                 if offset_from and offset_dir:
-                    self.logger.error(f"Not in mudlet? but we know mudlet {id_mudlet} at {offset_room.id_str}/{offset_dir}")
+                    self.logger.error(_("Not in mudlet? but we know mudlet# {id_mudlet} at {offset_room.id_str}/{offset_dir}").format(offset_room=offset_room, offset_dir=offset_dir, id_mudlet=id_mudlet))
                 else:
-                    self.logger.error(f"Not in mudlet? but we know mudlet {id_mudlet}")
+                    self.logger.error(_("Not in mudlet? but we know mudlet# {id_mudlet}").format(id_mudlet=id_mudlet))
                 return None
         if hash:
             try:
@@ -1182,7 +1185,7 @@ class S(Server):
             except NoData:
                 pass
             else:
-                self.logger.error(f"New room? but we know hash {hash} at {room.id_old}")
+                self.logger.error(_("New room? but we know hash {hash} at {room.id_old}").format(room=room, hash=hash))
                 return None
         if offset_from is None and id_mudlet is None:
             self.logger.warning("I don't know where to place the room!")
@@ -1269,7 +1272,7 @@ class S(Server):
 
         if not room: # case 2: non-hashed or new room
             if not self.room:
-                await self.mud.print("MAP: I have no idea where you are.")
+                await self.mud.print(_("MAP: I have no idea where you are."))
                 return
 
             if r_hash: # yes definitely a new room, thus we moved
@@ -1277,7 +1280,7 @@ class S(Server):
                     moved = self.sent[0]
             else: # maybe moved
                 if moved is None:
-                    await self.mud.print("MAP: If you moved, say '#mn'.")
+                    await self.mud.print(_("MAP: If you moved, say '#mn'."))
                     return
             
             room = self.room.exits.get(moved, None)
@@ -1294,7 +1297,7 @@ class S(Server):
                 room = room2
             elif room2 and room2.id_old != room.id_old:
                 self.logger.warning("Conflict! From %s we went %s, old=%s mud=%s", self.room.id_str, moved, room.id_str, room2.id_str)
-                await self.mud.print(f"MAP: Conflict! {room.id_str} vs. {room2.id_str}")
+                await self.mud.print(_("MAP: Conflict! {room.id_str} vs. {room2.id_str}").format(room2=room2, room=room))
                 self.room = None
                 return
             if not room:
@@ -1323,7 +1326,7 @@ class S(Server):
                 if rev:
                     await room.set_exit(rev, self.room)
                 else:
-                    await self.mud.print("Way back unknown, not set")
+                    await self.mud.print(_("Way back unknown, not set"))
 
         short = info.get("short","").rstrip(".")
         if short and room.id_mudlet:
@@ -1394,9 +1397,9 @@ class S(Server):
 #                for k,v in room["EXITS"].items():
 #                    v=int(v)
 #                    if v:
-#                        ex.append(f"{k}={v}")
+#                        ex.append(_("{k}={v}").format(v=v, k=k))
 #                    else:
-#                        ex.append(f"{k}")
+#                        ex.append(_("{k}").format(k=k))
 #
 #                sql = "INSERT INTO `rooms` set id_old=%s,name=%s,long_descr=%s, note=%s, exits=%s,label=%s"
 #                await cursor.execute(sql, (i,room["RSHORT"],"\n".join(room.get("RLONG",())),
@@ -1421,7 +1424,7 @@ class S(Server):
         if vr.id_mudlet:
             await self.mud.centerview(vr.id_mudlet)
         else:
-            await self.mud.print(f"No mapped room to {d}")
+            await self.mud.print(_("No mapped room to {d}").format(d=d))
 
     async def alias_vg(self, cmd):
         """Shift the view to the room in this direction"""
@@ -1465,7 +1468,7 @@ class S(Server):
     # ### main code ### #
 
     async def run(self, db):
-        print("connected")
+        print(_("connected"))
         await self.setup(db)
 
         info = await self.mud.gmcp.MG.room.info
@@ -1497,7 +1500,7 @@ async def main(config):
     logging.basicConfig(level=getattr(logging,cfg.log['level'].upper()))
 
     with SQL(cfg) as db:
-        print("waiting for connection from Mudlet")
+        print(_("waiting for connection from Mudlet"))
         async with S(cfg=cfg) as mud:
             await mud.run(db=db)
 

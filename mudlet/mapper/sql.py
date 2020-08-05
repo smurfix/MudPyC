@@ -12,10 +12,13 @@ from sqlalchemy.schema import CreateTable, DropTable
 from .const import SignalThis, SkipRoute, SkipSignal
 from .const import ENV_OK,ENV_STD,ENV_SPECIAL,ENV_UNMAPPED
 
+import gettext
+_ = gettext.gettext
+
 class NoData(RuntimeError):
     def __str__(self):
         if self.args:
-            return f"‹NoData:{':'.join(self.args)}›"
+            return _("‹NoData:{':'.join(self.args)}›").format(self=self)
         return "‹NoData›"
     pass
 
@@ -67,11 +70,11 @@ def SQL(cfg):
         @property
         def info_str(self):
             if self.dst_id:
-                res = f"‹{self.__class__.__name__}: {self.src.id_str} via {self.dir} {self.dst.id_str}›"
+                res = _("‹{self.__class__.__name__}: {self.src.id_str} via {self.dir} {self.dst.id_str}›").format(self=self)
             else:
-                res = f"‹{self.__class__.__name__}: {self.src.id_str} via {self.dir}›"
+                res = _("‹{self.__class__.__name__}: {self.src.id_str} via {self.dir}›").format(self=self)
             if self.steps:
-                res += f" ({len(self.moves)})"
+                res += _(" ({lsm})").format(lsm=len(self.moves))
             return res
 
         @property
@@ -108,7 +111,7 @@ def SQL(cfg):
 
         @property
         def info_str(self):
-            return f"‹{self.__class__.__name__}: {self.id_str} {self.exit_str} {self.name}›"
+            return _("‹{self.__class__.__name__}: {self.id_str} {self.exit_str} {self.name}›").format(self=self)
 
         @property
         def id_str(self):
