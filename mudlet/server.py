@@ -158,14 +158,18 @@ class Server:
                 msglen = int(line)
                 msg = await f.read_all(msglen)
                 msg = json.loads(msg)
-                await self._msg_in(msg)
+                try:
+                    await self._msg_in(msg)
+                except Exception as exc:
+                    logger.exception("CRASH")
         except EnvironmentError as err:
             if err.errno == errno.EBADF:
                 return  # closed from outside
             raise
 
     async def _msg_in(self, msg):
-        logger.debug("IN %r",msg)
+        if msg.get("result",()) and msg["result"][0] != "Pong":
+            logger.debug("IN %r",msg)
         seq = msg.get("seq",None)
         if seq is not None:
             try:
@@ -360,9 +364,12 @@ class Server:
                         self._replies[k] = outcome.Error(EOFError())
                         v.set()
                 n.cancel_scope.cancel()
+                pass # end finally
+            pass # end nursery
 
     def _send(self, data):
-        logger.debug("OUT %r",data)
+        if data.get("action","") != "ping":
+            logger.debug("OUT %r",data)
         json.dumps(data)  # functional no-op but catches errors early
         self._to_send.append(data)
         self._to_send_wait.set()
