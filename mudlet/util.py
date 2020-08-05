@@ -29,6 +29,11 @@ class NotGiven:
     def __repr__(self):
         return "<*NotGiven*>"
 
+def doc(docstring):
+    def decorate(fn):
+        fn.__doc__ = docstring
+        return fn
+    return decorate
 
 def combine_dict(*d, cls=dict):
     """

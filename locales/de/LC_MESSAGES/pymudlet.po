@@ -5,7 +5,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"POT-Creation-Date: 2020-08-05 18:35+0200\n"
+"POT-Creation-Date: 2020-08-05 20:28+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -27,289 +27,623 @@ msgstr "SYNC: Mudlet: neue Domäne {v}"
 msgid "SYNC: renumber area {v}: {k} > {kk}"
 msgstr "SYNC: Domäne {v} umbenannt: {k} > {kk}"
 
-#: mudlet/mapper/main.py:245
+#: mudlet/mapper/main.py:237
+msgid ""
+"\n"
+"        Configuration.\n"
+"\n"
+"        Shows config data. No parameters.\n"
+"        "
+msgstr ""
+"\n"
+"Konfiguration."
+"Zeigt Konfigdaten."
+
+#: mudlet/mapper/main.py:248
 msgid "Config item '{cmd}' unknown."
 msgstr "Konfig '{cmd}' unbekannt."
 
-#: mudlet/mapper/main.py:247
+#: mudlet/mapper/main.py:250
 msgid "{cmd} = {v}."
 msgstr "{cmd} = {v}."
 
-#: mudlet/mapper/main.py:251
+#: mudlet/mapper/main.py:254
 msgid "{k} = {v}."
 msgstr "{k} = {v}."
 
-#: mudlet/mapper/main.py:269
+#: mudlet/mapper/main.py:256
+msgid ""
+"\n"
+"        Change setting for forcing newly visited rooms' areas\n"
+"        to what 'use_mg_area' says."
+msgstr "\n"
+"Setze besuchte Räume auf die Domäne im MUD?"
+
+#: mudlet/mapper/main.py:263
+msgid ""
+"\n"
+"        Use the MUD's area name?\n"
+"        If False, use the last-visited room or 'Default'.\n"
+"        "
+msgstr "\n"
+"        Verwende die Domäne des MUD?\n"
+"        Wenn nicht, nimm die des zuletzt besuchten Raums, oder 'Default'."
+
+#: mudlet/mapper/main.py:271
+msgid "Show/change the room's area/domain."
+msgstr "Zeige/Ändere die Domäne des Raums."
+
+#: mudlet/mapper/main.py:276
 msgid "No active room."
 msgstr "Kein aktiver Raum."
 
-#: mudlet/mapper/main.py:275
+#: mudlet/mapper/main.py:282
 msgid "No area/domain set."
 msgstr "Keine Domäne bekannt."
 
-#: mudlet/mapper/main.py:300
+#: mudlet/mapper/main.py:295
+msgid "Set the room to its 'other' area, or to a new named one"
+msgstr "Wechsle die Domäne des Raums"
+
+#: mudlet/mapper/main.py:308
 msgid "No alternate area/domain known."
 msgstr "Keine anderen Domänen bekannt."
 
-#: mudlet/mapper/main.py:313
+#: mudlet/mapper/main.py:311
+msgid "When creating an exit, also link back?"
+msgstr "Beim Anlegen eines Ausgangs auch den Rückweg eintragen?"
+
+#: mudlet/mapper/main.py:316
+msgid "Can new rooms be created in Z direction?"
+msgstr "Erscheinen neue Räume ggf. über/unter dem vorherigen auf der Karte?"
+
+#: mudlet/mapper/main.py:323
 msgid "Setting '{name}' {set}."
 msgstr "Einstellung '{name}' {set}."
 
-#: mudlet/mapper/main.py:313
+#: mudlet/mapper/main.py:323
 msgid "cleared"
 msgstr "ist aus"
 
-#: mudlet/mapper/main.py:313
+#: mudlet/mapper/main.py:323
 msgid "set"
 msgstr "ist an"
 
-#: mudlet/mapper/main.py:340 mudlet/mapper/main.py:350
+#: mudlet/mapper/main.py:326
+msgid "X shift for moving room labels (Ctrl-left/right)"
+msgstr "X-Offset beim Bewegen von Raumnamen (Ctrl-links/rechts)"
+
+#: mudlet/mapper/main.py:331
+msgid "Y shift for moving room labels (Ctrl-Shift-left/right)"
+msgstr "Y-Offset beim Bewegen von Raumnamen (Ctrl-Shift-links/rechts)"
+
+#: mudlet/mapper/main.py:336
+msgid "X offset for placing rooms"
+msgstr "X-Offset beim Platzieren neuer Räume"
+
+#: mudlet/mapper/main.py:341
+msgid "Y offset for placing rooms"
+msgstr "Y-Offset beim Platzieren neuer Räume"
+
+#: mudlet/mapper/main.py:346
+msgid "Diagonal offset for placing rooms (Z, nonstandard exits)"
+msgstr ""
+"Diagonales Offset zum Platzieren neuer Räume (ohne Z, nicht-Standard-Ausgänge)"
+
+#: mudlet/mapper/main.py:355 mudlet/mapper/main.py:365
 msgid "Setting '{name}' to {v}."
 msgstr "Einstellung '{name}' ist jetzt '{v}'."
 
-#: mudlet/mapper/main.py:344 mudlet/mapper/main.py:354
+#: mudlet/mapper/main.py:359 mudlet/mapper/main.py:369
 msgid "Setting '{name}' is {v}."
 msgstr "Einstellung '{name}' ist '{v}'."
 
-#: mudlet/mapper/main.py:365
+#: mudlet/mapper/main.py:376
+msgid "Remove an exit from a room"
+msgstr "Lösche den Ausgang eines Raums"
+
+#: mudlet/mapper/main.py:381
 msgid "Usage: #x- exitname"
 msgstr "Verwendung: #x- Name_des_Ausgangs"
 
-#: mudlet/mapper/main.py:371 mudlet/mapper/main.py:400
-#: mudlet/mapper/main.py:420
+#: mudlet/mapper/main.py:387 mudlet/mapper/main.py:418
+#: mudlet/mapper/main.py:440
 msgid "Exit unknown."
 msgstr "Ausgang unbekannt"
 
-#: mudlet/mapper/main.py:375
+#: mudlet/mapper/main.py:391
 msgid "Removed."
 msgstr "Entfernt"
 
-#: mudlet/mapper/main.py:415
+#: mudlet/mapper/main.py:394
+msgid "Add an exit to a room."
+msgstr "Lege einen Ausgang an einem Raum an."
+
+#: mudlet/mapper/main.py:406
+msgid "Show an exit's details"
+msgstr "Details eines Ausgangs"
+
+#: mudlet/mapper/main.py:425
+msgid ""
+"\n"
+"        Commands for an exit.\n"
+"        Usage: #xc ‹exit› ‹whatever to send›\n"
+"        \"-\": remove commands.\n"
+"        Otherwise, add to the list of things to send.\n"
+"        "
+msgstr "\n"
+"        Wegbefehle eines Ausgangs.\n"
+"        Verwendung: #xc ‹Ausgang› ‹zu sendender Text›\n"
+"        \"-\": löscht die Befehle.\n"
+"        Ansonsten wird dein Text an die Liste angehängt."
+
+#: mudlet/mapper/main.py:435
 msgid "Missing arguments. You want '#xs'."
 msgstr "Fehlende Argumente. Du willst '#xs'."
 
-#: mudlet/mapper/main.py:424
+#: mudlet/mapper/main.py:444
 msgid "Steps:"
 msgstr "Schritte:"
 
-#: mudlet/mapper/main.py:428
+#: mudlet/mapper/main.py:448
 msgid "Deleted."
 msgstr "Gelöscht."
 
-#: mudlet/mapper/main.py:430
+#: mudlet/mapper/main.py:450
 msgid "This exit doesn't have specials."
 msgstr "Dieser Ausgang hat keine Schritte."
 
-#: mudlet/mapper/main.py:433
+#: mudlet/mapper/main.py:453
 msgid "Added."
 msgstr "Hinzugefügt."
 
-#: mudlet/mapper/main.py:449
+#: mudlet/mapper/main.py:456
+msgid ""
+"\n"
+"        Prepare a named exit\n"
+"        Usage: you have an interesting and/or existing exit but don't know\n"
+"        which command triggers it.\n"
+"        So you say \"#xn pseudo_direction\", then try any number of things,\n"
+"        and when you do move the exit will be created with the name you\n"
+"        give here and with the command you used to get there.\n"
+"\n"
+"        \"#xn\" without a name will clear this.\n"
+"        "
+msgstr "\n"
+"        Benannten Ausgang vorbereiten\n"
+"        Verwendung: di siehst einen Interessanten Ausgang, hast aber keine\n"
+"        Ahnung, mit welchem Befehl du da hinkommst.\n"
+"        Dann sagst du \"#xn Pseudorichtung\", dann spielst du rum, und\n"
+"        sobald du dich bewegst wird der Ausgang mit dem Namen "
+"\"PseudoRichtung\"\n"
+"        angelegt und der Befehl, mit dem du dich bewegt hast, wird "
+"eingetragen.        \"#xn\" ohne Pseudorichtung schaltet wieder auf "
+"Normalmodus."
+
+#: mudlet/mapper/main.py:471
 msgid "Exit name cleared."
 msgstr "Ausgang gelöscht."
 
-#: mudlet/mapper/main.py:452
+#: mudlet/mapper/main.py:474
 msgid "Exit name '{self.named_exit}' set."
 msgstr "Name zu '{self.named_exit}' geändert."
 
-#: mudlet/mapper/main.py:463
+#: mudlet/mapper/main.py:476
+msgid ""
+"\n"
+"        Rename the exit just taken.\n"
+"        The exit just taken, usually a command like \"enter house\",\n"
+"        is renamed to whatever you say here. The exit is aliased to the old\n"
+"        name. Thus \"#xr house\" will rename that exit to \"house\" and "
+"save\n"
+"        \"enter house\" as the command to use.\n"
+"        "
+msgstr "\n"
+"        Benenne den Ausgang um, den du gerade genommen hast.\n"
+"        Der Ausgang, z.B. ein Befehl a la \"betrete haus\",\n"
+"        wird umbenannt zu der Pseudorichtung, die du hier angibst,\n"
+"        und der alte Name wird dort als Befehl eingetragen.\n"
+"        Wenn du also \"#xr haus\" eingibst, dann heißt der Ausgang\n"
+"        künftig \"haus\" und wird \"betrete haus\" ausgeben."
+
+#: mudlet/mapper/main.py:487
 msgid "Usage: #xt new_name"
 msgstr "Verwendung: #xt neuer_Name"
 
-#: mudlet/mapper/main.py:468
+#: mudlet/mapper/main.py:492
 msgid "I don't know where I am or where I came from."
 msgstr "Ich habe keine Ahnung, wo du bist und/oder wo du herkommst."
 
-#: mudlet/mapper/main.py:476
+#: mudlet/mapper/main.py:500
 msgid "This exit already exists:"
 msgstr "Diesen Ausgang gibt es schon:"
 
-#: mudlet/mapper/main.py:483
+#: mudlet/mapper/main.py:507
 msgid ""
 "Room {self.last_room.id_str} doesn't have an exit to {self.room.id_str}?"
 msgstr "Raum {self.last_room.id_str} hat keinen Ausgang zu {self.room.id_str}?"
 
-#: mudlet/mapper/main.py:486
+#: mudlet/mapper/main.py:510
 msgid "This exit already has steps:"
 msgstr "Dieser Ausgang hat schon Schritte:"
 
-#: mudlet/mapper/main.py:499
+#: mudlet/mapper/main.py:517
+msgid ""
+"\n"
+"        Fix last move\n"
+"        You went to another room instead.\n"
+"        Mention a room# to use that room, or leave empty to create a new "
+"room.\n"
+"        "
+msgstr "\n"
+"        Repariert die letzte Bewegung\n"
+"        Du bist nicht hier-, sonder woanders hingegangen.\n"
+"        Gib eine Raumnummer als neues Ziel an. Ansonsten wird\n"
+"        ein neuer Raum angelegt."
+
+#: mudlet/mapper/main.py:525
 msgid "I have no idea where you were."
 msgstr "Ich habe keine Ahnung, wo du warst."
 
-#: mudlet/mapper/main.py:502
+#: mudlet/mapper/main.py:528
 msgid "I have no idea how you got here."
 msgstr "Ich habe keine Ahnung, wie du hier hergekommen bist."
 
-#: mudlet/mapper/main.py:568
+#: mudlet/mapper/main.py:540
+msgid ""
+"\n"
+"        Database rooms not in Mudlet\n"
+"\n"
+"        Find routes to those rooms. Use #gg to use one.\n"
+"\n"
+"        No parameters.\n"
+"        "
+msgstr "\n"
+"        Räume in der DB aber nicht in Mudlet\n"
+"\n"
+"        Finde Wege zu diesen Räumen. Dann sag '#gg', um einem\n"
+"        dieser Wege langzulaufen.\n"
+"\n"
+"        Keine Parameter."
+
+#: mudlet/mapper/main.py:596
 msgid "#gu {d} : {r.id_str} {r.name} ({lh})"
 msgstr "#gu {d} : {r.id_str} {r.name} ({lh})"
 
-#: mudlet/mapper/main.py:579
+#: mudlet/mapper/main.py:607
 msgid "Maybe more results: #gn"
 msgstr "Mit '#gn' bekommst du evtl. mehr Ergebnisse."
 
-#: mudlet/mapper/main.py:581
+#: mudlet/mapper/main.py:609
 msgid "No more results."
 msgstr "Keine weiteren Ergebnisse."
 
-#: mudlet/mapper/main.py:587
+#: mudlet/mapper/main.py:615
 msgid "#gg {n} :d{lh} f{room.info_str}"
 msgstr "#gg {n} :d{lh} f{room.info_str}"
 
-#: mudlet/mapper/main.py:600
+#: mudlet/mapper/main.py:621
+msgid ""
+"\n"
+"        Path generator / walker status\n"
+"        "
+msgstr "\nStatus des Weggenerators / Sprinters"
+
+#: mudlet/mapper/main.py:629
 msgid "No active walk."
 msgstr "Kein aktiver Weg."
 
-#: mudlet/mapper/main.py:604
+#: mudlet/mapper/main.py:633
 msgid "No active path generator."
 msgstr "Kein aktiver Weggenerator."
 
-#: mudlet/mapper/main.py:615
+#: mudlet/mapper/main.py:635
+msgid ""
+"\n"
+"        Ask the path generator for another room or three.\n"
+"\n"
+"        Parameter: number of additional rooms, default 3.\n"
+"        "
+msgstr "\n"
+"        Sagt dem Weggenerator, er möge ein paar mehr Wege produzieren.\n"
+"\n"
+"        Parameter: Zahl der neuen Wege, Default 3."
+
+#: mudlet/mapper/main.py:650
 msgid "No path generator is active."
 msgstr "Kein aktiver Weggenerator."
 
-#: mudlet/mapper/main.py:623
+#: mudlet/mapper/main.py:652
+msgid ""
+"\n"
+"        Use the first / a specific path which the generator produced\n"
+"        No parameters: use the first result\n"
+"        Otherwise: use the n'th result\n"
+"        "
+msgstr "\n"
+"        Verwende einen Weg\n"
+"        Laufen den ersten / N-ten Weg lang, den der Generator gefunden hat."
+
+#: mudlet/mapper/main.py:660
 msgid "No route search active"
 msgstr "Keine Wegsuche aktiv."
 
-#: mudlet/mapper/main.py:627
+#: mudlet/mapper/main.py:664
 msgid "No route search results yet"
 msgstr "Die Suche ist noch ergebnislos."
 
-#: mudlet/mapper/main.py:629
+#: mudlet/mapper/main.py:666
 msgid "No route search results. Sorry."
 msgstr "Die Suche war ergebnislos. Sorry."
 
-#: mudlet/mapper/main.py:637
+#: mudlet/mapper/main.py:674
 msgid "I only have {lgr} results."
 msgstr "Ich habe nur {lgr} Ergebnisse."
 
-#: mudlet/mapper/main.py:649
+#: mudlet/mapper/main.py:679
+msgid ""
+"\n"
+"        Return to previous room\n"
+"        No parameter: list the last ten rooms you started a speedwalk from.\n"
+"        Otherwise, go to the N'th room in the list."
+msgstr "\n"
+"Geh zu einem vorherigen Raum zurück\n"
+"Ohne Parameter: Liste der letzten zehn Räume, aus denen du weggerannt bist.\n"
+"Sonst: gehe zun N'ten Raum in dieser Liste."
+
+#: mudlet/mapper/main.py:689
 msgid "{n}: {r.id_str} {r.name}"
 msgstr "{n}: {r.id_str} {r.name}"
 
-#: mudlet/mapper/main.py:651
+#: mudlet/mapper/main.py:691
 msgid "No rooms yet remembered."
 msgstr "Ich habe mir noch keine Räume gemerkt."
 
-#: mudlet/mapper/main.py:668
+#: mudlet/mapper/main.py:698
+msgid ""
+"\n"
+"        Add a room to the #gr list\n"
+"        Remember the current (or a numbered) room for later walking-back-to\n"
+"        "
+msgstr "\n"
+"        Anhängen an die besuchte-Räume-Liste (#gr)\n"
+"        Merkt sich den aktuellen (oder den angegebenen) Raum, für spätere\n"
+"        dort-hin-Laufen."
+
+#: mudlet/mapper/main.py:710
 msgid "Room {cmd.id_str} is already on the list."
 msgstr "Raum {cmd.id_str} ist schon auf der Liste."
 
-#: mudlet/mapper/main.py:683
+#: mudlet/mapper/main.py:717
+msgid ""
+"\n"
+"        skiplist for searches.\n"
+"        Rooms on the list are skipped while searching.\n"
+"        "
+msgstr "\n"
+"        Skipliste für Suchen.\n"
+"        Räume auf dieser Liste werden beim Suchen übersprungen."
+
+#: mudlet/mapper/main.py:727
 msgid "Skip list is empty."
 msgstr "Die Skipliste ist leer."
 
-#: mudlet/mapper/main.py:686
+#: mudlet/mapper/main.py:730
 msgid "{r.id_str}:{r.name}"
 msgstr "{r.id_str}:{r.name}"
 
-#: mudlet/mapper/main.py:706 mudlet/mapper/main.py:726
+#: mudlet/mapper/main.py:741
+msgid ""
+"\n"
+"        Add room the skiplist.\n"
+"        No room given: use the current room.\n"
+"        "
+msgstr "\n"
+"        Füge einen Raum zur Skipliste hinzu.\n"
+"        Keine Angabe: verwendet den aktuellen Raum."
+
+#: mudlet/mapper/main.py:752 mudlet/mapper/main.py:774
 msgid "No current room known"
 msgstr "Ich weiß nicht, wo du bist."
 
-#: mudlet/mapper/main.py:710
+#: mudlet/mapper/main.py:756
 msgid "Room {cmd.id_str} already is on the list."
 msgstr "Raum {cmd.id_str} ist schon auf der Liste."
 
-#: mudlet/mapper/main.py:713
+#: mudlet/mapper/main.py:759
 msgid "Room {cmd.id_str} added."
 msgstr "Raum {cmd.id_str} ist jetzt auf der Liste."
 
-#: mudlet/mapper/main.py:733
+#: mudlet/mapper/main.py:763
+msgid ""
+"\n"
+"        Remove room from the skiplist.\n"
+"        No room given: use the current room.\n"
+"        "
+msgstr "\n"
+"        Entferne einen Raum von der Skipliste.\n"
+"        Keine Angabe: verwendet den aktuellen Raum."
+
+#: mudlet/mapper/main.py:781
 msgid "Room {cmd.id_str} is not on the list."
 msgstr "Raum {cmd.id_str} ist nicht auf der Liste."
 
-#: mudlet/mapper/main.py:735
+#: mudlet/mapper/main.py:783
 msgid "Room {cmd.id_str} removed."
 msgstr "Raum {cmd.id_str} ist nicht mehr auf der Liste."
 
-#: mudlet/mapper/main.py:749
+#: mudlet/mapper/main.py:786
+msgid ""
+"\n"
+"        Forget a / clear the current skiplist.\n"
+"        If a name is given, delete the named list, else clear the current\n"
+"        in-memory list"
+msgstr "\n"
+"        Vergiss eine / leere die aktuelle Skipliste.\n"
+"        Wenn du einen Namen angibst, wird diese Skipliste gelöscht.\n"
+"        Ansonsten wird die aktuelle Liste zurückgesetzt (alle Räume "
+"entfernt)."
+
+#: mudlet/mapper/main.py:799
 msgid "List {cmd} doesn't exist"
 msgstr "Die Liste '{name} gibt es nicht"
 
-#: mudlet/mapper/main.py:756
+#: mudlet/mapper/main.py:806
 msgid "List cleared."
 msgstr "Liste gelöscht."
 
-#: mudlet/mapper/main.py:770
+#: mudlet/mapper/main.py:809
+msgid ""
+"\n"
+"        Store the skiplist (by name)\n"
+"        Stored lists are merged when one with the same name exists.\n"
+"        No name given: list stored skiplists.\n"
+"        "
+msgstr "\n"
+"        Speichere die aktuelle Skipliste\n"
+"        Wenn eine Liste dieses namens schon existiert, wird die aktuelle\n"
+"        Liste angehängt.\n"
+"        Ohne Namen: Liste der gespeicherten Skiplisten."
+
+#: mudlet/mapper/main.py:822
 msgid "{sk.name}: {lsk} rooms"
 msgstr "{sk.name}: {lsk} Räume"
 
-#: mudlet/mapper/main.py:772
+#: mudlet/mapper/main.py:824
 msgid "No skiplists found"
 msgstr "Keine Skiplisten gefunden."
 
-#: mudlet/mapper/main.py:780
+#: mudlet/mapper/main.py:832
 msgid "skiplist '{cmd}' contains {lsk} rooms."
 msgstr "In der Skipliste '{cmd}' sind {lsk} Räume."
 
-#: mudlet/mapper/main.py:794
+#: mudlet/mapper/main.py:835
+msgid ""
+"\n"
+"        Restore the named skiplist by merging with the current list.\n"
+"        No name given: merge/restore the last-saved list.\n"
+"        "
+msgstr "\n"
+"        Lade eine Skipliste\n"
+"        Lädt eine Liste in den Speicher.\n"
+"        Ohne Parameter: lädt die zuletzt gespeicherte Liste."
+
+#: mudlet/mapper/main.py:848
 msgid "No last-saved skiplist."
 msgstr "Du hast noch keine Skipliste gespeichert."
 
-#: mudlet/mapper/main.py:802
+#: mudlet/mapper/main.py:856
 msgid "skiplist '{cmd}' not found."
 msgstr "Skipliste '{cmd}' nicht gefunden."
 
-#: mudlet/mapper/main.py:805
+#: mudlet/mapper/main.py:859
 msgid "skiplist '{cmd}' merged, now {nr} rooms (+{nnr})."
 msgstr "Skiplist '{cmd}' dazugenommen, jetzt {nr} Räume (+{nnr})."
 
-#: mudlet/mapper/main.py:813
+#: mudlet/mapper/main.py:863
+msgid "Go to typed room"
+msgstr "Gehe zum nähesten Raum eines Typs"
+
+#: mudlet/mapper/main.py:868
 msgid "Usage: #gt Kneipe / Kirche / Laden"
 msgstr "Verwendung: #gt Kneipe / Kirche / Laden"
 
-#: mudlet/mapper/main.py:869
+#: mudlet/mapper/main.py:880
+msgid "Cancel path generation."
+msgstr "Weggenerator abbrechen."
+
+#: mudlet/mapper/main.py:887
+msgid "Cancel walking."
+msgstr "Weg abbrechen."
+
+#: mudlet/mapper/main.py:894
+msgid ""
+"\n"
+"        Cancel walking and/or path generation\n"
+"\n"
+"        No parameters.\n"
+"        "
+msgstr "\n"
+"        Brich Laufen oder Weggenerierung ab.\n"
+"\n"
+"        Keine Parameter."
+
+#: mudlet/mapper/main.py:904
+msgid ""
+"\n"
+"        Exits (short)\n"
+"        Print a one-line list of exits of the current / a given room"
+msgstr "\n"
+"        Ausgänge\n"
+"        Gibt einen Einzeiler mit allen Ausgängen des aktuellen / eines\n"
+"        bestimmten Raums aus."
+
+#: mudlet/mapper/main.py:916
+msgid ""
+"\n"
+"        Exits (long)\n"
+"        Print a multi-line list of exits of the current / a given room"
+msgstr "\n"
+"        Ausgänge\n"
+"        Gibt eine mehrzeilige Liste mit den Ausgängen des aktuellen /\n"
+"        eines bestimmten Raums aus."
+
+#: mudlet/mapper/main.py:931
 msgid "{d} - unknown"
 msgstr "{d} - unbekannt"
 
-#: mudlet/mapper/main.py:871
+#: mudlet/mapper/main.py:933
 msgid "{d} = {dst.info_str}"
 msgstr "{d} = {dst.info_str}"
 
-#: mudlet/mapper/main.py:882
+#: mudlet/mapper/main.py:936
+msgid "Current Room"
+msgstr "Aktueller Raum"
+
+#: mudlet/mapper/main.py:941
+msgid "Selected Rooms"
+msgstr "Ausgewählte Räume"
+
+#: mudlet/mapper/main.py:946
 msgid "No room selected."
 msgstr "Kein Raum ausgewählt."
 
-#: mudlet/mapper/main.py:901
+#: mudlet/mapper/main.py:953
+msgid ""
+"\n"
+"        Walk to a mapped room.\n"
+"        This overrides any other walk code\n"
+"        Parameter: the room's ID.\n"
+"        "
+msgstr "\n"
+"Laufe zu einem Raum auf der Karte.Damit werden abgebrochen.Parameter: die "
+"Raumnummer"
+
+#: mudlet/mapper/main.py:967
 msgid "No current room known!"
 msgstr "Kein aktiver Raum bekannt."
 
-#: mudlet/mapper/main.py:938
+#: mudlet/mapper/main.py:985
+msgid "Recalculate colors"
+msgstr "Farben neu berechnen"
+
+#: mudlet/mapper/main.py:1005
 msgid "Area '{name}' already exists"
 msgstr "Die Domäne '{name}' gibt es schon"
 
-#: mudlet/mapper/main.py:942
+#: mudlet/mapper/main.py:1009
 msgid "Area '{name} does not exist"
 msgstr "Die Domäne '{name} gibt es nicht"
 
-#: mudlet/mapper/main.py:967
+#: mudlet/mapper/main.py:1034
 msgid "Dunno what to do with {d !r} {err_str}"
 msgstr "Keine Ahnung was ich mit {d !r} soll? {err_str}"
 
-#: mudlet/mapper/main.py:1082
-msgid "NEXT"
-msgstr "WEITER"
-
-#: mudlet/mapper/main.py:1126
+#: mudlet/mapper/main.py:1193
 msgid "MAP: I do not know this room."
 msgstr "KARTE: Ich kenne diesen Raum nicht."
 
-#: mudlet/mapper/main.py:1159
-msgid ""
-"CHAN:{chan} : {player}\n"
-"    :{txt}"
-msgstr ""
-"KANAL:{chan} : {player}\n"
-"     :{txt}"
-
-#: mudlet/mapper/main.py:1164
-msgid "CHAN:{chan} : {player} {txt}"
-msgstr "KANAL:{chan} : {player} {txt}"
-
-#: mudlet/mapper/main.py:1175
+#: mudlet/mapper/main.py:1243
 msgid ""
 "Not in mudlet? but we know mudlet# {id_mudlet} at {offset_room.id_str}/"
 "{offset_dir}"
@@ -317,41 +651,45 @@ msgstr ""
 "Nicht in Mudlet? Aber ich kenne die mudlet# {id_mudlet} bei {offset_room."
 "id_str}/{offset_dir}"
 
-#: mudlet/mapper/main.py:1177
+#: mudlet/mapper/main.py:1245
 msgid "Not in mudlet? but we know mudlet# {id_mudlet}"
 msgstr "Nicht in Mudlet? Aber ich kenne die Mudlet# {id_mudlet}"
 
-#: mudlet/mapper/main.py:1185
+#: mudlet/mapper/main.py:1253
 msgid "New room? but we know hash {hash} at {room.id_old}"
 msgstr "Neuer Raum? aber ich kenne den Hash {hash} in {room.id_old}"
 
-#: mudlet/mapper/main.py:1272
+#: mudlet/mapper/main.py:1340
 msgid "MAP: I have no idea where you are."
 msgstr "KARTE: Ich habe keine Ahnung, wo du bist."
 
-#: mudlet/mapper/main.py:1280
+#: mudlet/mapper/main.py:1348
 msgid "MAP: If you moved, say '#mn'."
 msgstr "KARTE: Hast du dich bewegt? dann sag '#mn'."
 
-#: mudlet/mapper/main.py:1297
+#: mudlet/mapper/main.py:1365
 msgid "MAP: Conflict! {room.id_str} vs. {room2.id_str}"
 msgstr "MAP: Konflikt! {room.id_str} vs. {room2.id_str}"
 
-#: mudlet/mapper/main.py:1326
+#: mudlet/mapper/main.py:1394
 msgid "Way back unknown, not set"
 msgstr "Der Rückweg ist unbekannt. Nicht eingetragen."
 
-#: mudlet/mapper/main.py:1424
+#: mudlet/mapper/main.py:1492
 msgid "No mapped room to {d}"
 msgstr "Kein bekannter Raum in Richtung {d}"
 
-#: mudlet/mapper/main.py:1468
-msgid "connected"
-msgstr "verbunden"
+#: mudlet/mapper/main.py:1494
+msgid "Shift the view to the room in this direction"
+msgstr "Zentriere die Ansicht auf dem Raum in dieser Richtung"
 
 #: mudlet/mapper/main.py:1500
-msgid "waiting for connection from Mudlet"
-msgstr "warte auf Verbindung von Mudlet"
+msgid "Shift the view to this room"
+msgstr "Zentriere die Ansicht auf diesem Raum"
+
+#: mudlet/mapper/main.py:1510
+msgid "Shift the view to the player's"
+msgstr "Zentriere die Ansicht auf den Spieler"
 
 #: mudlet/mapper/sql.py:18
 msgid "‹NoData:{jsa}›"
@@ -443,3 +781,22 @@ msgstr "Zu viele Parameter"
 #: mudlet/server.py:493
 msgid "Too few parameters"
 msgstr "Zu wenige Parameter"
+
+#~ msgid "NEXT"
+#~ msgstr "WEITER"
+
+#~ msgid ""
+#~ "CHAN:{chan} : {player}\n"
+#~ "    :{txt}"
+#~ msgstr ""
+#~ "KANAL:{chan} : {player}\n"
+#~ "     :{txt}"
+
+#~ msgid "CHAN:{chan} : {player} {txt}"
+#~ msgstr "KANAL:{chan} : {player} {txt}"
+
+#~ msgid "connected"
+#~ msgstr "verbunden"
+
+#~ msgid "waiting for connection from Mudlet"
+#~ msgstr "warte auf Verbindung von Mudlet"

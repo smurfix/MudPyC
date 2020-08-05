@@ -177,7 +177,7 @@ class Walker:
             logged = False
             resumed = False
             while self.in_room != self.way[0]:
-                nr = self.s.db.r_id_old(self.next_room_id)
+                nr = self.s.db.r_old(self.next_room_id)
                 self.state = _("Wait for entering room {nr.id_str}:{nr.name}").format(nr=nr)
                 with trio.move_on_after(99 if logged else 5) as cs:
                     await self.s.wait_moved()

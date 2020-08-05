@@ -19,6 +19,7 @@ from .sql import SQL, NoData
 from .const import SignalThis, SkipRoute, SkipSignal
 from .const import ENV_OK,ENV_STD,ENV_SPECIAL,ENV_UNMAPPED
 from .walking import Walker, PathGenerator
+from ..util import doc
 
 import logging
 logger = logging.getLogger(__name__)
@@ -92,8 +93,7 @@ def loc2rev(x):
     return y
 
 def dir_off(d, use_z=True, d_x=5, d_y=5, d_small=2):
-    """Calculate an (un)likely offset for placing a new room.
-    """
+    """Calculate an (un)likely offset for placing a new room."""
     x,y,z = 0,0,0
     d = short2loc(d)
     if "ost" in d: x += d_x
@@ -234,10 +234,13 @@ class S(Server):
     def _cmdfix_r(self,v):
         return self.db.r_mudlet(int(v))
 
-    async def alias_c(self, cmd):
-        """Configuration.
-        Shows config data. No parameters.
+    @doc(_(
         """
+        Configuration.
+
+        Shows config data. No parameters.
+        """))
+    async def alias_c(self, cmd):
         if cmd:
             try:
                 v = self.conf[cmd]
@@ -250,20 +253,24 @@ class S(Server):
             for k,v in self.conf.items():
                 await self.mud.print(_("{k} = {v}.").format(v=v, k=k))
 
+    @doc(_(
+        """
+        Change setting for forcing newly visited rooms' areas
+        to what 'use_mg_area' says."""))
     async def alias_cff(self, cmd):
-        """Change setting for forcing newly visited rooms' areas
-        to what 'use_mg_area' says."""
         await self._conf_flip("force_area")
 
-    async def alias_cfm(self, cmd):
-        """Use the MUD's area name?
-        If False, use the last-visited room or 'Default'.
+    @doc(_(
         """
+        Use the MUD's area name?
+        If False, use the last-visited room or 'Default'.
+        """))
+    async def alias_cfm(self, cmd):
         await self._conf_flip("use_mg_area")
 
+    @doc(_(
+        """Show/change the room's area/domain."""))
     async def alias_ra(self, cmd):
-        """Show/change the room's area/domain.
-        """
         cmd = self.cmdfix("w", cmd)
         if not self.room:
             await self.mud.print(_("No active room."))
@@ -285,8 +292,9 @@ class S(Server):
         self.db.commit()
 
     @with_alias("ra!")
+    @doc(_(
+        """Set the room to its 'other' area, or to a new named one"""))
     async def alias_ra_b(self, cmd):
-        """Set the room to its 'other' area, or to a new named one"""
         cmd = self.cmdfix("w", cmd)
         if cmd:
             cmd = cmd[0]
@@ -300,12 +308,14 @@ class S(Server):
                 await self.mud.print(_("No alternate area/domain known."))
         return await self.alias_ra(area.name)
 
+    @doc(_(
+        """When creating an exit, also link back?"""))
     async def alias_cfr(self, cmd):
-        """When creating an exit, also link back?"""
         await self._conf_flip("add_reverse")
 
+    @doc(_(
+        """Can new rooms be created in Z direction?"""))
     async def alias_cfz(self, cmd):
-        """Can new rooms be created in Z direction?"""
         await self._conf_flip("dir_use_z")
 
     async def _conf_flip(self, name):
@@ -313,24 +323,29 @@ class S(Server):
         await self.mud.print(_("Setting '{name}' {set}.").format(name=name, set=_('set') if self.conf[name] else _('cleared')))
         await self._save_conf(name)
 
+    @doc(_(
+        """X shift for moving room labels (Ctrl-left/right)"""))
     async def alias_cox(self, cmd):
-        """X shift for moving room labels (Ctrl-left/right)"""
         await self._conf_float("label_shift_x", cmd)
 
+    @doc(_(
+        """Y shift for moving room labels (Ctrl-Shift-left/right)"""))
     async def alias_coy(self, cmd):
-        """Y shift for moving room labels (Ctrl-Shift-left/right)"""
         await self._conf_float("label_shift_x", cmd)
 
+    @doc(_(
+        """X offset for placing rooms"""))
     async def alias_cop(self, cmd):
-        """X offset for placing rooms"""
         await self._conf_int("pos_x_delta", cmd)
 
+    @doc(_(
+        """Y offset for placing rooms"""))
     async def alias_coq(self, cmd):
-        """Y offset for placing rooms"""
         await self._conf_int("pos_x_delta", cmd)
 
+    @doc(_(
+        """Diagonal offset for placing rooms (Z, nonstandard exits)"""))
     async def alias_cor(self, cmd):
-        """Diagonal offset for placing rooms (Z, nonstandard exits)"""
         await self._conf_int("pos_small_delta", cmd)
 
     async def _conf_float(self, name, cmd):
@@ -358,8 +373,9 @@ class S(Server):
         await self.mud.setMapUserData("conf."+name, v)
 
     @with_alias("x-")
+    @doc(_(
+        """Remove an exit from a room"""))
     async def alias_x_m(self, cmd):
-        """Remove an exit from a room"""
         cmd = self.cmdfix("w",cmd)
         if not cmd:
             await self.mud.print(_("Usage: #x- exitname"))
@@ -375,8 +391,9 @@ class S(Server):
         await self.mud.print(_("Removed."))
 
     @with_alias("x+")
+    @doc(_(
+        """Add an exit to a room."""))
     async def alias_x_p(self, cmd):
-        """Add an exit to a room."""
         cmd = self.cmdfix("wr",cmd)
         if len(cmd) == 2:
             d,r = cmd
@@ -386,8 +403,9 @@ class S(Server):
         await self.room.set_exit(d, r)
         await self.mud.updateMap()
 
+    @doc(_(
+        """Show an exit's details"""))
     async def alias_xs(self,cmd):
-        """Show an exit's details"""
 
         cmd = self.cmdfix("w",cmd)
         if len(cmd) == 0:
@@ -404,12 +422,14 @@ class S(Server):
                 for m in x.moves:
                     await self.mud.print("… "+m)
 
-    async def alias_xc(self, cmd):
-        """Commands for an exit.
+    @doc(_(
+        """
+        Commands for an exit.
         Usage: #xc ‹exit› ‹whatever to send›
         "-": remove commands.
         Otherwise, add to the list of things to send.
-        """
+        """))
+    async def alias_xc(self, cmd):
         cmd = self.cmdfix("w*", cmd)
         if len(cmd) < 2:
             await self.mud.print(_("Missing arguments. You want '#xs'."))
@@ -433,8 +453,9 @@ class S(Server):
                 await self.mud.print(_("Added."))
             self.db.commit()
 
-    async def alias_xn(self, cmd):
-        """Prepare a named exit
+    @doc(_(
+        """
+        Prepare a named exit
         Usage: you have an interesting and/or existing exit but don't know
         which command triggers it.
         So you say "#xn pseudo_direction", then try any number of things,
@@ -442,7 +463,8 @@ class S(Server):
         give here and with the command you used to get there.
 
         "#xn" without a name will clear this.
-        """
+        """))
+    async def alias_xn(self, cmd):
         cmd = self.cmdfix("w", cmd)
         if not cmd:
             self.named_exit = None
@@ -451,13 +473,15 @@ class S(Server):
             self.named_exit = cmd[0]
             await self.mud.print(_("Exit name '{self.named_exit}' set.").format(self=self))
 
-    async def alias_xt(self, cmd):
-        """Rename the exit just taken.
+    @doc(_(
+        """
+        Rename the exit just taken.
         The exit just taken, usually a command like "enter house",
         is renamed to whatever you say here. The exit is aliased to the old
         name. Thus "#xr house" will rename that exit to "house" and save
         "enter house" as the command to use.
-        """
+        """))
+    async def alias_xt(self, cmd):
         cmd = self.cmdfix("w",cmd)
         if not cmd:
             await self.mud.print(_("Usage: #xt new_name"))
@@ -490,11 +514,13 @@ class S(Server):
         x.dir = cmd
         self.db.commit()
 
-    async def alias_mn(self, cmd):
-        """Fix last move
+    @doc(_(
+        """
+        Fix last move
         You went to another room instead.
         Mention a room# to use that room, or leave empty to create a new room.
-        """
+        """))
+    async def alias_mn(self, cmd):
         if not self.last_room:
             await self.mud.print(_("I have no idea where you were."))
             return
@@ -511,13 +537,15 @@ class S(Server):
         self.db.comit()
         self.went_to_room(r, fix=True)
 
-    async def alias_mud(self, cmd):
-        """Database rooms not in Mudlet
+    @doc(_(
+        """
+        Database rooms not in Mudlet
 
         Find routes to those rooms. Use #gg to use one.
 
         No parameters.
-        """
+        """))
+    async def alias_mud(self, cmd):
         async def check(room):
             # exits that are in Mudlet.
             mx = None
@@ -590,10 +618,11 @@ class S(Server):
         evt, self._gen_next = self._gen_next, trio.Event()
         evt.set()
 
-    async def alias_gi(self, cmd):
+    @doc(_(
         """
         Path generator / walker status
-        """
+        """))
+    async def alias_gi(self, cmd):
         if self.walker:
             await self.mud.print("Walk: "+str(self.walker))
         else:
@@ -603,22 +632,30 @@ class S(Server):
         else:
             await self.mud.print(_("No active path generator."))
 
-    async def alias_gn(self, cmd):
+    @doc(_(
         """
         Ask the path generator for another room or three.
 
-        No parameters.
-        """
+        Parameter: number of additional rooms, default 3.
+        """))
+    async def alias_gn(self, cmd):
+        cmd = self.cmdfix("i", cmd)
+        if cmd and cmd[0] > 0:
+            cmd = cmd[0]
+        else:
+            cmd = 3
         if self.path_gen:
-            self.path_gen.make_more_results(3)
+            self.path_gen.make_more_results(cmd)
         else:
             await self.mud.print(_("No path generator is active."))
 
-    async def alias_gu(self, cmd):
-        """Use the first / a specific path which the generator produced
+    @doc(_(
+        """
+        Use the first / a specific path which the generator produced
         No parameters: use the first result
         Otherwise: use the n'th result
-        """
+        """))
+    async def alias_gu(self, cmd):
         if self.path_gen is None:
             await self.mud.print(_("No route search active"))
             return
@@ -639,9 +676,12 @@ class S(Server):
 
         self.clear_gen()
 
+    @doc(_(
+        """
+        Return to previous room
+        No parameter: list the last ten rooms you started a speedwalk from.
+        Otherwise, go to the N'th room in the list."""))
     async def alias_gr(self, cmd):
-        """Return to prev room
-        List the last ten rooms you started a speedwalk from"""
         cmd = self.cmdfix("i", cmd)
         if not cmd:
             if self.start_rooms:
@@ -655,10 +695,12 @@ class S(Server):
 
 
     @with_alias("gr+")
-    async def alias_gr_p(self, cmd):
-        """Add a room to the #gr list
-        Remember the current (or a numbered) room for later walking-back-to
+    @doc(_(
         """
+        Add a room to the #gr list
+        Remember the current (or a numbered) room for later walking-back-to
+        """))
+    async def alias_gr_p(self, cmd):
         cmd = self.cmdfix("r", cmd)
         if cmd:
             cmd = cmd[0]
@@ -672,10 +714,12 @@ class S(Server):
             self.start_rooms.pop()
 
 
-    async def alias_gs(self,cmd):
-        """skiplist for searches.
-        Rooms on the list are skipped while searching.
+    @doc(_(
         """
+        skiplist for searches.
+        Rooms on the list are skipped while searching.
+        """))
+    async def alias_gs(self,cmd):
         res = []
         rl = 0
         maxlen = 100
@@ -694,10 +738,12 @@ class S(Server):
             await self.mud.print(" ".join(res))
 
     @with_alias("gs+")
-    async def alias_gs_p(self,cmd):
-        """Add room the skiplist.
-        No room given: use the current room.
+    @doc(_(
         """
+        Add room the skiplist.
+        No room given: use the current room.
+        """))
+    async def alias_gs_p(self,cmd):
         db = self.db
         cmd = self.cmdfix("r", cmd)
         if not cmd:
@@ -714,10 +760,12 @@ class S(Server):
         db.commit()
 
     @with_alias("gs-")
-    async def alias_gs_m(self,cmd):
-        """Remove room from the skiplist.
-        No room given: use the current room.
+    @doc(_(
         """
+        Remove room from the skiplist.
+        No room given: use the current room.
+        """))
+    async def alias_gs_m(self,cmd):
         db = self.db
         cmd = self.cmdfix("r", cmd)
         if not cmd:
@@ -735,10 +783,12 @@ class S(Server):
             await self.mud.print(_("Room {cmd.id_str} removed."))
 
     @with_alias("gs=")
-    async def alias_gs_eq(self,cmd):
-        """Forget a / clear the current skiplist.
+    @doc(_(
+        """
+        Forget a / clear the current skiplist.
         If a name is given, delete the named list, else clear the current
-        in-memory list"""
+        in-memory list"""))
+    async def alias_gs_eq(self,cmd):
         db = self.db
         cmd = self.cmdfix("w", cmd)
         if cmd:
@@ -756,11 +806,13 @@ class S(Server):
             await self.mud.print(_("List cleared."))
 
 
-    async def alias_gss(self,cmd):
-        """Suspend the skiplist (by name)
+    @doc(_(
+        """
+        Store the skiplist (by name)
         Stored lists are merged when one with the same name exists.
         No name given: list stored skiplists.
-        """
+        """))
+    async def alias_gss(self,cmd):
         db = self.db
         cmd = self.cmdfix("w", cmd)
         if not cmd:
@@ -780,10 +832,12 @@ class S(Server):
         await self.mud.print(_("skiplist '{cmd}' contains {lsk} rooms.").format(cmd=cmd, lsk=len(sk.rooms)))
         db.commit()
 
-    async def alias_gsr(self,cmd):
-        """Restore the named skiplist by merging with the current list.
-        No name given: merge/restore the last-saved list.
+    @doc(_(
         """
+        Restore the named skiplist by merging with the current list.
+        No name given: merge/restore the last-saved list.
+        """))
+    async def alias_gsr(self,cmd):
         db = self.db
         cmd = self.cmdfix("w", cmd)
         if cmd:
@@ -806,8 +860,9 @@ class S(Server):
 
 
 
+    @doc(_(
+        """Go to typed room"""))
     async def alias_gt(self, cmd):
-        """Go to typed room"""
         cmd = self.cmdfix("w",cmd)
         if not cmd:
             await self.mud.print(_("Usage: #gt Kneipe / Kirche / Laden"))
@@ -822,30 +877,35 @@ class S(Server):
                 return SkipSignal
         await self.gen_rooms(check)
 
+    @doc(_(
+        """Cancel path generation."""))
     async def clear_gen(self):
-        """Cancel path generation."""
         if self.path_gen:
             self.path_gen.cancel()
             self.path_gen = None
 
+    @doc(_(
+        """Cancel walking."""))
     async def clear_walk(self):
-        """Cancel walking."""
         if self.walker:
             self.walker.cancel()
             self.walker = None
 
-    async def alias_gc(self, cmd):
+    @doc(_(
         """
         Cancel walking and/or path generation
 
         No parameters.
-        """
+        """))
+    async def alias_gc(self, cmd):
         self.clear_gen()
         self.clear_walk()
 
+    @doc(_(
+        """
+        Exits (short)
+        Print a one-line list of exits of the current / a given room"""))
     async def alias_x(self, cmd):
-        """Exits
-        Print a one-line list of exits of the current / a given room"""
         cmd = self.cmdfix("i",cmd)
         if not cmd:
             room = self.room
@@ -853,9 +913,11 @@ class S(Server):
             room = self.db.r_mudlet(cmd[0])
         await self.mud.print(room.exit_str)
 
+    @doc(_(
+        """
+        Exits (long)
+        Print a multi-line list of exits of the current / a given room"""))
     async def alias_xx(self, cmd):
-        """Exits
-        Print a multi-line list of exits of the current / a given room"""
         cmd = self.cmdfix("i",cmd)
         if not cmd:
             room = self.room
@@ -871,12 +933,14 @@ class S(Server):
                 await self.mud.print(_("{d} = {dst.info_str}").format(dst=dst, d=d))
 
 
+    @doc(_(
+        """Current Room"""))
     async def alias_rc(self, cmd):
-        """Current Room"""
         await self.mud.print(self.room.info_str)
 
+    @doc(_(
+        """Selected Rooms"""))
     async def alias_rs(self, cmd):
-        """Selected Rooms"""
         sel = await self.mud.getMapSelection()
         if not sel or not sel[0]:
             await self.mud.print(_("No room selected."))
@@ -886,11 +950,13 @@ class S(Server):
             await self.mud.print(room.info_str)
 
     @with_alias("g#")
-    async def alias_g_h(self, cmd):
-        """Walk to a mapped room.
+    @doc(_(
+        """
+        Walk to a mapped room.
         This overrides any other walk code
         Parameter: the room's ID.
-        """
+        """))
+    async def alias_g_h(self, cmd):
         dest = self.db.r_mudlet(int(cmd)).id_old
 
         await self.run_to_room(dest)
@@ -912,12 +978,13 @@ class S(Server):
 
         async for h in self.room.reachable:
             r = h[-1]
-            if r == dest:
+            if r == room:
                 self.walker = Walker(self, h)
                 break
 
+    @doc(_(
+        """Recalculate colors"""))
     async def alias_mcr(self, cmd):
-        """Recalculate colors"""
         db = self.db
         id_old = db.q(func.max(db.Room.id_old)).scalar()
         while id_old:
@@ -978,7 +1045,7 @@ class S(Server):
         area_rev = {}
         for k,v in area_names.items:
             area_rev[v] = k
-        print(area_names)
+        logger.debug("AREAS:%r",area_names)
 
         for r in db.q(db.Room).filter(db.Room.id_old != None, db.Room.id_mudlet != None):
             todo.append(r)
@@ -1017,7 +1084,7 @@ class S(Server):
                 y = await r.mud_exits(mud)
             except NoData:
                 # didn't go there yet
-                print("EXPLORE",r.id_old,r.name)
+                logger.debug("EXPLORE %s %s",r.id_str,r.name)
                 explore.add(r.id_old)
                 continue
             # print(r.id_old,r.id_mudlet,r.name,":".join(f"{k}={v}" for k,v in y.items()), v=v, k=k)
@@ -1030,7 +1097,7 @@ class S(Server):
                 if nr is None:
                     # missing data?
                     r.set_exit(d,None)
-                    print("EXPLORE",r.id_old,r.name)
+                    logger.debug("EXPLORE %s %s",r.id_str,r.name)
                     continue
                 if nr.id_mudlet: continue
                 mid = y.get(d,None)
@@ -1048,7 +1115,7 @@ class S(Server):
                     done.add(nr.id_old)
                     broken.add(nr.id_old)
                     xr = db.r_mudlet(mid)
-                    print("BAD",nr.id_old,xr.id_old,"=",mid,nr.name)
+                    logger.warning("BAD %s %s = %s %s",nr.id_old,xr.id_old,mid,nr.name)
                     xr.id_mudlet = None
                     xr.hash_mg = None
                     nr.hash_mg = None
@@ -1057,7 +1124,7 @@ class S(Server):
                 else:
                     todo.appendleft(nr)
 
-        print(more)
+        logger.debug("%r",more)
 
     @run_in_task
     async def called_input(self, msg):
@@ -1079,7 +1146,7 @@ class S(Server):
             return msg
 
     def called_prompt(self, msg):
-        print(_("NEXT"))
+        logger.debug("NEXT")
         self.prompted = P_NEXT
         try:
             self._prompt_s.send_nowait(None)
@@ -1101,7 +1168,7 @@ class S(Server):
         if msg.startswith("Der GameDriver teilt Dir mit:"):
             return
 
-        print("IN  :", msg)
+        logger.debug("IN  : %s", msg)
 
     async def prompt(self):
         pass  # use only in MUDs that don't send GA
@@ -1115,7 +1182,7 @@ class S(Server):
         if msg[0].startswith("gmcp.") and msg[0] != msg[1]:
             # not interesting, will show up later
             return
-        print(msg)
+        logger.debug("%r", msg)
 
     async def event_sysWindowResizeEvent(self, msg):
         pass
@@ -1128,7 +1195,7 @@ class S(Server):
             self.room = room
 
     async def event_sysDataSendRequest(self, msg):
-        print("OUT :", msg[1])
+        logger.debug("OUT : %s", msg[1])
         # We are sending data. Thus there won't be a prompt, thus we take
         # the prompt signal that might already be there out of the channel.
         try:
@@ -1156,12 +1223,13 @@ class S(Server):
         txt = msg["msg"]
         if txt.startswith(prefix):
             txt = msg["msg"].replace(prefix,"").replace("\n"," ").replace("  "," ").strip()
-            print(_("CHAN:{chan} : {player}\n    :{txt}").format(txt=txt, player=player, chan=chan))
+            logger.debug("CHAN:%s : %s",chan,player)
+            logger.debug("    :%s", txt)
         else:
             prefix = "[{chan}:{player} ".format(chan=chan, player=player)
             if txt.startswith(prefix) and txt.endswith("]"):
                 txt = txt[len(prefix):-1]
-            print(_("CHAN:{chan} : {player} {txt}").format(txt=txt, player=player, chan=chan))
+            logger.debug("CHAN:%s : %s %s", chan, player, txt)
 
     async def new_room(self, descr, hash=None, id_mudlet=None, offset_from=None,
             offset_dir=None, area=None):
@@ -1208,7 +1276,7 @@ class S(Server):
             await room.set_area(area)
 
         self.db.commit()
-        print("ROOM NEW:",room.id_old, room.id_mudlet)
+        logger.debug("ROOM NEW:%s/%s",room.id_old, room.id_mudlet)
         return room
 
     async def place_room(self, start,dir,room):
@@ -1238,7 +1306,7 @@ class S(Server):
         if info == self.room_info:
             return
 
-        print(info)
+        logger.debug("INFO:%r",info)
         self.last_room_info = self.room_info
         self.room_info = info
 
@@ -1340,7 +1408,7 @@ class S(Server):
                 await room.set_area(self.room.area)
         room.info_area = area
         db.commit()
-        print(room.info_str)
+        logger.debug("ROOM:%s",room.info_str)
 
         await self.went_to_room(room, moved)
 
@@ -1423,13 +1491,15 @@ class S(Server):
         else:
             await self.mud.print(_("No mapped room to {d}").format(d=d))
 
+    @doc(_(
+        """Shift the view to the room in this direction"""))
     async def alias_vg(self, cmd):
-        """Shift the view to the room in this direction"""
         await self.called_view_go(cmd)
 
     @with_alias("v#")
+    @doc(_(
+        """Shift the view to this room"""))
     async def alias_v_h(self, cmd):
-        """Shift the view to this room"""
         await self.called_view_goto(int(cmd))
 
     async def called_view_reset(self):
@@ -1437,8 +1507,9 @@ class S(Server):
         self.view_room = self.room
         await self.mud.centerview(self.room.id_mudlet)
 
+    @doc(_(
+        """Shift the view to the player's"""))
     async def alias_vr(self, cmd):
-        """Shift the view to the player's"""
         await self.called_view_reset()
 
     async def called_view_goto(self, d):
@@ -1465,11 +1536,10 @@ class S(Server):
     # ### main code ### #
 
     async def run(self, db):
-        print(_("connected"))
+        logger.debug("connected")
         await self.setup(db)
 
         info = await self.mud.gmcp.MG.room.info
-        print(info)
         await self.new_info(info)
 
         #await mud.mud.centerview()
@@ -1497,7 +1567,7 @@ async def main(config):
     logging.basicConfig(level=getattr(logging,cfg.log['level'].upper()))
 
     with SQL(cfg) as db:
-        print(_("waiting for connection from Mudlet"))
+        logger.debug("waiting for connection from Mudlet")
         async with S(cfg=cfg) as mud:
             await mud.run(db=db)
 

@@ -448,7 +448,7 @@ class Server:
             await ali(cmd)
         except Exception as err:
             logger.warning("Error in alias %r", ocmd, exc_info=err)
-            await self.mud.print(_("Error: {err !r}").format(err=err))
+            await self.mud.print(_("Error: {err!r}").format(err=err))
 
     def _cmdfix_i(self, cmd):
         return int(cmd)
