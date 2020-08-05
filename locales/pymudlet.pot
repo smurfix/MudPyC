@@ -5,7 +5,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"POT-Creation-Date: 2020-08-05 21:34+0200\n"
+"POT-Creation-Date: 2020-08-05 21:42+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -112,17 +112,25 @@ msgstr ""
 msgid "{cmd} = {v}."
 msgstr ""
 
+#: mudlet/mapper/main.py:269
+msgid "AN"
+msgstr ""
+
+#: mudlet/mapper/main.py:269
+msgid "aus"
+msgstr ""
+
 #: mudlet/mapper/main.py:272
 msgid ""
 "\n"
-"        Modify existing rooms' area when visiting them\n"
+"        Modify existing rooms' area when you visit them?\n"
 "        "
 msgstr ""
 
 #: mudlet/mapper/main.py:279
 msgid ""
 "\n"
-"        Use the MUD's area name\n"
+"        Use the MUD's area name?\n"
 "        If unset, use the last-visited room's area, or 'Default'.\n"
 "        "
 msgstr ""

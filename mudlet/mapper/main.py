@@ -271,14 +271,14 @@ class S(Server):
 
     @doc(_(
         """
-        Modify existing rooms' area when visiting them
+        Modify existing rooms' area when you visit them?
         """))
     async def alias_cff(self, cmd):
         await self._conf_flip("force_area")
 
     @doc(_(
         """
-        Use the MUD's area name
+        Use the MUD's area name?
         If unset, use the last-visited room's area, or 'Default'.
         """))
     async def alias_cfm(self, cmd):
