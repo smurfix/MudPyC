@@ -14,7 +14,7 @@ class PathGenerator:
         self.check_fn = check_fn
         self.start_room = start_room
 
-        self.results = []
+        self.results = []  # (destination,path)
         self._n_results = trio.Semaphore(n_results)
         self._stall_wait = trio.Event()
 
@@ -57,7 +57,7 @@ class PathGenerator:
         return self
 
     async def __aexit__(self, *tb):
-        self.cancel()
+        await self.cancel()
 
     async def cancel(self):
         if self._scope:
@@ -97,8 +97,7 @@ class PathGenerator:
                             self._n_results.acquire_nowait()
                         except trio.WouldBlock:
                             self._stall_wait.set()
-                            self._n_results.acquire()
-                        await self._n_results.acquire()
+                            await self._n_results.acquire()
         finally:
             self._scope = None
 
@@ -137,7 +136,7 @@ class Walker:
         res = _("Walk from {self.first_room.id_str}").format(self=self)
         if self.first_room != self.next_room_id and self.next_room_id != self.last_room.id_old:
             next_room = self.s.db.r_old(self.next_room_id)
-            res += _(" via {next_room.id_str}").format(self=self)
+            res += _(" via {next_room.id_str}").format(next_room=next_room)
         res += _(" to {self.last_room.id_str} ({self.state})").format(self=self)
         self._rec = False
         return res
@@ -172,11 +171,11 @@ class Walker:
 
     async def _walk(self):
         """The actual walker."""
-        await self.s.send_commands("kurz")
+        await self.s.set_long_mode(False)
         while self.way:
             logged = False
             resumed = False
-            while self.in_room != self.way[0]:
+            while self.way and self.in_room != self.way[0]:
                 nr = self.s.db.r_old(self.next_room_id)
                 self.state = _("Wait for entering room {nr.id_str}:{nr.name}").format(nr=nr)
                 with trio.move_on_after(99 if logged else 5) as cs:
@@ -184,18 +183,20 @@ class Walker:
                 if self.s.walker is not self:
                     self.state = "Wait for reactivation"
                     await self._resumed.wait()
+                    # way may have changed
                     resumed = True
                 elif cs.cancel_called:
                     if not logged:
-                        await self.s.send_commands("lang")
+                        await self.s.set_long_mode(True)
                         logged = True
                     await self.s.mud.print("STALL: "+str(self))
-            self.prev_room_id = self.way.pop(0)
+            if self.way:
+                self.prev_room_id = self.way.pop(0)
             if not self.way:
                 await self.s.walk_done(True)
                 return
             if resumed or logged:
-                await self.s.send_commands("kurz")
+                await self.s.t_long_mode(False)
             await self.step_to(self.next_room_id)
 
 
@@ -239,7 +240,7 @@ class Walker:
         Set did_move=False if you're in darkness and didn't get a location
         update.
 
-        In both cases the wallk will resume after you manually entered that
+        In both cases the walk will resume after you manually entered that
         room again.
         """
         self.s.walker = None
@@ -255,7 +256,9 @@ class Walker:
         await self.s.send_commands(*exit.moves, err_str = _("walking back from {self.s.room.id_str} to {self.s.last_room.id_str}").format(self=self))
 
 
-    async def resume(self):
+    async def resume(self, skip=0):
+        if skip:
+            del self.way[:skip]
         self._resumed.set()
         self._resumed = trio.Event()
 

@@ -96,9 +96,9 @@ class Alias:
 
         if with_sub and self.sub:
             p = self.prompt
-            ht.append("Subcommands:")
+            ht.append(_("Subcommands:"))
             for k,v in self.sub.items():
-                vh = cleandoc(v.helptext).split("\n",1)[0] if v.helptext else "(no help text known)"
+                vh = cleandoc(v.helptext).split("\n",1)[0] if v.helptext else _("(no help text known)")
                 ht.append(f"{p+k} {'*' if v.sub else ':'} {vh}")
         await self.s.mud.print("\n".join(ht), noreply=True)
 

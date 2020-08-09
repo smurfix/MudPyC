@@ -5,7 +5,7 @@ from heapq import heappush,heappop
 
 from sqlalchemy import ForeignKey, Column, Integer, MetaData, Table, String, Text, create_engine, select, func
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker, object_session, validates
+from sqlalchemy.orm import relationship, sessionmaker, object_session, validates, backref
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.schema import CreateTable, DropTable
 
@@ -15,7 +15,10 @@ from .const import ENV_OK,ENV_STD,ENV_SPECIAL,ENV_UNMAPPED
 class NoData(RuntimeError):
     def __str__(self):
         if self.args:
-            return _("‹NoData:{jsa}›").format(jsa=':'.join(self.args))
+            try:
+                return _("‹NoData:{jsa}›").format(jsa=':'.join(str(x) for x in self.args))
+            except Exception:
+                pass
         return "‹NoData›"
     pass
 
@@ -48,26 +51,27 @@ def SQL(cfg):
     class Exit(_AddOn, Base):
         __tablename__ = "exits"
         id = Column(Integer, primary_key=True)
-        src_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE", ondelete="RESTRICT"), nullable=False)
+        src_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
         dir = Column(String, nullable=False)
-        dst_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE", ondelete="RESTRICT"), nullable=True)
+        dst_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE", ondelete="CASCADE"), nullable=True)
         det = Column(Integer, nullable=False, default=0) # ways with multiple destinations ## TODO
         cost = Column(Integer, nullable=False, default=1)
         steps = Column(String, nullable=True)
+        in_mudlet = Column(Integer, nullable=False, default=0)
 
         src = relationship("Room", back_populates="_exits", foreign_keys="Exit.src_id")
         dst = relationship("Room", foreign_keys="Exit.dst_id")
 
         @validates("dir")
         def dir_min_len(self, key, dir) -> str:
-            if len(dir) < 3:  # oben
+            if dir is not None and len(dir) < 3:  # oben
                 raise ValueError('some_string too short')
             return dir
 
         @property
         def info_str(self):
             if self.dst_id:
-                res = _("Exit: {self.src.id_str} via {self.dir} {self.dst.id_str}").format(self=self)
+                res = _("Exit: {self.src.id_str} via {self.dir} to {self.dst.id_str}").format(self=self)
             else:
                 res = _("Exit: {self.src.id_str} via {self.dir}").format(self=self)
             if self.steps:
@@ -104,17 +108,48 @@ def SQL(cfg):
 
         area = relationship(Area, back_populates="rooms")
         _exits = relationship(Exit,
-            primaryjoin=id_old == Exit.src_id, foreign_keys=[Exit.src_id])
+            primaryjoin=id_old == Exit.src_id, foreign_keys=[Exit.src_id],
+            cascade="delete", passive_deletes=True)
+        _r_exits = relationship(Exit,
+            primaryjoin=id_old == Exit.dst_id, foreign_keys=[Exit.dst_id],
+            cascade="delete", passive_deletes=True)
+
+        @validates("id_mudlet")
+        def mudlet_ok(self, key, id) -> str:
+            if id is not None and id < 0:
+                raise ValueError('Cannot be negative')
+            return id
 
         @property
         def info_str(self):
-            return _("‹Room: {self.id_str} {self.exit_str} {self.name}›").format(self=self)
+            return _("‹{self.id_str} {self.exit_str} {self.name}›").format(self=self)
+
+        @property
+        def idn_str(self):
+            n = self.name.rstrip(".")
+            if len(n)>30:
+                n = f"{n[:19]}…{n[-10:]}"
+            n = n.replace(" ","_")
+            return _("{self.id_str}:{n}").format(self=self,n=n)
+
+        @property
+        def idnn_str(self):
+            n = self.name.rstrip(".")
+            return _("‹{self.id_str}:{n}›").format(self=self,n=n)
 
         @property
         def id_str(self):
-            old = str(self.id_old) if self.id_old else ""
-            mud = str(self.id_mudlet) if self.id_mudlet else ""
-            return f"{old}/{mud}"
+            return f"{self.id_old or ''}/{self.id_mudlet or ''}"
+
+        def set_id_mudlet(self, id_mudlet):
+            # Clear the "exit is set in Mudlet" flags because those stub
+            # exits to nonexisting rooms suddenly aren't stub exits any more
+            # so when we next look at them they need to be reconsidered
+            self.id_mudlet = id_mudlet
+            for x in self._exits:
+                x.in_mudlet = False
+            for x in self._r_exits:
+                x.in_mudlet = False
 
         @property
         def exit_str(self):
@@ -143,45 +178,53 @@ def SQL(cfg):
 
         @property
         def long_descr(self):
-            d = self._long_descr
+            d = session.query(LongDescr).filter(LongDescr.room_id==self.id_old).one_or_none()
             if d is None:
                 return None
             return d.descr
 
         @long_descr.setter
         def long_descr(self, descr):
-            d = self._long_descr
+            if descr is None:
+                del self.long_descr
+                return
+            d = session.query(LongDescr).filter(LongDescr.room_id==self.id_old).one_or_none()
             if d is None:
                 d = Descr(descr=descr, room_id=self.id_old)
-                self._s.add(d)
+                session.add(d)
             else:
                 d.descr = descr
 
         @long_descr.deleter
         def long_descr(self):
-            if self._long_descr is not None:
-                self._s.delete(self._long_descr)
+            d = session.query(LongDescr).filter(LongDescr.room_id==self.id_old).one_or_none()
+            if d is not None:
+                session.delete(d)
 
         @property
         def note(self):
-            d = self._note
+            d = session.query(Note).filter(Note.room_id==self.id_old).one_or_none()
             if d is None:
                 return None
-            return d.descr
+            return d.note
 
         @note.setter
-        def note(self, descr):
-            d = self._note
+        def note(self, note):
+            if note is None:
+                del self.note
+                return
+            d = session.query(Note).filter(Note.room_id==self.id_old).one_or_none()
             if d is None:
-                d = Descr(descr=descr, room_id=self.id_old)
-                self._s.add(d)
+                d = Note(note=note, room_id=self.id_old)
+                session.add(d)
             else:
-                d.descr = descr
+                d.note = note
 
         @note.deleter
         def note(self):
-            if self._note is not None:
-                self._s.delete(self._note)
+            d = session.query(Note).filter(Note.room_id==self.id_old).one_or_none()
+            if d is not None:
+                session.delete(d)
 
         @property
         def cost(self):
@@ -287,36 +330,51 @@ def SQL(cfg):
             """
             Add an exit d going to room v.
             v=True (default): add but don't overwrite if it points somewhere.
-            v=None: exit goes nowhere known
+            v=False: delete the destination
+            v=None: delete the exit 
+
+            Returns a tuple: (Exit, changedFlag)
             """
             # TODO split this up
             x = self.exits
-            if v is True:
+            changed = False
+            if v is True or v is False:
                 for x in self._exits:
                     if x.dir == d:
+                        if x.dst_id:
+                            if v:
+                                v = x.dst
+                            else:
+                                x.dst = None
+                                changed = True
                         break
                 else:
                     x = Exit(src=self, dir=d)
                     self._s.add(x)
+                    changed = True
             else:
                 for x in self._exits:
                     if x.dir == d:
                         if v:
-                            x.dst = v
+                            if x.dst != v:
+                                x.dst = v
+                                changed = True
                         else:
                             self._s.delete(x)
+                            changed = True
                         break
                 else:
                     if v:
                         x = Exit(src=self, dir=d, dst=v)
                         self._s.add(x)
+                        changed = True
 
-            if not skip_mud:
-                await self.set_mud_exit(d,v)
+            if (changed or not x.in_mudlet) and not skip_mud:
+                x.in_mudlet = await self.set_mud_exit(d,v)
             #self._exits = ":".join(f"{k}={v}" if v else f"{k}" for k,v in x.items())
             self._s.commit()
 
-            return x
+            return x,changed
 
         async def del_exit(self,d, skip_mud=False):
             await self.set_exit(d,None, skip_mud=skip_mud)
@@ -335,45 +393,54 @@ def SQL(cfg):
         async def set_mud_exit(self,d,v=True):
             m = self._m
             mud = self._m.mud
+            if not self.id_mudlet:
+                raise RuntimeError("no id_mudlet "+self.idnn_str)
 
+            changed = False
             d = m.loc2itl(d)
-            if v and v is not True:  # set
+            if v and v is not True and v is not False and v.id_mudlet:  # set
                 if d in m.itl_names:
                     await mud.setExit(self.id_mudlet,v.id_mudlet,d)
                 else:
                     await mud.addSpecialExit(self.id_mudlet,v.id_mudlet,d)
-            elif not v:  # delete
-                if d in m.itl_names:
-                    await mud.setExit(self.id_mudlet, -1, d)
-                else:
-                    await mud.removeSpecialExit(self.id_mudlet,d)
+                changed = True
             else:
-                x = (await mud.getRoomExits(self.id_mudlet))[0]
-                if d not in x:
+                if not v:  # delete
                     if d in m.itl_names:
-                        await mud.setExitStub(self.id_mudlet, d, True)
-                    else: # special exit
-                        await mud.addSpecialExit(self.id_mudlet,0,d) # ?
+                        await mud.setExit(self.id_mudlet, -1, d)
+                    else:
+                        await mud.removeSpecialExit(self.id_mudlet,d)
+                    changed = True
+                if v is not None: # stub
+                    x = (await mud.getRoomExits(self.id_mudlet))
+                    x = x[0] if len(x) else []
+                    if d not in x:
+                        if d in m.itl_names:
+                            await mud.setExitStub(self.id_mudlet, d, True)
+                        else: # special exit
+                            await mud.addSpecialExit(self.id_mudlet,0,d) # ?
+                        changed = True
 
             await mud.setRoomEnv(self.id_mudlet, ENV_OK+self.open_exits)
+            return changed
 
     class LongDescr(_AddOn, Base):
         __tablename__ = "longdescr"
         id = Column(Integer, nullable=True, primary_key=True)
-        room_id = Column(Integer, ForeignKey("room.id_old", onupdate="CASCADE",ondelete="RESTRICT"), nullable=False)
+        room_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE",ondelete="RESTRICT"), nullable=False)
         descr = Column(Text, nullable=False)
 
-        room = relationship("Room", backref="_longdescr", uselist=False,
-            primaryjoin=id == Room.id_old, foreign_keys=[Room.id_old])
+#        room = relationship("Room", uselist=False,
+#            primaryjoin=id == Room.id_old, foreign_keys=[Room.id_old])
 
     class Note(_AddOn, Base):
         __tablename__ = "notes"
         id = Column(Integer, nullable=True, primary_key=True)
-        room_id = Column(Integer, ForeignKey("room.id_old", onupdate="CASCADE",ondelete="RESTRICT"), nullable=False)
+        room_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE",ondelete="RESTRICT"), nullable=False)
         note = Column(Text, nullable=False)
 
-        room = relationship("Room", backref="_note", uselist=False,
-            primaryjoin=id == Room.id_old, foreign_keys=[Room.id_old])
+#        room = relationship("Room", uselist=False,
+#            primaryjoin=id == Room.id_old, foreign_keys=[Room.id_old])
 
     class Skiplist(_AddOn, Base):
         __tablename__ = "skip"
@@ -424,7 +491,8 @@ def SQL(cfg):
             Room=Room, Area=Area, Exit=Exit, Skiplist=Skiplist,
             r_hash=r_hash, r_old=r_old, r_mudlet=r_mudlet,
             r_new=r_new, r_skiplist=r_skiplist,
-            commit=session.commit, rollback=session.rollback, add=session.add)
+            commit=session.commit, rollback=session.rollback,
+            add=session.add, delete=session.delete)
     session._main = ref(res)
     try:
         yield res

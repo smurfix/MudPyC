@@ -17,6 +17,7 @@ from .util import attrdict, combine_dict, OSLineReader, ValueEvent
 from .alias import Alias
 import trio
 import os
+import sys
 import errno
 import json
 
@@ -30,8 +31,8 @@ DEFAULTS = attrdict(
         ca_certs=None, certfile=None, keyfile=None, use_reloader=False,
         )
     )
-if "XDG_RUNTIME_DIR" in os.environ:
-    DEFAULTS["fifo"] = os.path.join(os.environ["XDG_RUNTIME_DIR"], "mudlet_fifo")
+#if "XDG_RUNTIME_DIR" in os.environ:
+#    DEFAULTS["fifo"] = os.path.join(os.environ["XDG_RUNTIME_DIR"], "mudlet_fifo")
 
 def run_in_task(x):
     x.run_in_task = True
@@ -59,6 +60,8 @@ class _CallMudlet:
         if meth is not None:
             msg['meth'] = meth
         if dest is not None:
+            if isinstance(dest,str):
+                dest = dest.split(".")
             msg['dest'] = dest
         return await self.server.rpc(action="call", name=self.name, args=args, noreply=noreply, **msg)
 
@@ -67,7 +70,7 @@ class _CallMudlet:
 
     async def _get(self):
         if self.meth:
-            raise RuntimeError("Only for method calls")
+            raise RuntimeError("Only for non-method calls")
         res = await self.server.rpc(action="get", name=self.name)
         if not res:
             return None  # nil, Lua can't store that in a table
@@ -75,8 +78,19 @@ class _CallMudlet:
 
     async def _set(self, value):
         if self.meth:
-            raise RuntimeError("Only for method calls")
+            raise RuntimeError("Only for non-method calls")
         return await self.server.rpc(action="set", name=self.name, value=value)
+
+    @property
+    async def _nil(self):
+        if self.meth:
+            raise RuntimeError("Only for non-method calls")
+        return not await self.server.rpc(action="exists", name=self.name)
+
+    async def _del(self):
+        if self.meth:
+            raise RuntimeError("Only for non-method calls")
+        await self.server.rpc(action="delete", name=self.name)
 
 class Server:
     _seq = 1
@@ -188,6 +202,7 @@ class Server:
             ev.set()
         else:
             await self._dispatch(msg)
+        logger.debug("IN done %r",msg)
         
     async def _dispatch(self, msg):
         action = msg.get("action",None)
@@ -276,8 +291,14 @@ class Server:
     async def _ping(self):
         while True:
             t1 = trio.current_time()
-            with trio.fail_after(2):
-                res = await self.rpc(action="ping")
+            try:
+                with trio.fail_after(2):
+                    res = await self.rpc(action="ping")
+            except trio.TooSlowError:
+                if "pdb" in sys.modules:
+                    logger.error("PING ?!?")
+                else:
+                    raise
             if res[0] != "Pong":
                 raise ValueError(res)
             t2 = trio.current_time()

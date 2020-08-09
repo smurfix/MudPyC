@@ -35,7 +35,7 @@ def doc(docstring):
         return fn
     return decorate
 
-def combine_dict(*d, cls=dict):
+def combine_dict(*d, cls=dict, force=False):
     """
     Returns a dict with all keys+values of all dict arguments.
     The first found value wins.
@@ -48,8 +48,10 @@ def combine_dict(*d, cls=dict):
     """
     res = cls()
     keys = {}
-    if len(d) <= 1:
-        return d
+    if not d:
+        return res
+    if len(d) == 1 and not force:
+        return d[0]
     for kv in d:
         for k, v in kv.items():
             if k not in keys:
@@ -63,7 +65,7 @@ def combine_dict(*d, cls=dict):
                 assert not isinstance(vv, Mapping)
             res[k] = v[0]
         else:
-            res[k] = combine_dict(*v, cls=cls)
+            res[k] = combine_dict(*v, cls=cls, force=force)
     return res
 
 
