@@ -37,6 +37,26 @@
 					<integer>1</integer>
 				</regexCodePropertyList>
 			</Trigger>
+			<Trigger isActive="yes" isFolder="no" isTempTrigger="no" isMultiline="no" isPerlSlashGOption="no" isColorizerTrigger="no" isFilterTrigger="no" isSoundTrigger="no" isColorTrigger="no" isColorTriggerFg="no" isColorTriggerBg="no">
+				<name>Send prompt</name>
+				<script>py.call("prompt", line)</script>
+				<triggerType>0</triggerType>
+				<conditonLineDelta>0</conditonLineDelta>
+				<mStayOpen>0</mStayOpen>
+				<mCommand></mCommand>
+				<packageName></packageName>
+				<mFgColor>#ff0000</mFgColor>
+				<mBgColor>#ffff00</mBgColor>
+				<mSoundFile></mSoundFile>
+				<colorTriggerFgColor>#000000</colorTriggerFgColor>
+				<colorTriggerBgColor>#000000</colorTriggerBgColor>
+				<regexCodeList>
+					<string></string>
+				</regexCodeList>
+				<regexCodePropertyList>
+					<integer>7</integer>
+				</regexCodePropertyList>
+			</Trigger>
 		</TriggerGroup>
 	</TriggerPackage>
 	<TimerPackage />
@@ -73,6 +93,29 @@ end</script>
 				<command></command>
 				<packageName></packageName>
 				<regex>^#(.*)$</regex>
+			</Alias>
+			<Alias isActive="yes" isFolder="no">
+				<name>Anything goes to Python</name>
+				<script>local m = matches[2]
+
+local function send_cb(b,s)
+    if not b then
+        send(m, false)
+    elseif type(s) == "string" then
+        send(s, true)
+    end
+end
+
+if string.sub(m,1,1) == "#" or string.sub(m,1,4) == "lua " then
+    -- stu
+elseif not py.connected then
+    send(m, false)
+else
+    py.call(send_cb, "input", m)
+end</script>
+				<command></command>
+				<packageName></packageName>
+				<regex>(.+)</regex>
 			</Alias>
 		</AliasGroup>
 	</AliasPackage>
@@ -197,7 +240,7 @@ end
 
 function py._run_timer()
     if py.timer == nil then
-        py.backoff = py.backoff * 2 + 0.1
+        py.backoff = py.backoff * 1.2 + 0.1
         if py.backoff &gt; 5 then py.backoff = 5 end
         py.timer = tempTimer(py.backoff, py._retry)
     end
@@ -266,7 +309,7 @@ end
 function py._get_done(_, url, msg)
     if url ~= py.url_get then return end
     if not py.get_open then py.dbg("PY: getHTTP without GET?") return end
-    py.dbg2("get done")
+    py.dbg2("get done",msg)
     py.get_open = false
     
     msg = yajl.to_value(msg)
@@ -383,6 +426,14 @@ local function getvalue(s)
     return val
 end
 
+local function toHex(s)
+    local res = ""
+    for i=1,len(s) do
+        res = res .. string.format("%02x",string.byte(string.sub(s,i,i)))
+    end
+    return res
+end
+
 -- forward an event
 function py.action.handle(msg)
     local evt = msg.event
@@ -394,10 +445,14 @@ function py.action.handle(msg)
         if py.url_get == args[2] then return end -- do not send my events
         if py.url_put == args[2] then return end -- do not send my events
         
-        if string.sub(args[1],9) == "HttpError" then py.dbg2("Err",py.url,yajl.to_string(args)) return end
-        if string.sub(args[1],1,5) == "gmcp." then -- add the value to the event
+        if string.sub(args[1],9) == "HttpError" then
+            py.dbg2("Err",py.url,yajl.to_string(args))
+            return
+        elseif string.sub(args[1],1,5) == "gmcp." then -- add the value to the event
             -- TODO they're generated with increasing detail. Only send the last one.
             args[#args+1] = getvalue(args[1])
+        elseif args[1] == "sysTelnetEvent" then
+            args[4] = toHex(args[4])
         end
         py._send({event=evt, args=args})
         py._do_http()
@@ -440,6 +495,13 @@ function py.action.call(msg)
     return func(unpack(args))
 end
 
+-- new . Must be atomic
+function py.action.newroom(msg)
+    local r = createRoomID()
+    addRoom(r)
+    return r
+end
+
 -- get a value
 function py.action.get(msg)
     assert(#msg.name &gt; 0, "no empty name!")
@@ -450,15 +512,47 @@ function py.action.get(msg)
     return val
 end
 
+-- check for a value
+function py.action.exists(msg)
+    assert(#msg.name &gt; 0, "no empty name!")
+    val = _G
+    for _,name in ipairs(msg.name) do
+        val = val[name]
+        if val == nil then return false end
+    end
+    return true
+end
+
 -- set a value
 function py.action.set(msg)
     local self,old = nil,_G
     assert(#msg.name &gt; 0, "no empty name!")
-    for _,name in ipairs(msg.name) do
+    local prev
+    for i,name in ipairs(msg.name) do
+        prev = name
         self = old
         old = old[name]
+        if old == nil and i &lt; #msg.name then
+            old = {}
+            self[prev] = old
+        end
     end
-    self[name] = msg.value
+    self[prev] = msg.value
+    if msg.old then return old end  -- otherwise return nothing
+end
+
+-- clear a value
+function py.action.delete(msg)
+    local self,old = nil,_G
+    assert(#msg.name &gt; 0, "no empty name!")
+    local prev
+    for _,name in ipairs(msg.name) do
+        prev = name
+        self = old
+        old = old[name]
+        if old == nil and i &lt; #msg.name then return end
+    end
+    self[prev] = nil
     if msg.old then return old end  -- otherwise return nothing
 end
 
@@ -483,9 +577,437 @@ end
 </script>
 				<eventHandlerList />
 			</Script>
+			<Script isActive="yes" isFolder="no">
+				<name>Support functions for shifting the viewpoint</name>
+				<packageName></packageName>
+				<script>function py.go_view(d)
+    if py.connected then
+        py.call("view_go",d)
+    else
+       local room = getPlayerRoom()
+       local dest = getRoomExits(room)[mapper.intexitmap[mapper.exitmap[d]]]
+       if dest == nil then
+           dest = getSpecialExitsSwap(room)[d]
+       end
+       if dest ~= nil then
+           centerview(dest)
+       else 
+           print("No way to go "..d)
+           display(getRoomExits(room),mapper.exitmap[d])
+       end
+    end
+end
+
+function py.reset_view(d)
+    if py.connected then
+        py.call("view_reset",d)
+    else
+        print("Not connected")
+    end
+end
+
+function py.walk_to_view(d)
+    if py.connected then
+        py.call("view_goto",d)
+    else
+        print("Not connected")
+    end
+end
+
+function py.shift_label(x,y)
+    if py.connected then
+        py.call("label_shift",x,y)
+    else
+        print("Not connected")
+    end
+end
+</script>
+				<eventHandlerList />
+			</Script>
+			<Script isActive="yes" isFolder="no">
+				<name>Basic setup</name>
+				<packageName></packageName>
+				<script>mudlet = mudlet or {}
+mudlet.mapper_script = true
+</script>
+				<eventHandlerList />
+			</Script>
+			<Script isActive="yes" isFolder="no">
+				<name>GUI setup</name>
+				<packageName></packageName>
+				<script>-- thanks to krrrcks for the original I cloned this from
+
+GUI = GUI or {}
+GUI.angezeigt = GUI.angezeigt or false
+GUI.lp_anzeige_blinkt = GUI.lp_anzeige_blinkt or false
+
+function initGUI()
+
+  -- Textfenster begrenzen
+  setBorderTop(0)
+  setBorderBottom(85) -- bisschen Platz fuer Statuszeile
+  setBorderLeft(0)
+  setBorderRight(0)
+
+  -- Statuszeile malen. Layout wie folgt:
+  -- Zeile 1: spieler (Name, Stufe), gift, trenner_1, vorsicht (Vorsicht, Fluchtrichtung)
+  -- Zeile 2: ort_raum (Region, Raumnummer, Para), ort_region (Ort kurz)
+  -- Zeile 3: lp_titel, lp_anzeige (Lebenspunkte-Anzeige), kp_titel, kp_anzeige (KP-Anzeige), trenner_2
+  local HBox = Geyser.HBox:new({
+      name="HBox",
+      x=0, y=-90,
+      width="100%", height=70,
+  })
+  GUI.mainbox = HBox
+  
+  local VBox = Geyser.VBox:new({
+      name="VBox", width="100%", h_policy=Geyser.Fixed
+  }, HBox)
+
+  
+  Zeile = Geyser.HBox:new({name="HBox_line4"}, VBox)
+  GUI.raumnotizen = Geyser.Label:new({name = "raumnotizen"}, Zeile)
+  GUI.raumtype = Geyser.Label:new({name = "raumtype"}, Zeile)
+  
+  -- Zeile 1
+  Zeile = Geyser.HBox:new({name="HBox_line1"}, VBox)
+  GUI.spieler = Geyser.Label:new({name = "spieler"}, Zeile)
+  GUI.gift = Geyser.Label:new({name = "gift"}, Zeile)
+  GUI.trenner_1 = Geyser.Label:new({name = "trenner_1"}, Zeile)
+  GUI.vorsicht = Geyser.Label:new({name = "vorsicht"}, Zeile)
+
+  -- Zeile 2  
+  Zeile = Geyser.HBox:new({name="HBox_line2"}, VBox)
+  GUI.ort_raum = Geyser.Label:new({name = "ort_raum"}, Zeile)
+  GUI.ort_region = Geyser.Label:new({name = "ort_region"}, Zeile)
+
+  -- Zeile 3
+  Zeile = Geyser.HBox:new({name="HBox_line3"}, VBox)
+
+  GUI.lp_titel = Geyser.Label:new({name = "lp_titel"}, Zeile)
+  GUI.lp_titel:echo("Lebenspunkte:")
+
+  GUI.lp_anzeige = Geyser.Gauge:new({name = "lp_anzeige"}, Zeile)
+  GUI.lp_anzeige:setColor(0, 255, 50) 
+  GUI.trenner_3 = Geyser.Label:new({name = "trenner_3"}, Zeile)
+  GUI.kp_titel = Geyser.Label:new({name = "kp_titel"}, Zeile)
+  GUI.kp_titel:echo("Konzentration:")
+
+  GUI.kp_anzeige = Geyser.Gauge:new({name = "kp_anzeige"}, Zeile)
+  GUI.kp_anzeige:setColor(0, 50, 250)
+
+  GUI.trenner_2 = Geyser.Label:new({name = "trenner_2"}, Zeile)
+end</script>
+				<eventHandlerList />
+			</Script>
 		</ScriptGroup>
 	</ScriptPackage>
-	<KeyPackage />
+	<KeyPackage>
+		<KeyGroup isActive="yes" isFolder="yes">
+			<name>Python</name>
+			<packageName></packageName>
+			<script></script>
+			<command></command>
+			<keyCode>-1</keyCode>
+			<keyModifier>-1</keyModifier>
+			<Key isActive="yes" isFolder="no">
+				<name>9: view nordosten</name>
+				<packageName></packageName>
+				<script>py.go_view("nordosten")</script>
+				<command></command>
+				<keyCode>57</keyCode>
+				<keyModifier>603979776</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>6: view osten</name>
+				<packageName></packageName>
+				<script>py.go_view("osten")</script>
+				<command></command>
+				<keyCode>54</keyCode>
+				<keyModifier>603979776</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>3: view suedosten</name>
+				<packageName></packageName>
+				<script>py.go_view("suedosten")</script>
+				<command></command>
+				<keyCode>51</keyCode>
+				<keyModifier>603979776</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>2: view sueden</name>
+				<packageName></packageName>
+				<script>py.go_view("sueden")</script>
+				<command></command>
+				<keyCode>50</keyCode>
+				<keyModifier>603979776</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>1: view suedwesten</name>
+				<packageName></packageName>
+				<script>py.go_view("suedwesten")</script>
+				<command></command>
+				<keyCode>49</keyCode>
+				<keyModifier>603979776</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>+: view unten</name>
+				<packageName></packageName>
+				<script>py.go_view("unten")</script>
+				<command></command>
+				<keyCode>43</keyCode>
+				<keyModifier>603979776</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>4: view westen</name>
+				<packageName></packageName>
+				<script>py.go_view("westen")</script>
+				<command></command>
+				<keyCode>52</keyCode>
+				<keyModifier>603979776</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>7: view nordwesten</name>
+				<packageName></packageName>
+				<script>py.go_view("nordwesten")</script>
+				<command></command>
+				<keyCode>55</keyCode>
+				<keyModifier>603979776</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>-: view oben</name>
+				<packageName></packageName>
+				<script>py.go_view("oben")</script>
+				<command></command>
+				<keyCode>45</keyCode>
+				<keyModifier>603979776</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>8: view norden</name>
+				<packageName></packageName>
+				<script>py.go_view("norden")</script>
+				<command></command>
+				<keyCode>56</keyCode>
+				<keyModifier>603979776</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>5: reset view</name>
+				<packageName></packageName>
+				<script>py.reset_view()</script>
+				<command></command>
+				<keyCode>53</keyCode>
+				<keyModifier>603979776</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>Enter: walk to view</name>
+				<packageName></packageName>
+				<script>py.walk_to_view()</script>
+				<command></command>
+				<keyCode>16777221</keyCode>
+				<keyModifier>603979776</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>Label down</name>
+				<packageName></packageName>
+				<script>py.shift_label(0,1)</script>
+				<command></command>
+				<keyCode>16777236</keyCode>
+				<keyModifier>100663296</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>Label up</name>
+				<packageName></packageName>
+				<script>py.shift_label(0,-1)</script>
+				<command></command>
+				<keyCode>16777234</keyCode>
+				<keyModifier>100663296</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>Label left</name>
+				<packageName></packageName>
+				<script>py.shift_label(-1,0)</script>
+				<command></command>
+				<keyCode>16777234</keyCode>
+				<keyModifier>67108864</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>Label right</name>
+				<packageName></packageName>
+				<script>py.shift_label(1,0)</script>
+				<command></command>
+				<keyCode>16777236</keyCode>
+				<keyModifier>67108864</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>F1</name>
+				<packageName></packageName>
+				<script>py.fn(1,0)</script>
+				<command></command>
+				<keyCode>16777264</keyCode>
+				<keyModifier>0</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>Shift F1</name>
+				<packageName></packageName>
+				<script>py.fn(1,1)</script>
+				<command></command>
+				<keyCode>16777264</keyCode>
+				<keyModifier>33554432</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>Control F1</name>
+				<packageName></packageName>
+				<script></script>
+				<command></command>
+				<keyCode>16777264</keyCode>
+				<keyModifier>67108864</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>Shift Control F1</name>
+				<packageName></packageName>
+				<script>py.fn(f1,3)</script>
+				<command></command>
+				<keyCode>16777264</keyCode>
+				<keyModifier>100663296</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>AltGr F1</name>
+				<packageName></packageName>
+				<script>py.fn(1,4)</script>
+				<command></command>
+				<keyCode>16777264</keyCode>
+				<keyModifier>1073741824</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>Shift AltGr F1</name>
+				<packageName></packageName>
+				<script>py.fn(1,5)</script>
+				<command></command>
+				<keyCode>-1</keyCode>
+				<keyModifier>-1</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>Control AltGr F1</name>
+				<packageName></packageName>
+				<script>py.fn(1,6)</script>
+				<command></command>
+				<keyCode>16777264</keyCode>
+				<keyModifier>1140850688</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>Shift Control AltGr F1</name>
+				<packageName></packageName>
+				<script>py.fn(1,7)</script>
+				<command></command>
+				<keyCode>16777264</keyCode>
+				<keyModifier>1174405120</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>F2</name>
+				<packageName></packageName>
+				<script>py.fn(2,0)</script>
+				<command></command>
+				<keyCode>16777265</keyCode>
+				<keyModifier>0</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>F3</name>
+				<packageName></packageName>
+				<script>py.fn(3,0)</script>
+				<command></command>
+				<keyCode>16777266</keyCode>
+				<keyModifier>0</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>F4</name>
+				<packageName></packageName>
+				<script>py.fn(4,0)</script>
+				<command></command>
+				<keyCode>16777267</keyCode>
+				<keyModifier>0</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>F5</name>
+				<packageName></packageName>
+				<script>py.fn(5,0)</script>
+				<command></command>
+				<keyCode>16777268</keyCode>
+				<keyModifier>0</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>F6</name>
+				<packageName></packageName>
+				<script>py.fn(6,0)</script>
+				<command></command>
+				<keyCode>16777269</keyCode>
+				<keyModifier>0</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>F7</name>
+				<packageName></packageName>
+				<script>py.fn(7,0)</script>
+				<command></command>
+				<keyCode>16777270</keyCode>
+				<keyModifier>0</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>F8</name>
+				<packageName></packageName>
+				<script>py.fn(8,0)</script>
+				<command></command>
+				<keyCode>16777271</keyCode>
+				<keyModifier>0</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>F9</name>
+				<packageName></packageName>
+				<script>py.fn(9,0)</script>
+				<command></command>
+				<keyCode>16777272</keyCode>
+				<keyModifier>0</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>F10</name>
+				<packageName></packageName>
+				<script>py.fn(10,0)</script>
+				<command></command>
+				<keyCode>16777273</keyCode>
+				<keyModifier>0</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>F11</name>
+				<packageName></packageName>
+				<script>py.fn(11,0)</script>
+				<command></command>
+				<keyCode>16777274</keyCode>
+				<keyModifier>0</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>F12</name>
+				<packageName></packageName>
+				<script>py.fn(12,0)</script>
+				<command></command>
+				<keyCode>16777275</keyCode>
+				<keyModifier>0</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>Pause</name>
+				<packageName></packageName>
+				<script>py.fn(15,0)</script>
+				<command></command>
+				<keyCode>16777224</keyCode>
+				<keyModifier>0</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>ScrollLock</name>
+				<packageName></packageName>
+				<script>py.fn(14,0)</script>
+				<command></command>
+				<keyCode>16777254</keyCode>
+				<keyModifier>0</keyModifier>
+			</Key>
+		</KeyGroup>
+	</KeyPackage>
 	<VariablePackage>
 		<HiddenVariables />
 	</VariablePackage>
