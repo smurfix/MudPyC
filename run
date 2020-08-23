@@ -2,8 +2,11 @@
 import logging
 import sys
 import os
-sys.argv[0:1] = [sys.argv[0], "-c","mapper.cfg"]
+import trio
 
-from mudlet.mapper import main
-logging.basicConfig(loglevel=logging.DEBUG)
-trio.run(main)
+sys.argv[0:1] = [sys.argv[0], "-c","mapper.cfg"]
+sys.path[0:0] = ["../trio"]
+
+from mudlet.mapper.main import main
+logging.basicConfig(level=logging.DEBUG,format="%(relativeCreated)d %(name)s %(message)s")
+main()

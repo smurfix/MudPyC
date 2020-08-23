@@ -196,7 +196,7 @@ class Walker:
                 await self.s.walk_done(True)
                 return
             if resumed or logged:
-                await self.s.t_long_mode(False)
+                await self.s.set_long_mode(False)
             await self.step_to(self.next_room_id)
 
 

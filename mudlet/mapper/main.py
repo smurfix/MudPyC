@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager, contextmanager
 from collections import deque
 from weakref import ref
 from inspect import iscoroutine
+import re
 
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -50,6 +51,13 @@ DEFAULT_CFG=attrdict(
             level="info",
             ),
         )
+
+EX1 = re.compile(r"^Es gibt (\S+) sichtbare Ausgaenge:\s*")
+EX2 = re.compile(r"^Es gibt einen sichtbaren Ausgang:\s*")
+EX3 = re.compile(r"^Es gibt keinen sichtbaren Ausgang.\s*")
+EX4 = re.compile(r"^Es gibt keine sichtbaren Ausgaenge.\s*")
+EX9 = re.compile(r"\.\s*$")
+
 
 CFG_HELP=attrdict(
         use_mg_area=_("Use the MUD's area name"),
@@ -134,9 +142,34 @@ def itl2loc(x):
         return { itl2loc(k):v for k,v in x.items() }
     else:
         return _itl2loc.get(x,x)
-def short2loc(x):
 
-    return x
+class Processor:
+    """
+    Class to collect one output to the MUD and whatever input you get in
+    response.
+    """
+    P_BEFORE = 0
+    P_AFTER = 1
+    P_LATE = 2
+
+    def __init__(self, direction):
+        self.direction = direction
+        self.lines = ([],[],[])
+        # before reporting exits or whatever
+        # after reporting exits but before the prompt
+        # after the prompt
+        self.current = self.P_BEFORE
+
+    def dir_seen(self):
+        if self.current == self.P_BEFORE:
+            self.current = self.P_AFTER
+
+    def prompt_seen(self):
+        self.current = self.P_LATE
+
+    def add(self, msg):
+        self.lines[self.current].append(msg)
+
 
 class S(Server):
 
@@ -156,6 +189,8 @@ class S(Server):
 
         self.logger = logging.getLogger(self.cfg['name'])
         self.sent = deque()
+        self.sent_new = None
+        self.exit_match = None
         self.start_rooms = deque()
         self.room = None
         self.last_room = None
@@ -220,7 +255,13 @@ class S(Server):
             else:
                 await self.new_info(info)
 
-        self.main.start_soon(self.sql_keepalive)
+        self.main.start_soon(self._sql_keepalive)
+        self._text_w,rd = trio.open_memory_channel(1000)
+        self.main.start_soon(self._text_writer,rd)
+
+    async def _text_writer(self, rd):
+        async for line in rd:
+            await self.mud.print(line)
 
     async def set_long_mode(self, long_mode):
         if long_mode:
@@ -231,18 +272,18 @@ class S(Server):
             ml = "ultrakurz"
         await self.send_command(ml)
 
-    async def sql_keepalive(self):
+    async def _sql_keepalive(self):
+        """
+        Small task to not let our SQL connection time out.
+        """
         while True:
             await trio.sleep(600)
             self.db.db.execute("select 1")
 
-    async def set_conf(self, k, v):
-        if k not in self.conf:
-            raise KeyError(k)
-        self.conf[k] = v
-        await self.mud.py.ext_conf._set(self.conf)
-
     async def sync_areas(self):
+        """
+        Sync up area names+IDs in our database and in Mudlet,
+        """
         seen = set()
         db=self.db
 
@@ -277,6 +318,9 @@ class S(Server):
         db.commit()
 
     def do_register_aliases(self):
+        """
+        Add some help textx to our sub-aliases
+        """
         super().do_register_aliases()
 
         self.alias.at("m").helptext = _("Mapping")
@@ -290,8 +334,13 @@ class S(Server):
         self.alias.at("rl").helptext = _("Room's long description")
     
     def _cmdfix_r(self,v):
+        """
+        cmdfix add-on that interprets room names.
+        Negative=ours, positive=Mudlet's
+        """
         v = int(v)
         if not v:
+            # zero
             return None
         if v < 0:
             return self.db.r_old(-v)
@@ -382,7 +431,10 @@ class S(Server):
                     self.room.label = None
                     self.db.commit()
             elif self.room.label != cmd:
-                await self.mud.print(_("Label of {room.idn_str} was {room.label}").format(room=self.room))
+                if self.room.label:
+                    await self.mud.print(_("Label of {room.idn_str} was {room.label}").format(room=self.room))
+                else:
+                    await self.mud.print(_("Label of {room.idn_str} set").format(room=self.room))
                 self.room.label = cmd
             else:
                 await self.mud.print(_("Label of {room.idn_str} not changed").format(room=self.room))
@@ -449,13 +501,12 @@ class S(Server):
                 await self.mud.print(_("No area/domain set."))
             return
 
-        cmd = cmd[0]
-        area = await self.get_named_area(cmd, False)
+        area = await self.get_named_area(cmd[0], False)
         if self.room.info_area == area:
             pass
         elif self.room.orig_area != area:
             self.room.orig_area = self.room.area
-        await self.room.set_area(area)
+        await self.room.set_area(area, force=True)
         self.db.commit()
 
     @with_alias("ra!")
@@ -597,6 +648,28 @@ class S(Server):
             if x.steps:
                 for m in x.moves:
                     await self.mud.print("… "+m)
+
+    @doc(_(
+        """
+        Cost of walking through an exit
+        Set the cost of using an exit.
+        Params: exit cost [room]
+        """))
+    async def alias_xp(self, cmd):
+        cmd = self.cmdfix("wir", cmd, min_words=2)
+        if len(cmd) > 2:
+            room = cmd[2]
+        else:
+            room = self.room
+        x = room.exit_at(cmd[0])
+        c = x.cost
+        if c != cmd[1]:
+            await self.mud.print(_("Cost of {exit.dir} from {room.idn_str} changed from {room.cost} to {cost}").format(room=room,exit=x,cost=cmd[1]))
+            x.cost = cmd[1]
+            self.db.commit()
+        else:
+            await self.mud.print(_("Cost of {exit.dir} from {room.idn_str} unchanged").format(room=room,exit=x))
+
 
     @doc(_(
         """
@@ -808,14 +881,16 @@ class S(Server):
 
         Find routes to those rooms. Use #gg to use one.
 
-        No parameters.
+        No parameters. Use the skip list to ignore "not interesting" rooms.
         """))
     async def alias_mud(self, cmd):
         async def check(room):
             # exits that are in Mudlet.
-            mx = None
-            if room in self.skiplist:
+
+            if room.id_mudlet is None:
                 return SkipRoute
+            if room in self.skiplist:
+                return None
             for x in room._exits:
                 if x.dst_id is None:
                     continue
@@ -870,7 +945,7 @@ class S(Server):
                 if n_results == 1:
                     await self.mud.print(_("{r.idnn_str} ({lh} steps)").format(r=r,lh=len(h),d=d+1))
                 else:
-                    await self.mud.print(_("#gu {d} : {r.idn_str} ({lh})").format(r=r,lh=len(h),d=d+1))
+                    await self.mud.print(_("#gg {d} : {r.idn_str} ({lh})").format(r=r,lh=len(h),d=d+1))
             return res
 
         await self.clear_gen()
@@ -880,13 +955,16 @@ class S(Server):
         try:
             async with PathGenerator(self, self.room, _check, **({"n_results":n_results} if n_results else {})) as gen:
                 self.path_gen = gen
+                await self.mud.print("GEN PRE STALL")
                 while await gen.wait_stalled():
+                    await self.mud.print("GEN POST STALL")
                     if n_results == 1:
                         await self.clear_walker()
-                        self.walker = Walker(self, self.path_gen.results[0][1])
+                        self.walker = Walker(self, gen.results[0][1])
                         await self.clear_gen()
                         return
                     await self.mud.print(_("Maybe more results: #gn"))
+                await self.mud.print("GEN NOT STALL")
                 if self.path_gen is gen:
                     await self.mud.print(_("No more results."))
                 # otherwise we've been cancelled
@@ -941,7 +1019,7 @@ class S(Server):
         No parameters: use the first result
         Otherwise: use the n'th result
         """))
-    async def alias_gu(self, cmd):
+    async def alias_gg(self, cmd):
         if self.path_gen is None:
             await self.mud.print(_("No route search active"))
             return
@@ -960,6 +1038,7 @@ class S(Server):
             await self.mud.print(_("I only have {lgr} results.").format(lgr=len(self.path_gen.results)))
             return
 
+        self.add_start_room(self.room)
         await self.clear_gen()
 
     @doc(_(
@@ -1019,7 +1098,7 @@ class S(Server):
             else:
                 await self.mud.print(_("No rooms yet remembered."))
             return
-        r = self.start_rooms[cmd-1]
+        r = self.start_rooms[cmd[0]-1]
         await self.run_to_room(r)
 
 
@@ -1038,7 +1117,20 @@ class S(Server):
         if room in self.start_rooms:
             await self.mud.print(_("Room {room.id_str} is already on the list.").format(room=room))
             return
-        self.start_rooms.appendleft(cmd)
+        self.add_start_room(cmd)
+
+
+    def add_start_room(self, room):
+        """
+        Add a room to the list of start rooms.
+
+        The new room is at the front of the queue. Duplicates are removed.
+        """
+        try:
+            self.start_rooms.remove(room)
+        except ValueError:
+            pass
+        self.start_rooms.appendleft(room)
         if len(self.start_rooms) > 10:
             self.start_rooms.pop()
 
@@ -1262,10 +1354,6 @@ class S(Server):
         await self.clear_gen()
         await self.clear_walk()
 
-    async def alias_gd(self, cmd):
-        await self.clear_gen()
-        await self.clear_walk()
-
     @doc(_(
         """
         Exits (short)
@@ -1350,16 +1438,13 @@ class S(Server):
             mx = None
             if r == room:
                 return SkipSignal
-            if r in self.skiplist:
-                return SkipRoute
+            # if r in self.skiplist:
+            #     return SkipRoute
             if not r.id_mudlet:
                 return SkipRoute
             return None
 
-        self.start_rooms.appendleft(self.room)
-        if len(self.start_rooms) > 10:
-            self.start_rooms.pop()
-
+        self.add_start_room(self.room)
         await self.gen_rooms(check, n_results=1)
 
     @doc(_(
@@ -1536,10 +1621,12 @@ class S(Server):
             self._input_grab = send
             yield r
         finally:
-            if self._input_grab is send:
-                self._input_grab = None
-                await w.aclose()
-                # otherwise done above
+            with trio.move_on_after(2) as cg:
+                cg.shield = True
+                if self._input_grab is send:
+                    self._input_grab = None
+                    await w.aclose()
+                    # otherwise done above
 
     async def called_input(self, msg):
         if self._input_grab:
@@ -1572,34 +1659,40 @@ class S(Server):
     async def alias_rl_b(self, cmd):
         ...
 
-    def called_prompt(self, msg):
+    async def called_prompt(self, msg):
+        """
+        Called by Mudlet when the MUD sends a Telnet GA
+        signalling readiness for the next line
+        """
         logger.debug("NEXT")
         self.maybe_close_descr()
-        try:
-            self._prompt_s.send_nowait(None)
-        except trio.WouldBlock:
-            pass
+        await self.prompt()
 
-    async def alias_gp(self,cmd):
-        try:
-            self._prompt_s.send_nowait(None)
-        except trio.WouldBlock:
-            pass
+    @doc(_(
+        """Go-ahead, send next
+        Use this command if the engine fails to recognize
+        the MUD's prompt / Telnet GA message"""))
+    async def alias_ga(self,cmd):
+        await self.prompt()
 
     async def send_command(self, cmd):
-        """Send a single line."""
+        """Send a single line to the MUD.
+        If necessary, waits until a prompt / GA is received.
+        """
         await self._prompt_r.receive()
+        self.did_send(cmd)
         await self.mud.send(cmd)
 
     async def called_text(self, msg):
-        if msg.startswith("> "):
+        """Incoming text from the MUD"""
+        m = self.is_prompt(msg)
+        if isinstance(m,str):
+            msg = m
             await self.prompt()
+            self.log_text_prompt()
             if len(msg) == 2:
                 return
             msg = msg[2:]
-
-        if msg.startswith("Der GameDriver teilt Dir mit:"):
-            return
 
 #       if exit_pat.match(msg):
 #           self.maybe_close_descr()
@@ -1607,9 +1700,89 @@ class S(Server):
 #           self.long_lines.apend(msg)
 
         logger.debug("IN  : %s", msg)
+        if self.filter_text(msg) is False:
+            return
+        self.log_text(msg)
+        self._text_w.send_nowait(msg)
+
+    def did_send(self, msg):
+        self.sent.appendleft(Processor(direction=msg))
+        if len(self.sent) > 10:
+            self.sent.pop()
+        self.sent_new = True
+        self.exit_match = None
+
+    def match_exit(self, msg):
+        """
+        Match the "there is one exit" or "there are N exits" line which
+        separates the room description from the things in the room.
+
+        TODO: if there's no GMCP this may signal that you have moved.
+        """
+        def matched():
+            if self.sent:
+                self.sent[0].dir_seen()
+
+        if self.exit_match is None:
+            m = EX3.search(msg)
+            if not m:
+                m = EX4.search(msg)
+            if m:
+                matched()
+                return True
+
+            m = EX1.search(msg)
+            if not m:
+                m = EX2.search(msg)
+            if m:
+                matched()
+                self.exit_match = True
+
+        if self.exit_match is True:
+            m = EX9.search(msg)
+            if m:
+                self.exit_match = False
+                return True
+
+        return self.exit_match
+
+
+    def log_text(self, msg):
+        if self.match_exit(msg):
+            return
+
+        if self.sent:
+            self.sent[0].add(msg)
+
+    def log_text_prompt(self):
+        if self.sent:
+            self.sent[0].prompt_seen()
+
+    ### mud specific
+
+    def is_prompt(self, msg):
+        """
+        If the line is / starts with / contains the MUD's input prompt,
+        remove it and return the rest of the line. 
+
+        Otherwise return None.
+        """
+        if msg.startswith("> "):
+            return msg[2:]
+
+    def filter_text(self, msg):
+        """
+        Filter the incoming text.
+        Return False if it should be suppressed
+        """
+        if msg.startswith("Der GameDriver teilt Dir mit:"):
+            return False
 
     async def prompt(self):
-        pass  # use only in MUDs that don't send GA
+        try:
+            self._prompt_s.send_nowait(None)
+        except trio.WouldBlock:
+            pass
 
     async def handle_event(self, msg):
         name = msg[0].replace(".","_")
@@ -1738,16 +1911,19 @@ class S(Server):
             self._prompt_r.receive_nowait()
         except trio.WouldBlock:
             pass
-        self.sent.appendleft(msg[1])
-        if len(self.sent) > 10:
-            self.sent.pop()
+        self.did_send(msg[1])
 
     async def event_gmcp_MG_room_info(self, msg):
         if len(msg) > 2:
             info = AD(msg[2])
         else:
             info = await mud.mud.gmcp.MG.room.info
-        await self.new_info(info)
+        if self.sent_new:
+            moved = self.sent[0].direction
+            self.sent_new = False
+        else:
+            moved = None
+        await self.new_info(info, moved=moved)
 
     async def event_gmcp_comm_channel(self, msg):
         # don't do a thing
@@ -1875,7 +2051,8 @@ class S(Server):
         rc = False
         src = False
 
-        if info == self.room_info:
+        if info == self.room_info and moved is None:
+            await self.mud.print("INFO same and not moved")
             return
 
         logger.debug("INFO:%r",info)
@@ -1898,7 +2075,7 @@ class S(Server):
             except NoData:
                 pass
             if moved is None and self.sent:
-                moved = self.sent[0]
+                moved = self.sent[0].direction
 
         # check directions from our old room
         if self.named_exit:
@@ -1919,7 +2096,11 @@ class S(Server):
                     return
             
             room = self.room.exits.get(moved, None) if self.room else None
-            id_mudlet = (await self.room.mud_exits).get(moved, None) if self.room else None
+            id_mudlet = await self.mud.getRoomIDbyHash(r_hash)
+            if id_mudlet and id_mudlet[0] > 0:
+                id_mudlet = id_mudlet[0]
+            else:
+                id_mudlet = (await self.room.mud_exits).get(moved, None) if self.room else None
             room2 = None
             if id_mudlet is not None:
                 try:
@@ -1983,9 +2164,9 @@ class S(Server):
             if room.orig_area is None:
                 room.orig_area = area
             if self.conf['use_mg_area'] or not self.room:
-                await room.set_area(area)
+                await room.set_area(area, force=True)
             else:
-                await room.set_area(self.room.area)
+                await room.set_area(self.room.area, force=True)
         room.info_area = area
         db.commit()
         logger.debug("ROOM:%s",room.info_str)
@@ -2183,11 +2364,12 @@ class S(Server):
                 async for msg in h:
                     await self.handle_event(msg['args'])
         except Exception as exc:
+            logger.exception("END")
             raise
         except BaseException as exc:
             logger.exception("END")
             raise
-        finally:
+        else:
             logger.error("END")
             pass
 #       async with self.events("*") as h:
@@ -2206,11 +2388,12 @@ async def main(config):
         config = open("mapper.cfg","r")
     cfg = yaml.safe_load(config)
     cfg = combine_dict(cfg, DEFAULT_CFG, cls=attrdict)
-    logging.basicConfig(level=getattr(logging,cfg.log['level'].upper()))
+    #logging.basicConfig(level=getattr(logging,cfg.log['level'].upper()))
 
     with SQL(cfg) as db:
         logger.debug("waiting for connection from Mudlet")
         async with S(cfg=cfg) as mud:
             await mud.run(db=db)
 
-main()
+if __name__ == "__main__":
+    main()

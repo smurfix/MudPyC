@@ -26,13 +26,12 @@ logger = logging.getLogger(__name__)
 
 DEFAULTS = attrdict(
         server=attrdict(
-        host="127.0.0.1", port=23817,
-        fifo=os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "mudlet_fifo"),
-        ca_certs=None, certfile=None, keyfile=None, use_reloader=False,
+            host="127.0.0.1", port=23817,
+            ca_certs=None, certfile=None, keyfile=None, use_reloader=False,
         )
     )
-#if "XDG_RUNTIME_DIR" in os.environ:
-#    DEFAULTS["fifo"] = os.path.join(os.environ["XDG_RUNTIME_DIR"], "mudlet_fifo")
+if "XDG_RUNTIME_DIR" in os.environ:
+    DEFAULTS["server"]["fifo"] = os.path.join(os.environ["XDG_RUNTIME_DIR"], "mudlet_fifo")
 
 def run_in_task(x):
     x.run_in_task = True
@@ -104,17 +103,17 @@ class Server:
         self._handlers = {}
         self._calls = {}
         
-        if 'fifo' in cfg:
+        if 'fifo' in cfg["server"]:
             try:
-                os.unlink(cfg['fifo'])
+                os.unlink(cfg["server"]['fifo'])
             except EnvironmentError as err:
                 if err.errno != errno.ENOENT:
                     raise
             try:
-                os.mkfifo(cfg['fifo'], 0o600)
+                os.mkfifo(cfg["server"]['fifo'], 0o600)
             except EnvironmentError as err:
                 logger.info("No FIFO. Using HTTP. (%r)", err)
-                del cfg['fifo']
+                del cfg["server"]['fifo']
 
 
         @self.app.route("/test", methods=['GET'])
@@ -136,10 +135,13 @@ class Server:
         @self.app.route("/json", methods=['PUT'])
         async def _put_data():
             msg = await request.get_data()
+            logger.debug("PUT %r",msg)
             if msg:
                 msg = json.loads(msg)
                 for m in msg:
+                    logger.debug("PUT P %r",m)
                     await self._msg_in(m)
+            logger.debug("PUT PE")
             msg = json.dumps([])
             return Response(msg, content_type="application/json")
 
@@ -163,6 +165,7 @@ class Server:
         if 'fifo' not in self.cfg['server']:
             task_status.started(None)
             return
+
         fx = os.open(self.cfg['server']['fifo'], os.O_RDONLY|os.O_NDELAY)
         f = OSLineReader(fx)
         task_status.started(fx)
@@ -216,7 +219,7 @@ class Server:
                 for q in list(qq):
                     try:
                         q.send_nowait(msg)
-                    except (trio.WouldBlock,trio.ClosedResourceError):
+                    except trio.ClosedResourceError:
                         await q.aclose()
                         qdel.add(q)
                 if qdel:
@@ -292,7 +295,7 @@ class Server:
         while True:
             t1 = trio.current_time()
             try:
-                with trio.fail_after(2):
+                with trio.fail_after(5):
                     res = await self.rpc(action="ping")
             except trio.TooSlowError:
                 if "pdb" in sys.modules:
@@ -312,7 +315,7 @@ class Server:
         """
         Listen to some event from Mudlet.
         """
-        qw,qr = trio.open_memory_channel(10)
+        qw,qr = trio.open_memory_channel(1000)
         try:
             qq = self._handlers[event]
         except KeyError:
@@ -322,14 +325,16 @@ class Server:
         try:
             yield qr
         finally:
-            try:
-                qq.remove(qw)
-            except KeyError:
-                pass
-            await qw.aclose()
-            if not qq:
-                await self.rpc(action="unhandle", event=event)
-                del self._handlers[event]
+            with trio.move_on_after(2) as cg:
+                cg.shield = True
+                try:
+                    qq.remove(qw)
+                except KeyError:
+                    pass
+                await qw.aclose()
+                if not qq:
+                    await self.rpc(action="unhandle", event=event)
+                    del self._handlers[event]
 
     async def __aenter__(self):
         self._mgr = mgr = self._run()
@@ -393,8 +398,8 @@ class Server:
             pass # end nursery
 
     def _send(self, data):
-        if data.get("action","") != "ping":
-            logger.debug("OUT %r",data)
+        # if data.get("action","") != "ping":
+        logger.debug("OUT %r",data)
         json.dumps(data)  # functional no-op but catches errors early
         self._to_send.append(data)
         self._to_send_wait.set()

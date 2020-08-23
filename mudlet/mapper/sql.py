@@ -65,7 +65,7 @@ def SQL(cfg):
         @validates("dir")
         def dir_min_len(self, key, dir) -> str:
             if dir is not None and len(dir) < 3:  # oben
-                raise ValueError('some_string too short')
+                raise ValueError(f'dir {dir!r} too short')
             return dir
 
         @property
@@ -74,6 +74,8 @@ def SQL(cfg):
                 res = _("Exit: {self.src.id_str} via {self.dir} to {self.dst.id_str}").format(self=self)
             else:
                 res = _("Exit: {self.src.id_str} via {self.dir}").format(self=self)
+            if self.cost != 1:
+                res += _(" :{cost}").format(cost=self.cost)
             if self.steps:
                 res += _(" ({lsm})").format(lsm=len(self.moves))
             return "‹"+res+"›"
@@ -243,10 +245,10 @@ def SQL(cfg):
             for x in self._exits:
                 x.cost += w
 
-        async def set_area(self, area):
+        async def set_area(self, area, force=False):
             mud = self._m.mud
 
-            if self.area == area:
+            if self.area == area and not force:
                 return
             self.area = area
             if self.id_mudlet:
