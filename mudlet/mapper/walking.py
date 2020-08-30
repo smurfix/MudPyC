@@ -15,6 +15,7 @@ class PathGenerator:
         self.start_room = start_room
 
         self.results = []  # (destination,path)
+        self.n_results = n_results
         self._n_results = trio.Semaphore(n_results)
         self._stall_wait = trio.Event()
 
@@ -90,6 +91,9 @@ class PathGenerator:
                         return
                     if p is SignalThis or p is SkipSignal:
                         self.results.append((r,h))
+                        if self.n_results == 1:
+                            await self.cancel()
+                            return
                         if self._result_wait:
                             self._result_wait.set()
                             self._result_wait = None
@@ -264,7 +268,7 @@ class Walker:
 
     async def cancel(self):
         self.scope.cancel()
-        if self.s.walker is self and not self.done:
+        if self.s.walker is self:
             await self.s.walk_done(False)
 
     async def wait(self):

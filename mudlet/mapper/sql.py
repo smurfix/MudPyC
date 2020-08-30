@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from weakref import ref
 from heapq import heappush,heappop
 
-from sqlalchemy import ForeignKey, Column, Integer, MetaData, Table, String, Text, create_engine, select, func
+from sqlalchemy import ForeignKey, Column, Integer, MetaData, Table, String, Float, Text, create_engine, select, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, object_session, validates, backref
 from sqlalchemy.exc import IntegrityError
@@ -42,6 +42,11 @@ def SQL(cfg):
         Column('room_id', Integer, ForeignKey('rooms.id_old'))
     )
 
+    assoc_seen_room = Table('seen_in', Base.metadata,
+        Column('seen_id', Integer, ForeignKey('seen.id')),
+        Column('room_id', Integer, ForeignKey('rooms.id_old'))
+    )
+
     class Area(_AddOn, Base):
         __tablename__ = "area"
         id = Column(Integer, primary_key=True)
@@ -53,7 +58,7 @@ def SQL(cfg):
         id = Column(Integer, primary_key=True)
         src_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
         dir = Column(String, nullable=False)
-        dst_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE", ondelete="CASCADE"), nullable=True)
+        dst_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE", ondelete="SET NULL"), nullable=True)
         det = Column(Integer, nullable=False, default=0) # ways with multiple destinations ## TODO
         cost = Column(Integer, nullable=False, default=1)
         steps = Column(String, nullable=True)
@@ -95,14 +100,18 @@ def SQL(cfg):
         __tablename__ = "rooms"
         id_old = Column(Integer, nullable=True, primary_key=True)
         id_mudlet = Column(Integer, nullable=True)
-        hash_mg = Column(Integer, nullable=True)
-        name = Column(String)
+        id_gmcp = Column(String, nullable=True, unique=True)
+        name = Column(String, nullable=True, index=True)
         label = Column(String)
         # long_descr = Column(Text)
         pos_x = Column(Integer)
         pos_y = Column(Integer)
         pos_z = Column(Integer)
+        last_visit = Column(Integer, nullable=True, unique=True)
         area_id = Column(Integer, ForeignKey("area.id", onupdate="CASCADE",ondelete="RESTRICT"), nullable=True)
+        label_x = Column(Float, default=0)
+        label_y = Column(Float, default=0)
+        flag = Column(Integer, nullable=False, default=0)
 
         # when changing an area
         orig_area = None
@@ -113,14 +122,19 @@ def SQL(cfg):
             primaryjoin=id_old == Exit.src_id, foreign_keys=[Exit.src_id],
             cascade="delete", passive_deletes=True)
         _r_exits = relationship(Exit,
-            primaryjoin=id_old == Exit.dst_id, foreign_keys=[Exit.dst_id],
-            cascade="delete", passive_deletes=True)
+            primaryjoin=id_old == Exit.dst_id, foreign_keys=[Exit.dst_id])
 
         @validates("id_mudlet")
         def mudlet_ok(self, key, id) -> str:
             if id is not None and id < 0:
                 raise ValueError('Cannot be negative')
             return id
+
+        @validates("id_gmcp")
+        def gmcp_min_len(self, key, id_gmcp) -> str:
+            if id_gmcp is not None and len(id_gmcp) < 8:  # oben
+                raise ValueError(f'GMCP id {id_gmcp!r} too short')
+            return id_gmcp
 
         @property
         def info_str(self):
@@ -143,15 +157,41 @@ def SQL(cfg):
         def id_str(self):
             return f"{self.id_old or ''}/{self.id_mudlet or ''}"
 
+        def next_word(self):
+            res = session.query(WordRoom).filter(WordRoom.room_id==self.id_old, WordRoom.flag == 0).first()
+            return res
+
+        def reset_words(self):
+            for wr in session.query(WordRoom).filter(WordRoom.room_id==self.id_old, WordRoom.flag == 1).all():
+                wr.flag = 0
+            session.commit()
+
+
         def set_id_mudlet(self, id_mudlet):
-            # Clear the "exit is set in Mudlet" flags because those stub
-            # exits to nonexisting rooms suddenly aren't stub exits any more
-            # so when we next look at them they need to be reconsidered
+            """
+            Clear the "exit is set in Mudlet" flags because those stub
+            exits to nonexisting rooms suddenly aren't stub exits any more
+            so when we next look at them they need to be reconsidered
+            """
             self.id_mudlet = id_mudlet
             for x in self._exits:
                 x.in_mudlet = False
             for x in self._r_exits:
                 x.in_mudlet = False
+
+        def with_word(self, word, create=False):
+            """
+            Return the WordRoom entry for this word, if known.
+            """
+            if isinstance(word, str):
+                word = get_word(word, create=create)
+                if word is None:
+                    return None
+            res = session.query(WordRoom).filter(WordRoom.room_id==self.id_old,WordRoom.word_id==word.id).one_or_none()
+            if res is None and create:
+                res = WordRoom(word=word, room=self)
+                session.add(res)
+            return res
 
         @property
         def exit_str(self):
@@ -165,9 +205,10 @@ def SQL(cfg):
                 elif d.startswith("betrete "):
                     d = "b-"+d[8:]
                 if x.dst_id:
-                    d += "="+str(x.dst_id)
                     if x.dst.id_mudlet is None:
-                        d += "-*"
+                        d += f"=-{x.dst.id_old}"
+                    else:
+                        d += f"={x.dst.id_mudlet}"
                 ex.append(d)
             return ":"+":".join(ex)+":"
 
@@ -177,6 +218,11 @@ def SQL(cfg):
             for x in self._exits:
                 res[x.dir] = x.dst
             return res
+
+        def visited(self):
+            lv = session.query(func.max(Room.last_visit)).scalar() or 0
+            if self.last_visit != lv:
+                self.last_visit = lv+1
 
         @property
         def long_descr(self):
@@ -192,7 +238,7 @@ def SQL(cfg):
                 return
             d = session.query(LongDescr).filter(LongDescr.room_id==self.id_old).one_or_none()
             if d is None:
-                d = Descr(descr=descr, room_id=self.id_old)
+                d = LongDescr(descr=descr, room_id=self.id_old)
                 session.add(d)
             else:
                 d.descr = descr
@@ -314,7 +360,7 @@ def SQL(cfg):
 
         def exit_to(self,d):
             """
-            Return the exit(s) to a specific room
+            Return (one of) the exit(s) to a specific room
             """
             res = []
             if isinstance(d,Room):
@@ -324,16 +370,15 @@ def SQL(cfg):
                     res.append(x)
             if not res:
                 raise KeyError()
-            if len(res) == 1:
-                return res[0]
-            return res
+            return res[0]
 
-        async def set_exit(self,d,v=True,skip_mud=False):
+        async def set_exit(self,d, v=True, *, force=True, skip_mud=False):
             """
             Add an exit d going to room v.
             v=True (default): add but don't overwrite if it points somewhere.
             v=False: delete the destination
             v=None: delete the exit 
+            force: change even if rooms differ, defaults to True.
 
             Returns a tuple: (Exit, changedFlag)
             """
@@ -358,7 +403,9 @@ def SQL(cfg):
                 for x in self._exits:
                     if x.dir == d:
                         if v:
-                            if x.dst != v:
+                            if x.dst and not force:
+                                pass
+                            elif x.dst != v:
                                 x.dst = v
                                 changed = True
                         else:
@@ -388,8 +435,16 @@ def SQL(cfg):
             res = {}
             if not self.id_mudlet:
                 raise NoData
-            x = (await mud.getRoomExits(self.id_mudlet))[0]
-            y = (await mud.getSpecialExitsSwap(self.id_mudlet))[0]
+            x = await mud.getRoomExits(self.id_mudlet)
+            if x:
+                x = x[0]
+            else:
+                x = {}
+            y = await mud.getSpecialExitsSwap(self.id_mudlet)
+            if y:
+                y = y[0]
+            else:
+                y = {}
             return combine_dict(m.itl2loc(x),y)
 
         async def set_mud_exit(self,d,v=True):
@@ -426,6 +481,12 @@ def SQL(cfg):
             await mud.setRoomEnv(self.id_mudlet, ENV_OK+self.open_exits)
             return changed
 
+
+        def has_thing(self, txt):
+            t = get_thing(txt)
+            self.things.append(t)
+
+
     class LongDescr(_AddOn, Base):
         __tablename__ = "longdescr"
         id = Column(Integer, nullable=True, primary_key=True)
@@ -434,6 +495,13 @@ def SQL(cfg):
 
 #        room = relationship("Room", uselist=False,
 #            primaryjoin=id == Room.id_old, foreign_keys=[Room.id_old])
+
+    class Thing(_AddOn, Base):
+        __tablename__ = "seen"
+        id = Column(Integer, nullable=True, primary_key=True)
+        name = Column(String, nullable=False)
+
+        rooms = relationship("Room", secondary=assoc_seen_room, backref="things")
 
     class Note(_AddOn, Base):
         __tablename__ = "notes"
@@ -450,6 +518,69 @@ def SQL(cfg):
         name = Column(String, nullable=False)
         rooms = relationship("Room", secondary=assoc_skip_room, backref="skiplists")
 
+    class Word(_AddOn, Base):
+        __tablename__ = "words"
+        id = Column(Integer, nullable=True, primary_key=True)
+        name = Column(String, nullable=False, unique=True)
+        flag = Column(Integer, nullable=False, default=0)
+        # 0 std, 2 skip
+
+        _alias_for = None
+
+        def alias_for(self, w):
+            """
+            This word is an alias for another word.
+            Replace it.
+            """
+            if isinstance(w,str):
+                w = get_word(w, create=True)
+            if w is self:
+                raise RuntimeError("Cannot replace with myself")
+            if w._alias_for is not None:
+                raise RuntimeError("already replaced")
+
+            for wr in self.in_rooms:
+                if wr.room.with_word(w) is None:
+                    # Original not known: update entry
+                    wr.word = w
+                else:
+                    session.delete(wr)
+            wa = WordAlias(name=self.name, word=w)
+            session.delete(self)
+            session.add(wa)
+            self._alias_for = w
+            return w
+
+    class WordAlias(_AddOn, Base):
+        __tablename__ = "wordalias"
+        id = Column(Integer, nullable=True, primary_key=True)
+        name = Column(String, nullable=False)
+        word_id = Column(Integer, ForeignKey("words.id", onupdate="CASCADE",ondelete="CASCADE"), nullable=False)
+
+        word = relationship("Word", backref="aliases")
+
+    class WordRoom(_AddOn, Base):
+        __tablename__ = "wordroom"
+        id = Column(Integer, nullable=True, primary_key=True)
+
+        word_id = Column(Integer, ForeignKey("words.id", onupdate="CASCADE",ondelete="CASCADE"), nullable=False)
+        room_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE",ondelete="CASCADE"), nullable=False)
+
+        flag = Column(Integer, nullable=False, default=0)
+        # 0 notscanned, 1 scanned, 2 skipped, 3 marked important?
+
+        word = relationship("Word", backref=backref("in_rooms", cascade="all, delete-orphan"))
+        room = relationship("Room", backref=backref("words", cascade="all, delete-orphan"))
+
+        def alias_for(self, w):
+            """
+            This word is an alias for another word.
+            Replace it.
+            """
+            ww = self.word.alias_for(w)
+            return session.query(WordRoom).filter(Room.id_old == self.room.id_old, Word.id == ww.id).one_or_none()
+
+
     def r_old(room):
         res = session.query(Room).filter(Room.id_old == room).one_or_none()
         if res is None:
@@ -463,7 +594,7 @@ def SQL(cfg):
         return res
 
     def r_hash(room):
-        res = session.query(Room).filter(Room.hash_mg == room).one_or_none()
+        res = session.query(Room).filter(Room.id_gmcp == room).one_or_none()
         if res is None:
             raise NoData("id_hash",room)
         return res
@@ -473,7 +604,7 @@ def SQL(cfg):
         session.add(res)
         return res
 
-    def r_skiplist(name, create=None):
+    def get_skiplist(name, create=None):
         sk = session.query(Skiplist).filter(Skiplist.name == name).one_or_none()
         if sk is None:
             if create is False:
@@ -481,6 +612,27 @@ def SQL(cfg):
             sk = Skiplist(name=name)
             session.add(sk)
         return sk
+
+    def get_word(name, create=False):
+        w = session.query(Word).filter(Word.name == name).one_or_none()
+        if w is None:
+            w = session.query(WordAlias).filter(WordAlias.name == name).one_or_none()
+            if w is not None:
+                w = w.word
+        if w is None and create:
+            w = Word(name=name)
+            session.add(w)
+        if w is not None and w._alias_for:
+            w = w._alias_for
+        return w
+
+    def get_thing(name):
+        th = session.query(Thing).filter(Thing.name == name).one_or_none()
+        if th is None:
+            th = Thing(name=name)
+            session.add(th)
+            session.commit()
+        return th
 
     def setup(server):
         session._mud__main = ref(server)
@@ -491,10 +643,12 @@ def SQL(cfg):
     res = attrdict(db=session, q=session.query,
             setup=setup,
             Room=Room, Area=Area, Exit=Exit, Skiplist=Skiplist,
-            r_hash=r_hash, r_old=r_old, r_mudlet=r_mudlet,
-            r_new=r_new, r_skiplist=r_skiplist,
+            r_hash=r_hash, r_old=r_old, r_mudlet=r_mudlet, r_new=r_new,
+            skiplist=get_skiplist, word=get_word, thing=get_thing,
             commit=session.commit, rollback=session.rollback,
-            add=session.add, delete=session.delete)
+            add=session.add, delete=session.delete,
+            WF_SCANNED=1, WF_SKIP=2, WF_IMPORTANT=3,
+            )
     session._main = ref(res)
     try:
         yield res

@@ -9,4 +9,9 @@ sys.path[0:0] = ["../trio"]
 
 from mudlet.mapper.main import main
 logging.basicConfig(level=logging.DEBUG,format="%(relativeCreated)d %(name)s %(message)s")
-main()
+try:
+	main()
+except trio.Cancelled as exc:
+	import pdb;pdb.set_trace()
+	raise
+
