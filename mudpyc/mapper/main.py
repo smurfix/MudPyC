@@ -1879,7 +1879,14 @@ class S(Server):
 
     @doc(_(
         """
-        Use the first / a specific path which the generator produced
+        Pause/resume walking
+        The current walker, if any, is stopped or resumed.
+        """))
+    async def alias_gp(self, cmd):
+
+    @doc(_(
+        """
+        Use one of the generator's paths
         No parameters: use the first result
         Otherwise: use the n'th result
         Param 2: how many rooms to skip at the end

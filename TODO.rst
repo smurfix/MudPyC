@@ -8,3 +8,4 @@ Update mudlet XML
 Output colorization
 On-screen buttons
 View manipulation
+Support for multiple users/avatars

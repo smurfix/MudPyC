@@ -16,7 +16,7 @@ class NoData(RuntimeError):
     def __str__(self):
         if self.args:
             try:
-                return _("‹NoData:{jsa}›").format(jsa=':'.join(str(x) for x in self.args))
+                return "‹NoData:{jsa}›".format(jsa=':'.join(str(x) for x in self.args))
             except Exception:
                 pass
         return "‹NoData›"
