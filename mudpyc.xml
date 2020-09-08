@@ -1,0 +1,3073 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE MudletPackage>
+<MudletPackage version="1.001">
+	<TriggerPackage>
+		<TriggerGroup isActive="yes" isFolder="yes" isTempTrigger="no" isMultiline="no" isPerlSlashGOption="no" isColorizerTrigger="no" isFilterTrigger="no" isSoundTrigger="no" isColorTrigger="no" isColorTriggerFg="no" isColorTriggerBg="no">
+			<name>Python</name>
+			<script></script>
+			<triggerType>0</triggerType>
+			<conditonLineDelta>0</conditonLineDelta>
+			<mStayOpen>0</mStayOpen>
+			<mCommand></mCommand>
+			<packageName></packageName>
+			<mFgColor>#ff0000</mFgColor>
+			<mBgColor>#ffff00</mBgColor>
+			<mSoundFile></mSoundFile>
+			<colorTriggerFgColor>#000000</colorTriggerFgColor>
+			<colorTriggerBgColor>#000000</colorTriggerBgColor>
+			<regexCodeList />
+			<regexCodePropertyList />
+			<Trigger isActive="yes" isFolder="no" isTempTrigger="no" isMultiline="no" isPerlSlashGOption="no" isColorizerTrigger="no" isFilterTrigger="no" isSoundTrigger="no" isColorTrigger="no" isColorTriggerFg="no" isColorTriggerBg="no">
+				<name>Send all inputs</name>
+				<script>if py.connected then
+    py.call("text", line)
+    deleteLine()
+end</script>
+				<triggerType>0</triggerType>
+				<conditonLineDelta>0</conditonLineDelta>
+				<mStayOpen>0</mStayOpen>
+				<mCommand></mCommand>
+				<packageName></packageName>
+				<mFgColor>#ff0000</mFgColor>
+				<mBgColor>#ffff00</mBgColor>
+				<mSoundFile></mSoundFile>
+				<colorTriggerFgColor>#000000</colorTriggerFgColor>
+				<colorTriggerBgColor>#000000</colorTriggerBgColor>
+				<regexCodeList>
+					<string>^(.*)$</string>
+				</regexCodeList>
+				<regexCodePropertyList>
+					<integer>1</integer>
+				</regexCodePropertyList>
+			</Trigger>
+			<Trigger isActive="yes" isFolder="no" isTempTrigger="no" isMultiline="no" isPerlSlashGOption="no" isColorizerTrigger="no" isFilterTrigger="no" isSoundTrigger="no" isColorTrigger="no" isColorTriggerFg="no" isColorTriggerBg="no">
+				<name>Send prompt</name>
+				<script>if py.connected then
+    py.call("prompt", line)
+end</script>
+				<triggerType>0</triggerType>
+				<conditonLineDelta>0</conditonLineDelta>
+				<mStayOpen>0</mStayOpen>
+				<mCommand></mCommand>
+				<packageName></packageName>
+				<mFgColor>#ff0000</mFgColor>
+				<mBgColor>#ffff00</mBgColor>
+				<mSoundFile></mSoundFile>
+				<colorTriggerFgColor>#000000</colorTriggerFgColor>
+				<colorTriggerBgColor>#000000</colorTriggerBgColor>
+				<regexCodeList>
+					<string></string>
+				</regexCodeList>
+				<regexCodePropertyList>
+					<integer>7</integer>
+				</regexCodePropertyList>
+			</Trigger>
+		</TriggerGroup>
+	</TriggerPackage>
+	<TimerPackage>
+		<TimerGroup isActive="no" isFolder="yes" isTempTimer="no" isOffsetTimer="no">
+			<name>mudlet-mapper</name>
+			<script></script>
+			<command></command>
+			<packageName>mudlet-mapper</packageName>
+			<time>00:00:00.000</time>
+			<TimerGroup isActive="yes" isFolder="yes" isTempTimer="no" isOffsetTimer="no">
+				<name>Mudlet Mapper</name>
+				<script></script>
+				<command></command>
+				<packageName></packageName>
+				<time>00:00:00.000</time>
+				<Timer isActive="no" isFolder="no" isTempTimer="no" isOffsetTimer="no">
+					<name>Check for updates periodically</name>
+					<script>mmp.checkforupdate()</script>
+					<command></command>
+					<packageName></packageName>
+					<time>01:00:00.000</time>
+				</Timer>
+			</TimerGroup>
+		</TimerGroup>
+	</TimerPackage>
+	<AliasPackage>
+		<AliasGroup isActive="yes" isFolder="yes">
+			<name>run-lua-code-v4</name>
+			<script></script>
+			<command></command>
+			<packageName>run-lua-code-v4</packageName>
+			<regex></regex>
+			<Alias isActive="yes" isFolder="no">
+				<name>run lua code</name>
+				<script>local f,e = loadstring("return "..matches[2])
+if not f then
+	f,e = assert(loadstring(matches[2]))
+end
+
+local r = f()
+if r ~= nil then display(r) end</script>
+				<command></command>
+				<packageName></packageName>
+				<regex>^lua (.*)$</regex>
+			</Alias>
+		</AliasGroup>
+		<AliasGroup isActive="yes" isFolder="yes">
+			<name>Python</name>
+			<script></script>
+			<command></command>
+			<packageName></packageName>
+			<regex></regex>
+			<Alias isActive="yes" isFolder="no">
+				<name>Hash-anything goes to Python</name>
+				<script>local m = matches[2]
+
+if m == "py+" then
+    if not py.connected then
+        print("Connecting.")
+        py.init(23817)
+    else
+        print("Already connected.")
+    end
+elseif string.sub(m,1,3) == "py+" and lua_isnumber(string.sub(m,4)) then
+    if not py.connected then
+        print("Connecting, port " .. string.sub(m,4))
+        py.init(0+string.sub(m,4))
+    else
+        print("Already connected.")
+    end
+elseif m == "py-" then
+    if py.connected then
+        py.exit()
+    else
+        print("Already disconnected.")
+    end
+elseif py.connected then
+    py.call("alias", matches[2])
+else
+    print("Not connected.")
+end</script>
+				<command></command>
+				<packageName></packageName>
+				<regex>^#(.*)$</regex>
+			</Alias>
+			<Alias isActive="yes" isFolder="no">
+				<name>Anything goes to Python</name>
+				<script>local m = matches[2]
+
+local function send_cb(b,s)
+    if not b then
+        send(m, false)
+    elseif type(s) == "string" then
+        send(s, false)
+    end
+end
+
+if string.sub(m,1,1) == "#" or string.sub(m,1,4) == "lua " then
+    -- ignore here, already processed elsewhere
+elseif py.connected then
+    py.call(send_cb, "input", m)
+else
+    send(m, false)
+end</script>
+				<command></command>
+				<packageName></packageName>
+				<regex>(.+)</regex>
+			</Alias>
+		</AliasGroup>
+	</AliasPackage>
+	<ActionPackage>
+		<ActionGroup isActive="yes" isFolder="yes" isPushButton="no" isFlatButton="no" useCustomLayout="no">
+			<name>Buttons</name>
+			<packageName></packageName>
+			<script></script>
+			<css></css>
+			<commandButtonUp></commandButtonUp>
+			<commandButtonDown></commandButtonDown>
+			<icon></icon>
+			<orientation>1</orientation>
+			<location>3</location>
+			<posX>0</posX>
+			<posY>0</posY>
+			<mButtonState>1</mButtonState>
+			<sizeX>0</sizeX>
+			<sizeY>0</sizeY>
+			<buttonColumn>1</buttonColumn>
+			<buttonRotation>0</buttonRotation>
+			<buttonColor>#ffffff</buttonColor>
+			<Action isActive="yes" isFolder="no" isPushButton="no" isFlatButton="no" useCustomLayout="no">
+				<name>Farbe</name>
+				<packageName></packageName>
+				<script>local sel = getMapSelection()
+local room = sel.center
+if room == nil then
+    room = getRoomIDbyHash(mapper.currentHash)
+    if room ~= nil then
+        sel.rooms = {room}
+    end
+end
+
+if sel.rooms ~= nil then
+
+local r,g,b
+
+setCustomEnvColor(30, 1,255,1, 255)
+setCustomEnvColor(31, 1,160,255, 255)
+setCustomEnvColor(32, 255,1,1, 255)
+
+local env = getRoomEnv(room)
+
+if 30 &lt;= env and env &lt; 32 then
+   env = env + 1
+elseif env == 32 then
+   env = 30
+end
+local k,v
+for k,v in pairs(sel.rooms) do
+    setRoomEnv(v,env)
+    echo("RoomID " .. v .. " now has " .. env .."\n")
+end
+
+end</script>
+				<css></css>
+				<commandButtonUp></commandButtonUp>
+				<commandButtonDown></commandButtonDown>
+				<icon></icon>
+				<orientation>1</orientation>
+				<location>0</location>
+				<posX>0</posX>
+				<posY>0</posY>
+				<mButtonState>1</mButtonState>
+				<sizeX>0</sizeX>
+				<sizeY>0</sizeY>
+				<buttonColumn>1</buttonColumn>
+				<buttonRotation>1</buttonRotation>
+				<buttonColor>#ffffff</buttonColor>
+			</Action>
+			<Action isActive="yes" isFolder="no" isPushButton="yes" isFlatButton="no" useCustomLayout="no">
+				<name>AutoArea</name>
+				<packageName></packageName>
+				<script>mapper = mapper or {}
+
+setAutoArea(getButtonState() == 2)</script>
+				<css></css>
+				<commandButtonUp></commandButtonUp>
+				<commandButtonDown></commandButtonDown>
+				<icon></icon>
+				<orientation>1</orientation>
+				<location>0</location>
+				<posX>0</posX>
+				<posY>0</posY>
+				<mButtonState>1</mButtonState>
+				<sizeX>0</sizeX>
+				<sizeY>0</sizeY>
+				<buttonColumn>1</buttonColumn>
+				<buttonRotation>1</buttonRotation>
+				<buttonColor>#ffffff</buttonColor>
+			</Action>
+			<Action isActive="yes" isFolder="no" isPushButton="yes" isFlatButton="no" useCustomLayout="no">
+				<name>Z-Wechsel</name>
+				<packageName></packageName>
+				<script>mapper = mapper or {}
+mapper.z_change = getButtonState() == 2</script>
+				<css></css>
+				<commandButtonUp></commandButtonUp>
+				<commandButtonDown></commandButtonDown>
+				<icon></icon>
+				<orientation>1</orientation>
+				<location>0</location>
+				<posX>0</posX>
+				<posY>0</posY>
+				<mButtonState>1</mButtonState>
+				<sizeX>0</sizeX>
+				<sizeY>0</sizeY>
+				<buttonColumn>1</buttonColumn>
+				<buttonRotation>1</buttonRotation>
+				<buttonColor>#ffffff</buttonColor>
+			</Action>
+			<Action isActive="yes" isFolder="no" isPushButton="yes" isFlatButton="no" useCustomLayout="no">
+				<name>addBack</name>
+				<packageName></packageName>
+				<script>-- add way back automatically, assuming it doesn't exist
+mapper = mapper or {}
+mapper.add_back = getButtonState() == 2</script>
+				<css></css>
+				<commandButtonUp></commandButtonUp>
+				<commandButtonDown></commandButtonDown>
+				<icon></icon>
+				<orientation>1</orientation>
+				<location>0</location>
+				<posX>0</posX>
+				<posY>0</posY>
+				<mButtonState>1</mButtonState>
+				<sizeX>0</sizeX>
+				<sizeY>0</sizeY>
+				<buttonColumn>1</buttonColumn>
+				<buttonRotation>1</buttonRotation>
+				<buttonColor>#ffffff</buttonColor>
+			</Action>
+		</ActionGroup>
+	</ActionPackage>
+	<ScriptPackage>
+		<ScriptGroup isActive="yes" isFolder="yes">
+			<name>Python</name>
+			<packageName></packageName>
+			<script></script>
+			<eventHandlerList />
+			<Script isActive="yes" isFolder="no">
+				<name>Connector</name>
+				<packageName></packageName>
+				<script>-- This module connects Mudlet to the "mudlet" Python module,
+-- allowing you to access all of Mudlet from Python instead of Lua.
+-- 
+-- Lag per request is around a millisecond or so. You can do things in parallel.
+-- 
+
+py = py or {}
+py.action = py.action or {}
+
+function py.init(port, url)
+    if py._handler_id_post_done ~= nil then
+        py.dbg("Already running")
+        return false
+    end
+    py.handler = py.handler or {}
+    py.callbacks = py.callbacks or {}
+    py.put_open = false
+    py.get_open = false
+    py.backoff = 0
+    py.seq = 0
+    py.connected = false
+    py.debug = py.debug or 0
+    py.send_buf = {}
+    
+    py.url = url or "http://127.0.0.1:" .. port .. "/json"
+    py.url_get = py.url
+    py.url_put = py.url
+    py.set_debug()
+    py.dbg("Setting up handlers")
+    py._handler_id_post_done = registerAnonymousEventHandler("sysPostHttpDone", py._get_done)
+    py._handler_id_post_err = registerAnonymousEventHandler("sysPostHttpError", py._get_error)
+    py._handler_id_get_done = registerAnonymousEventHandler("sysGetHttpDone", py._get_done)
+    py._handler_id_get_err = registerAnonymousEventHandler("sysGetHttpError", py._get_error)
+    py._handler_id_put_done = registerAnonymousEventHandler("sysPutHttpDone", py._put_done)
+    py._handler_id_put_err = registerAnonymousEventHandler("sysPutHttpError", py._put_error)
+    py._send({action="init"})
+    py._do_http()
+    return true
+end
+
+function py.set_debug(val)
+    if val == nil then val = py.debug else py.debug = val end
+    if val == 0 then
+        py.dbg = function(...) end
+        py.dbg2 = function(...) end
+    elseif val == 1 then
+        py.dbg = function(...) end
+        py.dbg2 = function(...) debugc(...) end
+    else
+        py.dbg = function(...) debugc(...) end
+        py.dbg2 = function(...) debugc(...) end
+    end
+end
+py.set_debug()
+
+function py.exit()
+    py.dbg("Shutting down")
+    py.connected = false
+    if py._handler_id_post_done then
+        print("Disconnected.")
+        killAnonymousEventHandler(py._handler_id_post_done)
+        killAnonymousEventHandler(py._handler_id_post_err)
+        killAnonymousEventHandler(py._handler_id_get_done)
+        killAnonymousEventHandler(py._handler_id_get_err)
+        killAnonymousEventHandler(py._handler_id_put_done)
+        killAnonymousEventHandler(py._handler_id_put_err)
+        py._handler_id_post_done = nil
+        py._handler_id_post_err = nil
+        py._handler_id_get_done = nil
+        py._handler_id_get_err = nil
+        py._handler_id_put_done = nil
+        py._handler_id_put_err = nil
+    end
+    if py.handler then
+        for _,hdl in pairs(py.handler) do
+            killAnonymousEventHandler(hdl)
+        end
+        py.handler = {}
+    end
+    if py.timer then
+        killTimer(py.timer)
+        py.timer = nil
+    end
+    py._reset_connection(true)
+end
+
+function py._reset_connection(no_timer)
+    if py.connected then
+        py.dbg("Reset!")
+        print("Disconnected. Retrying.")
+        py.connected = false
+        raiseEvent("PyDisconnect", py.url)
+
+        if py.file ~= nil then  -- most likely dead
+            py.file:close()
+            py.file = nil
+        end
+        py.send_buf = {}
+
+        local cbs = py.callbacks
+        py.callbacks = {}
+        for _,cb in pairs(py.callbacks) do
+            cb(false, "Disconnected")
+        end
+    end
+    if not no_timer and not py.get_open and not py.put_open then 
+        py._run_timer()
+    end
+end
+
+function py._run_timer()
+    if py.timer == nil then
+        py.backoff = py.backoff * 1.2 + 0.1
+        if py.backoff &gt; 5 then py.backoff = 5 end
+        py.timer = tempTimer(py.backoff, py._retry)
+    end
+
+end
+
+function py._do_http()
+    if #py.send_buf &gt; 0 then
+        if py.file then
+            local msg = py.send_buf
+            py.send_buf = {}
+            for _,m in ipairs(msg) do
+                m = yajl.to_string(m)
+                py.dbg("SendFile",m)
+                py.file:write(string.len(m) .. "\n" .. m)
+            end
+            py.file:flush()
+        elseif not py.put_open then
+            py.put_open = true
+            local msg = py.send_buf
+            py.send_buf = {}
+            msg = yajl.to_string(msg)
+            py.dbg("SendPut",msg)
+            local ok,url = putHTTP(msg, py.url, {["Content-Type"]="application/json"})
+            if ok then
+                py.url_put = url
+            else
+                py._put_error(nil,"PUT failed", py.url_put)
+                return
+            end
+        end    
+    end
+    if not py.get_open then
+        py.get_open = true
+        local ok,url
+        if getHTTP ~= nil then  -- mod by Smurf
+            py.dbg("StartGet")
+            ok,url = getHTTP(py.url)
+        else
+            msg = yajl.to_string({action="poll"})
+            py.dbg("StartPost")
+            ok,url = postHTTP(msg, py.url, {["Content-Type"]="application/json"})
+        end
+        if ok then
+            py.url_get = url
+        else
+            py._get_error(nil,"GET/POST failed", py.url_get)
+            return
+        end
+    end
+end
+
+function py._send(msg)
+    py.send_buf[#py.send_buf+1] = msg
+end
+
+function py._put_done(_, url, msg)
+    if url ~= py.url_put then return end
+    if not py.put_open then py.dbg2("PY: putHTTP without PUT?") return end
+    py.dbg2("put done")
+    py.put_open = false
+
+    py._do_http()
+end
+
+function py._get_done(_, url, msg)
+    if url ~= py.url_get then return end
+    if not py.get_open then py.dbg("PY: getHTTP without GET?") return end
+    py.dbg2("get done",msg)
+    py.get_open = false
+    
+    msg = yajl.to_value(msg)
+    for _,m in ipairs(msg) do
+        py._process(m)
+    end
+    py._do_http()
+end
+
+function py._process(msg)
+    if msg.action then
+        py.dbg("Process", yajl.to_string(msg))
+        local res = {pcall(py.action[msg.action], msg)}
+        local ok = res[1]
+        table.remove(res, 1)
+        if ok then
+            if not msg.seq then return end -- no reply expected
+            res = {result=res}
+        else
+            res = {error=res[1]}
+        end
+        res.seq = msg.seq -- no-op if missing
+        py._send(res)
+        return
+    end
+    py.dbg("PY: No idea how to handle:",yajl.to_string(msg))
+end
+
+
+function py._put_error(_, msg, url)
+    if url ~= py.url_put then return end
+    if not py.put_open then py.dbg2("PUT err but not open?",msg) return end
+    py.dbg2("PUT error", msg)
+    py.put_open = false
+    
+    py._reset_connection()
+end
+
+function py._get_error(_, msg, url)
+    if url ~= py.url_get then return end
+    if not py.get_open then py.dbg2("GET err but not open?") return end
+    py.dbg2("GET error", msg)
+    py.get_open = false
+    
+    py._reset_connection()
+end
+
+function py._retry()
+    py.timer = nil
+    py._send({action="init"})
+    py._do_http()
+end
+
+-- more public methods
+
+-- call this Python method (must be registered), then
+-- call the callback with "true" and the result(s)
+--                or with "false" and the error message
+function py.call(callback, name, ...)
+    local seq
+    local data={...}
+    if type(callback) == "string" then
+        table.insert(data,1,name)
+        name=callback
+        callback=nil
+    end
+    if not py.connected then
+        py.dbg("Not connected calling",name)
+        if callback ~= nil then callback(false,"not connected") end
+        return
+    end
+    if callback then
+        seq = py.seq+1
+        py.seq = seq
+        py.callbacks[seq] = callback
+    else
+        seq=nil
+    end
+    py._send({action="call", call=name, data=data, cseq=seq})
+    py._do_http()
+end
+
+-- calls from python
+
+-- setup
+function py.action.init(msg)
+    if py.connected then
+        py.dbg("init but already connected??")
+        return
+    end
+    if msg.fifo then
+        py.file = io.open(msg.fifo, "w")
+    end
+    -- otherwise use HTTP
+    py.connected = true
+    py._send({action="up"})
+    raiseEvent("PyConnect", py.url)
+    print("Connected!")
+    py._do_http()
+end
+
+-- keepalive
+function py.action.ping(msg)
+    return "Pong"
+end
+
+local function getvalue(s)
+    local val = _G
+    local sep = "."
+    for w in string.gmatch(s,"%w+") do
+        val = val[w]
+        if val == nil then return end
+    end
+    return val
+end
+
+local function toHex(s)
+    local res = ""
+    for i=1,len(s) do
+        res = res .. string.format("%02x",string.byte(string.sub(s,i,i)))
+    end
+    return res
+end
+
+-- forward an event
+function py.action.handle(msg)
+    local evt = msg.event
+    if py.handler[evt] then return false end
+    
+    local function hdl(...)
+        local args = {...}
+        if not py.connected then return end
+        if py.url_get == args[2] then return end -- do not send my events
+        if py.url_put == args[2] then return end -- do not send my events
+        
+        if string.sub(args[1],9) == "HttpError" then
+            py.dbg2("Err",py.url,yajl.to_string(args))
+            return
+        elseif string.sub(args[1],1,5) == "gmcp." then -- add the value to the event
+            -- TODO they're generated with increasing detail. Only send the last one.
+            args[#args+1] = getvalue(args[1])
+        elseif args[1] == "sysTelnetEvent" then
+            args[4] = toHex(args[4])
+        end
+        py._send({event=evt, args=args})
+        py._do_http()
+    end
+    py.handler[evt] = registerAnonymousEventHandler(evt, hdl)
+    return true
+end
+
+-- no longer forward an event
+function py.action.unhandle(msg)
+    local evt = msg.event
+    if not py.handler[evt] then return false end
+    killAnonymousEventHandler(py.handler[evt])
+    py.handler[evt] = nil
+    return true
+end
+
+-- call a function or method
+-- optionally store the result
+function py.action.call(msg)
+    local args = msg.args or {}
+    local self,func = nil,_G
+    assert(#msg.name &gt; (msg.meth and 1 or 0), "no empty name!")
+    for _,name in ipairs(msg.name) do
+        self = func
+        func = func[name]
+    end
+    if msg.meth then table.insert(args,1,self) end
+    if msg.dest then
+        assert(#msg.dest &gt; 0, "no empty name!")
+        local res = func(unpack(args))
+        local self,old = nil,_G
+        for _,name in ipairs(msg.dest) do
+            self = old
+            old = old[name]
+        end
+        self[name] = msg.value
+        return
+    end
+    return func(unpack(args))
+end
+
+-- new . Must be atomic
+function py.action.newroom(msg)
+    local r = createRoomID()
+    addRoom(r)
+    return r
+end
+
+-- get a value
+function py.action.get(msg)
+    assert(#msg.name &gt; 0, "no empty name!")
+    val = _G
+    for _,name in ipairs(msg.name) do
+        val = val[name]
+    end
+    return val
+end
+
+-- check for a value
+function py.action.exists(msg)
+    assert(#msg.name &gt; 0, "no empty name!")
+    val = _G
+    for _,name in ipairs(msg.name) do
+        val = val[name]
+        if val == nil then return false end
+    end
+    return true
+end
+
+-- set a value
+function py.action.set(msg)
+    local self,old = nil,_G
+    assert(#msg.name &gt; 0, "no empty name!")
+    local prev
+    for i,name in ipairs(msg.name) do
+        prev = name
+        self = old
+        old = old[name]
+        if old == nil and i &lt; #msg.name then
+            old = {}
+            self[prev] = old
+        end
+    end
+    self[prev] = msg.value
+    if msg.old then return old end  -- otherwise return nothing
+end
+
+-- clear a value
+function py.action.delete(msg)
+    local self,old = nil,_G
+    assert(#msg.name &gt; 0, "no empty name!")
+    local prev
+    for _,name in ipairs(msg.name) do
+        prev = name
+        self = old
+        old = old[name]
+        if old == nil and i &lt; #msg.name then return end
+    end
+    self[prev] = nil
+    if msg.old then return old end  -- otherwise return nothing
+end
+
+-- raise an event
+function py.action.event(msg)
+    raiseEvent(msg.name, unpack(msg.args or {}))
+end
+
+-- return the result of a "py.call()"
+function py.action.result(msg)
+    local seq = msg.cseq
+    local cb = py.callbacks[seq]
+    if cb then
+        py.callbacks[seq] = nil
+        if msg.error then
+            cb(false, msg.error)
+        else
+            cb(true, unpack(msg.result))
+        end
+    end
+end
+</script>
+				<eventHandlerList />
+			</Script>
+			<Script isActive="yes" isFolder="no">
+				<name>Support functions for shifting the viewpoint</name>
+				<packageName></packageName>
+				<script>function py.go_view(d)
+    if py.connected then
+        py.call("view_go",d)
+    else
+       local room = getPlayerRoom()
+       local dest = getRoomExits(room)[mapper.intexitmap[mapper.exitmap[d]]]
+       if dest == nil then
+           dest = getSpecialExitsSwap(room)[d]
+       end
+       if dest ~= nil then
+           centerview(dest)
+       else 
+           print("No way to go "..d)
+           display(getRoomExits(room),mapper.exitmap[d])
+       end
+    end
+end
+
+function py.reset_view(d)
+    if py.connected then
+        py.call("view_reset",d)
+    else
+        print("Not connected")
+    end
+end
+
+function py.walk_to_view(d)
+    if py.connected then
+        py.call("view_goto",d)
+    else
+        print("Not connected")
+    end
+end
+
+function py.shift_label(x,y)
+    if py.connected then
+        py.call("label_shift",x,y)
+    else
+        print("Not connected")
+    end
+end
+
+function py.fn(d,m)
+    if py.connected then
+        py.call("fnkey",d,m)
+    else
+        print("Not connected")
+    end
+end
+
+
+</script>
+				<eventHandlerList />
+			</Script>
+			<Script isActive="yes" isFolder="no">
+				<name>Basic setup</name>
+				<packageName></packageName>
+				<script>mudlet = mudlet or {}
+mudlet.mapper_script = true
+</script>
+				<eventHandlerList />
+			</Script>
+			<Script isActive="yes" isFolder="no">
+				<name>GUI setup</name>
+				<packageName></packageName>
+				<script>-- thanks to krrrcks for the original I cloned this from
+
+GUI = GUI or {}
+GUI.angezeigt = GUI.angezeigt or false
+GUI.lp_anzeige_blinkt = GUI.lp_anzeige_blinkt or false
+
+function initGUI()
+
+  -- Textfenster begrenzen
+  setBorderTop(0)
+  setBorderBottom(85) -- bisschen Platz fuer Statuszeile
+  setBorderLeft(0)
+  setBorderRight(0)
+
+  -- Statuszeile malen. Layout wie folgt:
+  -- Zeile 1: spieler (Name, Stufe), gift, trenner_1, vorsicht (Vorsicht, Fluchtrichtung)
+  -- Zeile 2: ort_raum (Region, Raumnummer, Para), ort_region (Ort kurz)
+  -- Zeile 3: lp_titel, lp_anzeige (Lebenspunkte-Anzeige), kp_titel, kp_anzeige (KP-Anzeige), trenner_2
+  local HBox = Geyser.HBox:new({
+      name="HBox",
+      x=0, y=-90,
+      width="100%", height=70,
+  })
+  GUI.mainbox = HBox
+  
+  local VBox = Geyser.VBox:new({
+      name="VBox", width="100%", h_policy=Geyser.Fixed
+  }, HBox)
+
+  
+  Zeile = Geyser.HBox:new({name="HBox_line4"}, VBox)
+  GUI.raumnotizen = Geyser.Label:new({name = "raumnotizen"}, Zeile)
+  GUI.raumtype = Geyser.Label:new({name = "raumtype"}, Zeile)
+  
+  -- Zeile 1
+  Zeile = Geyser.HBox:new({name="HBox_line1"}, VBox)
+  GUI.spieler = Geyser.Label:new({name = "spieler"}, Zeile)
+  GUI.gift = Geyser.Label:new({name = "gift"}, Zeile)
+  GUI.trenner_1 = Geyser.Label:new({name = "trenner_1"}, Zeile)
+  GUI.vorsicht = Geyser.Label:new({name = "vorsicht"}, Zeile)
+
+  -- Zeile 2  
+  Zeile = Geyser.HBox:new({name="HBox_line2"}, VBox)
+  GUI.ort_raum = Geyser.Label:new({name = "ort_raum"}, Zeile)
+  GUI.ort_region = Geyser.Label:new({name = "ort_region"}, Zeile)
+
+  -- Zeile 3
+  Zeile = Geyser.HBox:new({name="HBox_line3"}, VBox)
+
+  GUI.lp_titel = Geyser.Label:new({name = "lp_titel"}, Zeile)
+  GUI.lp_titel:echo("Lebenspunkte:")
+
+  GUI.lp_anzeige = Geyser.Gauge:new({name = "lp_anzeige"}, Zeile)
+  GUI.lp_anzeige:setColor(0, 255, 50) 
+  GUI.trenner_3 = Geyser.Label:new({name = "trenner_3"}, Zeile)
+  GUI.kp_titel = Geyser.Label:new({name = "kp_titel"}, Zeile)
+  GUI.kp_titel:echo("Konzentration:")
+
+  GUI.kp_anzeige = Geyser.Gauge:new({name = "kp_anzeige"}, Zeile)
+  GUI.kp_anzeige:setColor(0, 50, 250)
+
+  GUI.trenner_2 = Geyser.Label:new({name = "trenner_2"}, Zeile)
+end</script>
+				<eventHandlerList />
+			</Script>
+		</ScriptGroup>
+	</ScriptPackage>
+	<KeyPackage>
+		<KeyGroup isActive="yes" isFolder="yes">
+			<name>Python</name>
+			<packageName></packageName>
+			<script></script>
+			<command></command>
+			<keyCode>-1</keyCode>
+			<keyModifier>-1</keyModifier>
+            <Key isActive="yes" isFolder="no">
+                <name>F1</name>
+                <packageName></packageName>
+                <script>py.fn(1,0)</script>
+                <command></command>
+                <keyCode>16777264</keyCode>
+                <keyModifier>0</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr F1</name>
+                <packageName></packageName>
+                <script>py.fn(1,4)</script>
+                <command></command>
+                <keyCode>16777264</keyCode>
+                <keyModifier>1073741824</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control F1</name>
+                <packageName></packageName>
+                <script>py.fn(1,2)</script>
+                <command></command>
+                <keyCode>16777264</keyCode>
+                <keyModifier>67108864</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr F1</name>
+                <packageName></packageName>
+                <script>py.fn(1,6)</script>
+                <command></command>
+                <keyCode>16777264</keyCode>
+                <keyModifier>1140850688</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift F1</name>
+                <packageName></packageName>
+                <script>py.fn(1,1)</script>
+                <command></command>
+                <keyCode>16777264</keyCode>
+                <keyModifier>33554432</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr F1</name>
+                <packageName></packageName>
+                <script>py.fn(1,5)</script>
+                <command></command>
+                <keyCode>16777264</keyCode>
+                <keyModifier>1107296256</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control F1</name>
+                <packageName></packageName>
+                <script>py.fn(1,3)</script>
+                <command></command>
+                <keyCode>16777264</keyCode>
+                <keyModifier>100663296</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr F1</name>
+                <packageName></packageName>
+                <script>py.fn(1,7)</script>
+                <command></command>
+                <keyCode>16777264</keyCode>
+                <keyModifier>1174405120</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>F2</name>
+                <packageName></packageName>
+                <script>py.fn(2,0)</script>
+                <command></command>
+                <keyCode>16777265</keyCode>
+                <keyModifier>0</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr F2</name>
+                <packageName></packageName>
+                <script>py.fn(2,4)</script>
+                <command></command>
+                <keyCode>16777265</keyCode>
+                <keyModifier>1073741824</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control F2</name>
+                <packageName></packageName>
+                <script>py.fn(2,2)</script>
+                <command></command>
+                <keyCode>16777265</keyCode>
+                <keyModifier>67108864</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr F2</name>
+                <packageName></packageName>
+                <script>py.fn(2,6)</script>
+                <command></command>
+                <keyCode>16777265</keyCode>
+                <keyModifier>1140850688</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift F2</name>
+                <packageName></packageName>
+                <script>py.fn(2,1)</script>
+                <command></command>
+                <keyCode>16777265</keyCode>
+                <keyModifier>33554432</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr F2</name>
+                <packageName></packageName>
+                <script>py.fn(2,5)</script>
+                <command></command>
+                <keyCode>16777265</keyCode>
+                <keyModifier>1107296256</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control F2</name>
+                <packageName></packageName>
+                <script>py.fn(2,3)</script>
+                <command></command>
+                <keyCode>16777265</keyCode>
+                <keyModifier>100663296</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr F2</name>
+                <packageName></packageName>
+                <script>py.fn(2,7)</script>
+                <command></command>
+                <keyCode>16777265</keyCode>
+                <keyModifier>1174405120</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>F3</name>
+                <packageName></packageName>
+                <script>py.fn(3,0)</script>
+                <command></command>
+                <keyCode>16777266</keyCode>
+                <keyModifier>0</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr F3</name>
+                <packageName></packageName>
+                <script>py.fn(3,4)</script>
+                <command></command>
+                <keyCode>16777266</keyCode>
+                <keyModifier>1073741824</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control F3</name>
+                <packageName></packageName>
+                <script>py.fn(3,2)</script>
+                <command></command>
+                <keyCode>16777266</keyCode>
+                <keyModifier>67108864</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr F3</name>
+                <packageName></packageName>
+                <script>py.fn(3,6)</script>
+                <command></command>
+                <keyCode>16777266</keyCode>
+                <keyModifier>1140850688</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift F3</name>
+                <packageName></packageName>
+                <script>py.fn(3,1)</script>
+                <command></command>
+                <keyCode>16777266</keyCode>
+                <keyModifier>33554432</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr F3</name>
+                <packageName></packageName>
+                <script>py.fn(3,5)</script>
+                <command></command>
+                <keyCode>16777266</keyCode>
+                <keyModifier>1107296256</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control F3</name>
+                <packageName></packageName>
+                <script>py.fn(3,3)</script>
+                <command></command>
+                <keyCode>16777266</keyCode>
+                <keyModifier>100663296</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr F3</name>
+                <packageName></packageName>
+                <script>py.fn(3,7)</script>
+                <command></command>
+                <keyCode>16777266</keyCode>
+                <keyModifier>1174405120</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>F4</name>
+                <packageName></packageName>
+                <script>py.fn(4,0)</script>
+                <command></command>
+                <keyCode>16777267</keyCode>
+                <keyModifier>0</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr F4</name>
+                <packageName></packageName>
+                <script>py.fn(4,4)</script>
+                <command></command>
+                <keyCode>16777267</keyCode>
+                <keyModifier>1073741824</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control F4</name>
+                <packageName></packageName>
+                <script>py.fn(4,2)</script>
+                <command></command>
+                <keyCode>16777267</keyCode>
+                <keyModifier>67108864</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr F4</name>
+                <packageName></packageName>
+                <script>py.fn(4,6)</script>
+                <command></command>
+                <keyCode>16777267</keyCode>
+                <keyModifier>1140850688</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift F4</name>
+                <packageName></packageName>
+                <script>py.fn(4,1)</script>
+                <command></command>
+                <keyCode>16777267</keyCode>
+                <keyModifier>33554432</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr F4</name>
+                <packageName></packageName>
+                <script>py.fn(4,5)</script>
+                <command></command>
+                <keyCode>16777267</keyCode>
+                <keyModifier>1107296256</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control F4</name>
+                <packageName></packageName>
+                <script>py.fn(4,3)</script>
+                <command></command>
+                <keyCode>16777267</keyCode>
+                <keyModifier>100663296</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr F4</name>
+                <packageName></packageName>
+                <script>py.fn(4,7)</script>
+                <command></command>
+                <keyCode>16777267</keyCode>
+                <keyModifier>1174405120</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>F5</name>
+                <packageName></packageName>
+                <script>py.fn(5,0)</script>
+                <command></command>
+                <keyCode>16777268</keyCode>
+                <keyModifier>0</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr F5</name>
+                <packageName></packageName>
+                <script>py.fn(5,4)</script>
+                <command></command>
+                <keyCode>16777268</keyCode>
+                <keyModifier>1073741824</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control F5</name>
+                <packageName></packageName>
+                <script>py.fn(5,2)</script>
+                <command></command>
+                <keyCode>16777268</keyCode>
+                <keyModifier>67108864</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr F5</name>
+                <packageName></packageName>
+                <script>py.fn(5,6)</script>
+                <command></command>
+                <keyCode>16777268</keyCode>
+                <keyModifier>1140850688</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift F5</name>
+                <packageName></packageName>
+                <script>py.fn(5,1)</script>
+                <command></command>
+                <keyCode>16777268</keyCode>
+                <keyModifier>33554432</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr F5</name>
+                <packageName></packageName>
+                <script>py.fn(5,5)</script>
+                <command></command>
+                <keyCode>16777268</keyCode>
+                <keyModifier>1107296256</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control F5</name>
+                <packageName></packageName>
+                <script>py.fn(5,3)</script>
+                <command></command>
+                <keyCode>16777268</keyCode>
+                <keyModifier>100663296</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr F5</name>
+                <packageName></packageName>
+                <script>py.fn(5,7)</script>
+                <command></command>
+                <keyCode>16777268</keyCode>
+                <keyModifier>1174405120</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>F6</name>
+                <packageName></packageName>
+                <script>py.fn(6,0)</script>
+                <command></command>
+                <keyCode>16777269</keyCode>
+                <keyModifier>0</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr F6</name>
+                <packageName></packageName>
+                <script>py.fn(6,4)</script>
+                <command></command>
+                <keyCode>16777269</keyCode>
+                <keyModifier>1073741824</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control F6</name>
+                <packageName></packageName>
+                <script>py.fn(6,2)</script>
+                <command></command>
+                <keyCode>16777269</keyCode>
+                <keyModifier>67108864</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr F6</name>
+                <packageName></packageName>
+                <script>py.fn(6,6)</script>
+                <command></command>
+                <keyCode>16777269</keyCode>
+                <keyModifier>1140850688</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift F6</name>
+                <packageName></packageName>
+                <script>py.fn(6,1)</script>
+                <command></command>
+                <keyCode>16777269</keyCode>
+                <keyModifier>33554432</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr F6</name>
+                <packageName></packageName>
+                <script>py.fn(6,5)</script>
+                <command></command>
+                <keyCode>16777269</keyCode>
+                <keyModifier>1107296256</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control F6</name>
+                <packageName></packageName>
+                <script>py.fn(6,3)</script>
+                <command></command>
+                <keyCode>16777269</keyCode>
+                <keyModifier>100663296</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr F6</name>
+                <packageName></packageName>
+                <script>py.fn(6,7)</script>
+                <command></command>
+                <keyCode>16777269</keyCode>
+                <keyModifier>1174405120</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>F7</name>
+                <packageName></packageName>
+                <script>py.fn(7,0)</script>
+                <command></command>
+                <keyCode>16777270</keyCode>
+                <keyModifier>0</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr F7</name>
+                <packageName></packageName>
+                <script>py.fn(7,4)</script>
+                <command></command>
+                <keyCode>16777270</keyCode>
+                <keyModifier>1073741824</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control F7</name>
+                <packageName></packageName>
+                <script>py.fn(7,2)</script>
+                <command></command>
+                <keyCode>16777270</keyCode>
+                <keyModifier>67108864</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr F7</name>
+                <packageName></packageName>
+                <script>py.fn(7,6)</script>
+                <command></command>
+                <keyCode>16777270</keyCode>
+                <keyModifier>1140850688</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift F7</name>
+                <packageName></packageName>
+                <script>py.fn(7,1)</script>
+                <command></command>
+                <keyCode>16777270</keyCode>
+                <keyModifier>33554432</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr F7</name>
+                <packageName></packageName>
+                <script>py.fn(7,5)</script>
+                <command></command>
+                <keyCode>16777270</keyCode>
+                <keyModifier>1107296256</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control F7</name>
+                <packageName></packageName>
+                <script>py.fn(7,3)</script>
+                <command></command>
+                <keyCode>16777270</keyCode>
+                <keyModifier>100663296</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr F7</name>
+                <packageName></packageName>
+                <script>py.fn(7,7)</script>
+                <command></command>
+                <keyCode>16777270</keyCode>
+                <keyModifier>1174405120</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>F8</name>
+                <packageName></packageName>
+                <script>py.fn(8,0)</script>
+                <command></command>
+                <keyCode>16777271</keyCode>
+                <keyModifier>0</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr F8</name>
+                <packageName></packageName>
+                <script>py.fn(8,4)</script>
+                <command></command>
+                <keyCode>16777271</keyCode>
+                <keyModifier>1073741824</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control F8</name>
+                <packageName></packageName>
+                <script>py.fn(8,2)</script>
+                <command></command>
+                <keyCode>16777271</keyCode>
+                <keyModifier>67108864</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr F8</name>
+                <packageName></packageName>
+                <script>py.fn(8,6)</script>
+                <command></command>
+                <keyCode>16777271</keyCode>
+                <keyModifier>1140850688</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift F8</name>
+                <packageName></packageName>
+                <script>py.fn(8,1)</script>
+                <command></command>
+                <keyCode>16777271</keyCode>
+                <keyModifier>33554432</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr F8</name>
+                <packageName></packageName>
+                <script>py.fn(8,5)</script>
+                <command></command>
+                <keyCode>16777271</keyCode>
+                <keyModifier>1107296256</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control F8</name>
+                <packageName></packageName>
+                <script>py.fn(8,3)</script>
+                <command></command>
+                <keyCode>16777271</keyCode>
+                <keyModifier>100663296</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr F8</name>
+                <packageName></packageName>
+                <script>py.fn(8,7)</script>
+                <command></command>
+                <keyCode>16777271</keyCode>
+                <keyModifier>1174405120</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>F9</name>
+                <packageName></packageName>
+                <script>py.fn(9,0)</script>
+                <command></command>
+                <keyCode>16777272</keyCode>
+                <keyModifier>0</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr F9</name>
+                <packageName></packageName>
+                <script>py.fn(9,4)</script>
+                <command></command>
+                <keyCode>16777272</keyCode>
+                <keyModifier>1073741824</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control F9</name>
+                <packageName></packageName>
+                <script>py.fn(9,2)</script>
+                <command></command>
+                <keyCode>16777272</keyCode>
+                <keyModifier>67108864</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr F9</name>
+                <packageName></packageName>
+                <script>py.fn(9,6)</script>
+                <command></command>
+                <keyCode>16777272</keyCode>
+                <keyModifier>1140850688</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift F9</name>
+                <packageName></packageName>
+                <script>py.fn(9,1)</script>
+                <command></command>
+                <keyCode>16777272</keyCode>
+                <keyModifier>33554432</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr F9</name>
+                <packageName></packageName>
+                <script>py.fn(9,5)</script>
+                <command></command>
+                <keyCode>16777272</keyCode>
+                <keyModifier>1107296256</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control F9</name>
+                <packageName></packageName>
+                <script>py.fn(9,3)</script>
+                <command></command>
+                <keyCode>16777272</keyCode>
+                <keyModifier>100663296</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr F9</name>
+                <packageName></packageName>
+                <script>py.fn(9,7)</script>
+                <command></command>
+                <keyCode>16777272</keyCode>
+                <keyModifier>1174405120</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>F10</name>
+                <packageName></packageName>
+                <script>py.fn(10,0)</script>
+                <command></command>
+                <keyCode>16777273</keyCode>
+                <keyModifier>0</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr F10</name>
+                <packageName></packageName>
+                <script>py.fn(10,4)</script>
+                <command></command>
+                <keyCode>16777273</keyCode>
+                <keyModifier>1073741824</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control F10</name>
+                <packageName></packageName>
+                <script>py.fn(10,2)</script>
+                <command></command>
+                <keyCode>16777273</keyCode>
+                <keyModifier>67108864</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr F10</name>
+                <packageName></packageName>
+                <script>py.fn(10,6)</script>
+                <command></command>
+                <keyCode>16777273</keyCode>
+                <keyModifier>1140850688</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift F10</name>
+                <packageName></packageName>
+                <script>py.fn(10,1)</script>
+                <command></command>
+                <keyCode>16777273</keyCode>
+                <keyModifier>33554432</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr F10</name>
+                <packageName></packageName>
+                <script>py.fn(10,5)</script>
+                <command></command>
+                <keyCode>16777273</keyCode>
+                <keyModifier>1107296256</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control F10</name>
+                <packageName></packageName>
+                <script>py.fn(10,3)</script>
+                <command></command>
+                <keyCode>16777273</keyCode>
+                <keyModifier>100663296</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr F10</name>
+                <packageName></packageName>
+                <script>py.fn(10,7)</script>
+                <command></command>
+                <keyCode>16777273</keyCode>
+                <keyModifier>1174405120</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>F11</name>
+                <packageName></packageName>
+                <script>py.fn(11,0)</script>
+                <command></command>
+                <keyCode>16777274</keyCode>
+                <keyModifier>0</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr F11</name>
+                <packageName></packageName>
+                <script>py.fn(11,4)</script>
+                <command></command>
+                <keyCode>16777274</keyCode>
+                <keyModifier>1073741824</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control F11</name>
+                <packageName></packageName>
+                <script>py.fn(11,2)</script>
+                <command></command>
+                <keyCode>16777274</keyCode>
+                <keyModifier>67108864</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr F11</name>
+                <packageName></packageName>
+                <script>py.fn(11,6)</script>
+                <command></command>
+                <keyCode>16777274</keyCode>
+                <keyModifier>1140850688</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift F11</name>
+                <packageName></packageName>
+                <script>py.fn(11,1)</script>
+                <command></command>
+                <keyCode>16777274</keyCode>
+                <keyModifier>33554432</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr F11</name>
+                <packageName></packageName>
+                <script>py.fn(11,5)</script>
+                <command></command>
+                <keyCode>16777274</keyCode>
+                <keyModifier>1107296256</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control F11</name>
+                <packageName></packageName>
+                <script>py.fn(11,3)</script>
+                <command></command>
+                <keyCode>16777274</keyCode>
+                <keyModifier>100663296</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr F11</name>
+                <packageName></packageName>
+                <script>py.fn(11,7)</script>
+                <command></command>
+                <keyCode>16777274</keyCode>
+                <keyModifier>1174405120</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>F12</name>
+                <packageName></packageName>
+                <script>py.fn(12,0)</script>
+                <command></command>
+                <keyCode>16777275</keyCode>
+                <keyModifier>0</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr F12</name>
+                <packageName></packageName>
+                <script>py.fn(12,4)</script>
+                <command></command>
+                <keyCode>16777275</keyCode>
+                <keyModifier>1073741824</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control F12</name>
+                <packageName></packageName>
+                <script>py.fn(12,2)</script>
+                <command></command>
+                <keyCode>16777275</keyCode>
+                <keyModifier>67108864</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr F12</name>
+                <packageName></packageName>
+                <script>py.fn(12,6)</script>
+                <command></command>
+                <keyCode>16777275</keyCode>
+                <keyModifier>1140850688</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift F12</name>
+                <packageName></packageName>
+                <script>py.fn(12,1)</script>
+                <command></command>
+                <keyCode>16777275</keyCode>
+                <keyModifier>33554432</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr F12</name>
+                <packageName></packageName>
+                <script>py.fn(12,5)</script>
+                <command></command>
+                <keyCode>16777275</keyCode>
+                <keyModifier>1107296256</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control F12</name>
+                <packageName></packageName>
+                <script>py.fn(12,3)</script>
+                <command></command>
+                <keyCode>16777275</keyCode>
+                <keyModifier>100663296</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr F12</name>
+                <packageName></packageName>
+                <script>py.fn(12,7)</script>
+                <command></command>
+                <keyCode>16777275</keyCode>
+                <keyModifier>1174405120</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Pause</name>
+                <packageName></packageName>
+                <script>py.fn(15,0)</script>
+                <command></command>
+                <keyCode>16777224</keyCode>
+                <keyModifier>0</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr Pause</name>
+                <packageName></packageName>
+                <script>py.fn(15,4)</script>
+                <command></command>
+                <keyCode>16777224</keyCode>
+                <keyModifier>1073741824</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control Pause</name>
+                <packageName></packageName>
+                <script>py.fn(15,2)</script>
+                <command></command>
+                <keyCode>16777224</keyCode>
+                <keyModifier>67108864</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr Pause</name>
+                <packageName></packageName>
+                <script>py.fn(15,6)</script>
+                <command></command>
+                <keyCode>16777224</keyCode>
+                <keyModifier>1140850688</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Pause</name>
+                <packageName></packageName>
+                <script>py.fn(15,1)</script>
+                <command></command>
+                <keyCode>16777224</keyCode>
+                <keyModifier>33554432</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr Pause</name>
+                <packageName></packageName>
+                <script>py.fn(15,5)</script>
+                <command></command>
+                <keyCode>16777224</keyCode>
+                <keyModifier>1107296256</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control Pause</name>
+                <packageName></packageName>
+                <script>py.fn(15,3)</script>
+                <command></command>
+                <keyCode>16777224</keyCode>
+                <keyModifier>100663296</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr Pause</name>
+                <packageName></packageName>
+                <script>py.fn(15,7)</script>
+                <command></command>
+                <keyCode>16777224</keyCode>
+                <keyModifier>1174405120</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>ScrollLock</name>
+                <packageName></packageName>
+                <script>py.fn(14,0)</script>
+                <command></command>
+                <keyCode>16777254</keyCode>
+                <keyModifier>0</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr ScrollLock</name>
+                <packageName></packageName>
+                <script>py.fn(14,4)</script>
+                <command></command>
+                <keyCode>16777254</keyCode>
+                <keyModifier>1073741824</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control ScrollLock</name>
+                <packageName></packageName>
+                <script>py.fn(14,2)</script>
+                <command></command>
+                <keyCode>16777254</keyCode>
+                <keyModifier>67108864</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr ScrollLock</name>
+                <packageName></packageName>
+                <script>py.fn(14,6)</script>
+                <command></command>
+                <keyCode>16777254</keyCode>
+                <keyModifier>1140850688</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift ScrollLock</name>
+                <packageName></packageName>
+                <script>py.fn(14,1)</script>
+                <command></command>
+                <keyCode>16777254</keyCode>
+                <keyModifier>33554432</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr ScrollLock</name>
+                <packageName></packageName>
+                <script>py.fn(14,5)</script>
+                <command></command>
+                <keyCode>16777254</keyCode>
+                <keyModifier>1107296256</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control ScrollLock</name>
+                <packageName></packageName>
+                <script>py.fn(14,3)</script>
+                <command></command>
+                <keyCode>16777254</keyCode>
+                <keyModifier>100663296</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr ScrollLock</name>
+                <packageName></packageName>
+                <script>py.fn(14,7)</script>
+                <command></command>
+                <keyCode>16777254</keyCode>
+                <keyModifier>1174405120</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>KP 0</name>
+                <packageName></packageName>
+                <script>py.fn(0,0)</script>
+                <command></command>
+                <keyCode>48</keyCode>
+                <keyModifier>536870912</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr KP 0</name>
+                <packageName></packageName>
+                <script>py.fn(0,4)</script>
+                <command></command>
+                <keyCode>48</keyCode>
+                <keyModifier>1610612736</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control KP 0</name>
+                <packageName></packageName>
+                <script>py.fn(0,2)</script>
+                <command></command>
+                <keyCode>48</keyCode>
+                <keyModifier>603979776</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr KP 0</name>
+                <packageName></packageName>
+                <script>py.fn(0,6)</script>
+                <command></command>
+                <keyCode>48</keyCode>
+                <keyModifier>1677721600</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift KP 0</name>
+                <packageName></packageName>
+                <script>py.fn(0,1)</script>
+                <command></command>
+                <keyCode>48</keyCode>
+                <keyModifier>570425344</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr KP 0</name>
+                <packageName></packageName>
+                <script>py.fn(0,5)</script>
+                <command></command>
+                <keyCode>48</keyCode>
+                <keyModifier>1644167168</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control KP 0</name>
+                <packageName></packageName>
+                <script>py.fn(0,3)</script>
+                <command></command>
+                <keyCode>48</keyCode>
+                <keyModifier>637534208</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr KP 0</name>
+                <packageName></packageName>
+                <script>py.fn(0,7)</script>
+                <command></command>
+                <keyCode>48</keyCode>
+                <keyModifier>1711276032</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>KP 1</name>
+                <packageName></packageName>
+                <script>py.fn(8,0)</script>
+                <command></command>
+                <keyCode>49</keyCode>
+                <keyModifier>536870912</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr KP 1</name>
+                <packageName></packageName>
+                <script>py.fn(8,4)</script>
+                <command></command>
+                <keyCode>49</keyCode>
+                <keyModifier>1610612736</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control KP 1</name>
+                <packageName></packageName>
+                <script>py.fn(8,2)</script>
+                <command></command>
+                <keyCode>49</keyCode>
+                <keyModifier>603979776</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr KP 1</name>
+                <packageName></packageName>
+                <script>py.fn(8,6)</script>
+                <command></command>
+                <keyCode>49</keyCode>
+                <keyModifier>1677721600</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift KP 1</name>
+                <packageName></packageName>
+                <script>py.fn(8,1)</script>
+                <command></command>
+                <keyCode>49</keyCode>
+                <keyModifier>570425344</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr KP 1</name>
+                <packageName></packageName>
+                <script>py.fn(8,5)</script>
+                <command></command>
+                <keyCode>49</keyCode>
+                <keyModifier>1644167168</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control KP 1</name>
+                <packageName></packageName>
+                <script>py.fn(8,3)</script>
+                <command></command>
+                <keyCode>49</keyCode>
+                <keyModifier>637534208</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr KP 1</name>
+                <packageName></packageName>
+                <script>py.fn(8,7)</script>
+                <command></command>
+                <keyCode>49</keyCode>
+                <keyModifier>1711276032</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>KP 2</name>
+                <packageName></packageName>
+                <script>py.fn(8,0)</script>
+                <command></command>
+                <keyCode>50</keyCode>
+                <keyModifier>536870912</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr KP 2</name>
+                <packageName></packageName>
+                <script>py.fn(8,4)</script>
+                <command></command>
+                <keyCode>50</keyCode>
+                <keyModifier>1610612736</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control KP 2</name>
+                <packageName></packageName>
+                <script>py.fn(8,2)</script>
+                <command></command>
+                <keyCode>50</keyCode>
+                <keyModifier>603979776</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr KP 2</name>
+                <packageName></packageName>
+                <script>py.fn(8,6)</script>
+                <command></command>
+                <keyCode>50</keyCode>
+                <keyModifier>1677721600</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift KP 2</name>
+                <packageName></packageName>
+                <script>py.fn(8,1)</script>
+                <command></command>
+                <keyCode>50</keyCode>
+                <keyModifier>570425344</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr KP 2</name>
+                <packageName></packageName>
+                <script>py.fn(8,5)</script>
+                <command></command>
+                <keyCode>50</keyCode>
+                <keyModifier>1644167168</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control KP 2</name>
+                <packageName></packageName>
+                <script>py.fn(8,3)</script>
+                <command></command>
+                <keyCode>50</keyCode>
+                <keyModifier>637534208</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr KP 2</name>
+                <packageName></packageName>
+                <script>py.fn(8,7)</script>
+                <command></command>
+                <keyCode>50</keyCode>
+                <keyModifier>1711276032</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>KP 3</name>
+                <packageName></packageName>
+                <script>py.fn(8,0)</script>
+                <command></command>
+                <keyCode>51</keyCode>
+                <keyModifier>536870912</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr KP 3</name>
+                <packageName></packageName>
+                <script>py.fn(8,4)</script>
+                <command></command>
+                <keyCode>51</keyCode>
+                <keyModifier>1610612736</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control KP 3</name>
+                <packageName></packageName>
+                <script>py.fn(8,2)</script>
+                <command></command>
+                <keyCode>51</keyCode>
+                <keyModifier>603979776</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr KP 3</name>
+                <packageName></packageName>
+                <script>py.fn(8,6)</script>
+                <command></command>
+                <keyCode>51</keyCode>
+                <keyModifier>1677721600</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift KP 3</name>
+                <packageName></packageName>
+                <script>py.fn(8,1)</script>
+                <command></command>
+                <keyCode>51</keyCode>
+                <keyModifier>570425344</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr KP 3</name>
+                <packageName></packageName>
+                <script>py.fn(8,5)</script>
+                <command></command>
+                <keyCode>51</keyCode>
+                <keyModifier>1644167168</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control KP 3</name>
+                <packageName></packageName>
+                <script>py.fn(8,3)</script>
+                <command></command>
+                <keyCode>51</keyCode>
+                <keyModifier>637534208</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr KP 3</name>
+                <packageName></packageName>
+                <script>py.fn(8,7)</script>
+                <command></command>
+                <keyCode>51</keyCode>
+                <keyModifier>1711276032</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>KP 4</name>
+                <packageName></packageName>
+                <script>py.fn(8,0)</script>
+                <command></command>
+                <keyCode>52</keyCode>
+                <keyModifier>536870912</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr KP 4</name>
+                <packageName></packageName>
+                <script>py.fn(8,4)</script>
+                <command></command>
+                <keyCode>52</keyCode>
+                <keyModifier>1610612736</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control KP 4</name>
+                <packageName></packageName>
+                <script>py.fn(8,2)</script>
+                <command></command>
+                <keyCode>52</keyCode>
+                <keyModifier>603979776</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr KP 4</name>
+                <packageName></packageName>
+                <script>py.fn(8,6)</script>
+                <command></command>
+                <keyCode>52</keyCode>
+                <keyModifier>1677721600</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift KP 4</name>
+                <packageName></packageName>
+                <script>py.fn(8,1)</script>
+                <command></command>
+                <keyCode>52</keyCode>
+                <keyModifier>570425344</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr KP 4</name>
+                <packageName></packageName>
+                <script>py.fn(8,5)</script>
+                <command></command>
+                <keyCode>52</keyCode>
+                <keyModifier>1644167168</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control KP 4</name>
+                <packageName></packageName>
+                <script>py.fn(8,3)</script>
+                <command></command>
+                <keyCode>52</keyCode>
+                <keyModifier>637534208</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr KP 4</name>
+                <packageName></packageName>
+                <script>py.fn(8,7)</script>
+                <command></command>
+                <keyCode>52</keyCode>
+                <keyModifier>1711276032</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>KP 5</name>
+                <packageName></packageName>
+                <script>py.fn(8,0)</script>
+                <command></command>
+                <keyCode>53</keyCode>
+                <keyModifier>536870912</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr KP 5</name>
+                <packageName></packageName>
+                <script>py.fn(8,4)</script>
+                <command></command>
+                <keyCode>53</keyCode>
+                <keyModifier>1610612736</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control KP 5</name>
+                <packageName></packageName>
+                <script>py.fn(8,2)</script>
+                <command></command>
+                <keyCode>53</keyCode>
+                <keyModifier>603979776</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr KP 5</name>
+                <packageName></packageName>
+                <script>py.fn(8,6)</script>
+                <command></command>
+                <keyCode>53</keyCode>
+                <keyModifier>1677721600</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift KP 5</name>
+                <packageName></packageName>
+                <script>py.fn(8,1)</script>
+                <command></command>
+                <keyCode>53</keyCode>
+                <keyModifier>570425344</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr KP 5</name>
+                <packageName></packageName>
+                <script>py.fn(8,5)</script>
+                <command></command>
+                <keyCode>53</keyCode>
+                <keyModifier>1644167168</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control KP 5</name>
+                <packageName></packageName>
+                <script>py.fn(8,3)</script>
+                <command></command>
+                <keyCode>53</keyCode>
+                <keyModifier>637534208</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr KP 5</name>
+                <packageName></packageName>
+                <script>py.fn(8,7)</script>
+                <command></command>
+                <keyCode>53</keyCode>
+                <keyModifier>1711276032</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>KP 6</name>
+                <packageName></packageName>
+                <script>py.fn(8,0)</script>
+                <command></command>
+                <keyCode>54</keyCode>
+                <keyModifier>536870912</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr KP 6</name>
+                <packageName></packageName>
+                <script>py.fn(8,4)</script>
+                <command></command>
+                <keyCode>54</keyCode>
+                <keyModifier>1610612736</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control KP 6</name>
+                <packageName></packageName>
+                <script>py.fn(8,2)</script>
+                <command></command>
+                <keyCode>54</keyCode>
+                <keyModifier>603979776</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr KP 6</name>
+                <packageName></packageName>
+                <script>py.fn(8,6)</script>
+                <command></command>
+                <keyCode>54</keyCode>
+                <keyModifier>1677721600</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift KP 6</name>
+                <packageName></packageName>
+                <script>py.fn(8,1)</script>
+                <command></command>
+                <keyCode>54</keyCode>
+                <keyModifier>570425344</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr KP 6</name>
+                <packageName></packageName>
+                <script>py.fn(8,5)</script>
+                <command></command>
+                <keyCode>54</keyCode>
+                <keyModifier>1644167168</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control KP 6</name>
+                <packageName></packageName>
+                <script>py.fn(8,3)</script>
+                <command></command>
+                <keyCode>54</keyCode>
+                <keyModifier>637534208</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr KP 6</name>
+                <packageName></packageName>
+                <script>py.fn(8,7)</script>
+                <command></command>
+                <keyCode>54</keyCode>
+                <keyModifier>1711276032</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>KP 7</name>
+                <packageName></packageName>
+                <script>py.fn(8,0)</script>
+                <command></command>
+                <keyCode>55</keyCode>
+                <keyModifier>536870912</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr KP 7</name>
+                <packageName></packageName>
+                <script>py.fn(8,4)</script>
+                <command></command>
+                <keyCode>55</keyCode>
+                <keyModifier>1610612736</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control KP 7</name>
+                <packageName></packageName>
+                <script>py.fn(8,2)</script>
+                <command></command>
+                <keyCode>55</keyCode>
+                <keyModifier>603979776</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr KP 7</name>
+                <packageName></packageName>
+                <script>py.fn(8,6)</script>
+                <command></command>
+                <keyCode>55</keyCode>
+                <keyModifier>1677721600</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift KP 7</name>
+                <packageName></packageName>
+                <script>py.fn(8,1)</script>
+                <command></command>
+                <keyCode>55</keyCode>
+                <keyModifier>570425344</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr KP 7</name>
+                <packageName></packageName>
+                <script>py.fn(8,5)</script>
+                <command></command>
+                <keyCode>55</keyCode>
+                <keyModifier>1644167168</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control KP 7</name>
+                <packageName></packageName>
+                <script>py.fn(8,3)</script>
+                <command></command>
+                <keyCode>55</keyCode>
+                <keyModifier>637534208</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr KP 7</name>
+                <packageName></packageName>
+                <script>py.fn(8,7)</script>
+                <command></command>
+                <keyCode>55</keyCode>
+                <keyModifier>1711276032</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>KP 8</name>
+                <packageName></packageName>
+                <script>py.fn(8,0)</script>
+                <command></command>
+                <keyCode>56</keyCode>
+                <keyModifier>536870912</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr KP 8</name>
+                <packageName></packageName>
+                <script>py.fn(8,4)</script>
+                <command></command>
+                <keyCode>56</keyCode>
+                <keyModifier>1610612736</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control KP 8</name>
+                <packageName></packageName>
+                <script>py.fn(8,2)</script>
+                <command></command>
+                <keyCode>56</keyCode>
+                <keyModifier>603979776</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr KP 8</name>
+                <packageName></packageName>
+                <script>py.fn(8,6)</script>
+                <command></command>
+                <keyCode>56</keyCode>
+                <keyModifier>1677721600</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift KP 8</name>
+                <packageName></packageName>
+                <script>py.fn(8,1)</script>
+                <command></command>
+                <keyCode>56</keyCode>
+                <keyModifier>570425344</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr KP 8</name>
+                <packageName></packageName>
+                <script>py.fn(8,5)</script>
+                <command></command>
+                <keyCode>56</keyCode>
+                <keyModifier>1644167168</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control KP 8</name>
+                <packageName></packageName>
+                <script>py.fn(8,3)</script>
+                <command></command>
+                <keyCode>56</keyCode>
+                <keyModifier>637534208</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr KP 8</name>
+                <packageName></packageName>
+                <script>py.fn(8,7)</script>
+                <command></command>
+                <keyCode>56</keyCode>
+                <keyModifier>1711276032</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>KP 9</name>
+                <packageName></packageName>
+                <script>py.fn(8,0)</script>
+                <command></command>
+                <keyCode>57</keyCode>
+                <keyModifier>536870912</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr KP 9</name>
+                <packageName></packageName>
+                <script>py.fn(8,4)</script>
+                <command></command>
+                <keyCode>57</keyCode>
+                <keyModifier>1610612736</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control KP 9</name>
+                <packageName></packageName>
+                <script>py.fn(8,2)</script>
+                <command></command>
+                <keyCode>57</keyCode>
+                <keyModifier>603979776</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr KP 9</name>
+                <packageName></packageName>
+                <script>py.fn(8,6)</script>
+                <command></command>
+                <keyCode>57</keyCode>
+                <keyModifier>1677721600</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift KP 9</name>
+                <packageName></packageName>
+                <script>py.fn(8,1)</script>
+                <command></command>
+                <keyCode>57</keyCode>
+                <keyModifier>570425344</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr KP 9</name>
+                <packageName></packageName>
+                <script>py.fn(8,5)</script>
+                <command></command>
+                <keyCode>57</keyCode>
+                <keyModifier>1644167168</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control KP 9</name>
+                <packageName></packageName>
+                <script>py.fn(8,3)</script>
+                <command></command>
+                <keyCode>57</keyCode>
+                <keyModifier>637534208</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr KP 9</name>
+                <packageName></packageName>
+                <script>py.fn(8,7)</script>
+                <command></command>
+                <keyCode>57</keyCode>
+                <keyModifier>1711276032</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>KP *</name>
+                <packageName></packageName>
+                <script>py.fn(8,0)</script>
+                <command></command>
+                <keyCode>42</keyCode>
+                <keyModifier>536870912</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr KP *</name>
+                <packageName></packageName>
+                <script>py.fn(8,4)</script>
+                <command></command>
+                <keyCode>42</keyCode>
+                <keyModifier>1610612736</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control KP *</name>
+                <packageName></packageName>
+                <script>py.fn(8,2)</script>
+                <command></command>
+                <keyCode>42</keyCode>
+                <keyModifier>603979776</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr KP *</name>
+                <packageName></packageName>
+                <script>py.fn(8,6)</script>
+                <command></command>
+                <keyCode>42</keyCode>
+                <keyModifier>1677721600</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift KP *</name>
+                <packageName></packageName>
+                <script>py.fn(8,1)</script>
+                <command></command>
+                <keyCode>42</keyCode>
+                <keyModifier>570425344</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr KP *</name>
+                <packageName></packageName>
+                <script>py.fn(8,5)</script>
+                <command></command>
+                <keyCode>42</keyCode>
+                <keyModifier>1644167168</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control KP *</name>
+                <packageName></packageName>
+                <script>py.fn(8,3)</script>
+                <command></command>
+                <keyCode>42</keyCode>
+                <keyModifier>637534208</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr KP *</name>
+                <packageName></packageName>
+                <script>py.fn(8,7)</script>
+                <command></command>
+                <keyCode>42</keyCode>
+                <keyModifier>1711276032</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>KP +</name>
+                <packageName></packageName>
+                <script>py.fn(8,0)</script>
+                <command></command>
+                <keyCode>43</keyCode>
+                <keyModifier>536870912</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr KP +</name>
+                <packageName></packageName>
+                <script>py.fn(8,4)</script>
+                <command></command>
+                <keyCode>43</keyCode>
+                <keyModifier>1610612736</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control KP +</name>
+                <packageName></packageName>
+                <script>py.fn(8,2)</script>
+                <command></command>
+                <keyCode>43</keyCode>
+                <keyModifier>603979776</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr KP +</name>
+                <packageName></packageName>
+                <script>py.fn(8,6)</script>
+                <command></command>
+                <keyCode>43</keyCode>
+                <keyModifier>1677721600</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift KP +</name>
+                <packageName></packageName>
+                <script>py.fn(8,1)</script>
+                <command></command>
+                <keyCode>43</keyCode>
+                <keyModifier>570425344</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr KP +</name>
+                <packageName></packageName>
+                <script>py.fn(8,5)</script>
+                <command></command>
+                <keyCode>43</keyCode>
+                <keyModifier>1644167168</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control KP +</name>
+                <packageName></packageName>
+                <script>py.fn(8,3)</script>
+                <command></command>
+                <keyCode>43</keyCode>
+                <keyModifier>637534208</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr KP +</name>
+                <packageName></packageName>
+                <script>py.fn(8,7)</script>
+                <command></command>
+                <keyCode>43</keyCode>
+                <keyModifier>1711276032</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>KP -</name>
+                <packageName></packageName>
+                <script>py.fn(8,0)</script>
+                <command></command>
+                <keyCode>45</keyCode>
+                <keyModifier>536870912</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr KP -</name>
+                <packageName></packageName>
+                <script>py.fn(8,4)</script>
+                <command></command>
+                <keyCode>45</keyCode>
+                <keyModifier>1610612736</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control KP -</name>
+                <packageName></packageName>
+                <script>py.fn(8,2)</script>
+                <command></command>
+                <keyCode>45</keyCode>
+                <keyModifier>603979776</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr KP -</name>
+                <packageName></packageName>
+                <script>py.fn(8,6)</script>
+                <command></command>
+                <keyCode>45</keyCode>
+                <keyModifier>1677721600</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift KP -</name>
+                <packageName></packageName>
+                <script>py.fn(8,1)</script>
+                <command></command>
+                <keyCode>45</keyCode>
+                <keyModifier>570425344</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr KP -</name>
+                <packageName></packageName>
+                <script>py.fn(8,5)</script>
+                <command></command>
+                <keyCode>45</keyCode>
+                <keyModifier>1644167168</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control KP -</name>
+                <packageName></packageName>
+                <script>py.fn(8,3)</script>
+                <command></command>
+                <keyCode>45</keyCode>
+                <keyModifier>637534208</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr KP -</name>
+                <packageName></packageName>
+                <script>py.fn(8,7)</script>
+                <command></command>
+                <keyCode>45</keyCode>
+                <keyModifier>1711276032</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>KP /</name>
+                <packageName></packageName>
+                <script>py.fn(8,0)</script>
+                <command></command>
+                <keyCode>47</keyCode>
+                <keyModifier>536870912</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr KP /</name>
+                <packageName></packageName>
+                <script>py.fn(8,4)</script>
+                <command></command>
+                <keyCode>47</keyCode>
+                <keyModifier>1610612736</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control KP /</name>
+                <packageName></packageName>
+                <script>py.fn(8,2)</script>
+                <command></command>
+                <keyCode>47</keyCode>
+                <keyModifier>603979776</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr KP /</name>
+                <packageName></packageName>
+                <script>py.fn(8,6)</script>
+                <command></command>
+                <keyCode>47</keyCode>
+                <keyModifier>1677721600</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift KP /</name>
+                <packageName></packageName>
+                <script>py.fn(8,1)</script>
+                <command></command>
+                <keyCode>47</keyCode>
+                <keyModifier>570425344</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr KP /</name>
+                <packageName></packageName>
+                <script>py.fn(8,5)</script>
+                <command></command>
+                <keyCode>47</keyCode>
+                <keyModifier>1644167168</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control KP /</name>
+                <packageName></packageName>
+                <script>py.fn(8,3)</script>
+                <command></command>
+                <keyCode>47</keyCode>
+                <keyModifier>637534208</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr KP /</name>
+                <packageName></packageName>
+                <script>py.fn(8,7)</script>
+                <command></command>
+                <keyCode>47</keyCode>
+                <keyModifier>1711276032</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>KP ,</name>
+                <packageName></packageName>
+                <script>py.fn(8,0)</script>
+                <command></command>
+                <keyCode>44</keyCode>
+                <keyModifier>536870912</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr KP ,</name>
+                <packageName></packageName>
+                <script>py.fn(8,4)</script>
+                <command></command>
+                <keyCode>44</keyCode>
+                <keyModifier>1610612736</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control KP ,</name>
+                <packageName></packageName>
+                <script>py.fn(8,2)</script>
+                <command></command>
+                <keyCode>44</keyCode>
+                <keyModifier>603979776</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr KP ,</name>
+                <packageName></packageName>
+                <script>py.fn(8,6)</script>
+                <command></command>
+                <keyCode>44</keyCode>
+                <keyModifier>1677721600</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift KP ,</name>
+                <packageName></packageName>
+                <script>py.fn(8,1)</script>
+                <command></command>
+                <keyCode>44</keyCode>
+                <keyModifier>570425344</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr KP ,</name>
+                <packageName></packageName>
+                <script>py.fn(8,5)</script>
+                <command></command>
+                <keyCode>44</keyCode>
+                <keyModifier>1644167168</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control KP ,</name>
+                <packageName></packageName>
+                <script>py.fn(8,3)</script>
+                <command></command>
+                <keyCode>44</keyCode>
+                <keyModifier>637534208</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr KP ,</name>
+                <packageName></packageName>
+                <script>py.fn(8,7)</script>
+                <command></command>
+                <keyCode>44</keyCode>
+                <keyModifier>1711276032</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>KP .</name>
+                <packageName></packageName>
+                <script>py.fn(8,0)</script>
+                <command></command>
+                <keyCode>46</keyCode>
+                <keyModifier>536870912</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>AltGr KP .</name>
+                <packageName></packageName>
+                <script>py.fn(8,4)</script>
+                <command></command>
+                <keyCode>46</keyCode>
+                <keyModifier>1610612736</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control KP .</name>
+                <packageName></packageName>
+                <script>py.fn(8,2)</script>
+                <command></command>
+                <keyCode>46</keyCode>
+                <keyModifier>603979776</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Control AltGr KP .</name>
+                <packageName></packageName>
+                <script>py.fn(8,6)</script>
+                <command></command>
+                <keyCode>46</keyCode>
+                <keyModifier>1677721600</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift KP .</name>
+                <packageName></packageName>
+                <script>py.fn(8,1)</script>
+                <command></command>
+                <keyCode>46</keyCode>
+                <keyModifier>570425344</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift AltGr KP .</name>
+                <packageName></packageName>
+                <script>py.fn(8,5)</script>
+                <command></command>
+                <keyCode>46</keyCode>
+                <keyModifier>1644167168</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control KP .</name>
+                <packageName></packageName>
+                <script>py.fn(8,3)</script>
+                <command></command>
+                <keyCode>46</keyCode>
+                <keyModifier>637534208</keyModifier>
+            </Key>
+
+            <Key isActive="yes" isFolder="no">
+                <name>Shift Control AltGr KP .</name>
+                <packageName></packageName>
+                <script>py.fn(8,7)</script>
+                <command></command>
+                <keyCode>46</keyCode>
+                <keyModifier>1711276032</keyModifier>
+            </Key>
+
+		</KeyGroup>
+	</KeyPackage>
+	<HelpPackage>
+		<helpURL></helpURL>
+	</HelpPackage>
+</MudletPackage>
