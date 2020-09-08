@@ -3,36 +3,26 @@
 from setuptools import setup, find_packages
 
 LONG_DESC = """
-Assume you are really annoyed with Lua and want to use a reasonable
-scripting language. Say, Python.
+MudPyC is a client for MUDs written in Python.
 
-This module lets you do that.
+A MUD is a text-based multi-user role-playing game. If you don't already
+know what that is, you're probably looking at the wrong package.
 
-It establishes a bidirectional link between Mudlet/Lua and Python and
-exchanges structured messages between the two.
+MudPyC will do it all: sophisticated mapping, macros and shortcuts, support
+for combat, and whatnot. The idea is to be MUD-, frontend- and
+language-independent, with configurable extension modules for popular MUDs.
 
-Mudlet can do HTTP requests in the background, so we send a "long poll" PUSH
-request to the Python server. The reply contains the incoming messages (as
-a JSON array).
-
-There are a couple of optimizations to be had:
-
-* if "httpGET" is available, we use that instead of an empty PUSH.
-
-* if the platform supports Unix FIFO nodes in the file system, we use that
-  for sending to Python, as that's faster and less expensive than a HTTP
-  request per message.
-
-The only required parameter on the Mudlet side is the port number.
-
-Errors / exceptions are generally propagated to the caller.
+We're not there yet. The current version has only been tested with the
+German "Morgengrauen" MUD and the only front-end it supports is a lightly
+modified version of Mudlet. On the plus side, MudPyC is able to import your
+existing maps from Mudlet.
 """
 
 setup(
     name="mudlet",
     use_scm_version={"version_scheme": "guess-next-dev", "local_scheme": "dirty-tag"},
     setup_requires=["setuptools_scm"],
-    description="Talk to Mudlet with",
+    description="A MUD client",
     url="http://github.com/smurfix/pymudlet",
     long_description=LONG_DESC,
     author="Matthias Urlichs",
@@ -46,9 +36,9 @@ setup(
         "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
         "Operating System :: POSIX :: Linux",
         "Programming Language :: Python :: 3 :: Only",
-        "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: Implementation :: CPython",
         "Programming Language :: Python :: Implementation :: PyPy",
         "Framework :: Trio",
