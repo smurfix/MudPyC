@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 
-from mudlet import Server, Alias, with_alias, run_in_task
+from mudpyc import Server, Alias, with_alias, run_in_task
 import trio
-from mudlet.util import ValueEvent, attrdict, combine_dict
+from mudpyc.util import ValueEvent, attrdict, combine_dict
 from functools import partial
 import logging
 import asyncclick as click

@@ -4,4 +4,4 @@ from .alias import Alias, with_alias
 __all__ = ["Server","run_in_task","Alias","with_alias"]
 
 import gettext
-gettext.install("pymudlet", localedir="locales", names="gettext ngettext pgettext npgettext".split())
+gettext.install("mudpyc", localedir="locales", names="gettext ngettext pgettext npgettext".split())

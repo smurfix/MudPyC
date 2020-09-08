@@ -7,7 +7,7 @@ import trio
 sys.argv[0:1] = [sys.argv[0], "-c","mapper.cfg"]
 sys.path[0:0] = ["../trio"]
 
-from mudlet.mapper.main import main
+from mudpyc.mapper.main import main
 logging.basicConfig(level=logging.DEBUG,format="%(relativeCreated)d %(name)s %(message)s")
 try:
 	main()

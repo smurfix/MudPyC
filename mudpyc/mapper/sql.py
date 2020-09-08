@@ -1,4 +1,4 @@
-from mudlet.util import attrdict, combine_dict
+from mudpyc.util import attrdict, combine_dict
 from contextlib import contextmanager
 from weakref import ref
 from heapq import heappush,heappop

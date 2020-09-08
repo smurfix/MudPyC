@@ -19,11 +19,11 @@ existing maps from Mudlet.
 """
 
 setup(
-    name="mudlet",
+    name="mudpyc",
     use_scm_version={"version_scheme": "guess-next-dev", "local_scheme": "dirty-tag"},
     setup_requires=["setuptools_scm"],
     description="A MUD client",
-    url="http://github.com/smurfix/pymudlet",
+    url="http://github.com/smurfix/MudPyC",
     long_description=LONG_DESC,
     author="Matthias Urlichs",
     author_email="matthias@urlichs.de",

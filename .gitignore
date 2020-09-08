@@ -4,6 +4,6 @@ __pycache__/
 /mapper.cfg
 /.eggs/
 /dist/
-/mudlet.egg-info/
+/mudpyc.egg-info/
 *~
 locales/**/*.mo

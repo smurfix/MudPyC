@@ -3,7 +3,7 @@ from inspect import cleandoc
 
 class Alias:
     """
-    This class implements an iterative alias processor for PyMudlet.
+    This class implements an iterative alias processor for MudPyC.
 
     Usage:
       Do this in your derived class::

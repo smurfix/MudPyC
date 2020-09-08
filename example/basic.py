@@ -1,20 +1,20 @@
 #!/usr/bin/python3
 
-from mudlet import Server
+from mudpyc import Server
 import trio
-from mudlet.util import ValueEvent
+from mudpyc.util import ValueEvent
 from functools import partial
 import logging
 
 class S(Server):
     async def hello2(self, prompt,e):
         await trio.sleep(2)
-        # from here you could again call mudlet
+        # from here you could again call into mudlet
         e.set("Hello, "+prompt)
 
     def hello(self, prompt):
-        e = ValueEvent()
         # do not call into Mudlet from here, you will deadlock
+        e = ValueEvent()
         self.main.start_soon(self.hello2,prompt,e)
         return e
 
