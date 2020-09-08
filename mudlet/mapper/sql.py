@@ -48,9 +48,13 @@ def SQL(cfg):
     )
 
     class Area(_AddOn, Base):
+        F_IGNORE = (1<<0)
+
         __tablename__ = "area"
         id = Column(Integer, primary_key=True)
         name = Column(String)
+        flag = Column(Integer, nullable=False, default=0)
+
         rooms = relationship("Room", back_populates="area")
 
     class Exit(_AddOn, Base):
@@ -62,16 +66,28 @@ def SQL(cfg):
         det = Column(Integer, nullable=False, default=0) # ways with multiple destinations ## TODO
         cost = Column(Integer, nullable=False, default=1)
         steps = Column(String, nullable=True)
-        in_mudlet = Column(Integer, nullable=False, default=0)
+        flag = Column(Integer, nullable=False, default=0)
+        delay = Column(Integer, nullable=False, default=0)
+        feature_id = Column(Integer, ForeignKey("feature.id", onupdate="CASCADE", ondelete="SET NULL"), nullable=True)
 
         src = relationship("Room", back_populates="_exits", foreign_keys="Exit.src_id")
         dst = relationship("Room", foreign_keys="Exit.dst_id")
+        feature = relationship("Feature", backref="exits")
+
+        F_IN_MUDLET = (1<<0)
 
         @validates("dir")
         def dir_min_len(self, key, dir) -> str:
             if dir is not None and len(dir) < 3:  # oben
                 raise ValueError(f'dir {dir!r} too short')
             return dir
+
+        @property
+        def flag_str(self):
+            res = ""
+            ## if self.flag & Exit.F_IN_MUDLET:
+            ##     res += "m"
+            return res
 
         @property
         def info_str(self):
@@ -83,7 +99,9 @@ def SQL(cfg):
                 res += _(" :{cost}").format(cost=self.cost)
             if self.steps:
                 res += _(" ({lsm})").format(lsm=len(self.moves))
-            return "‹"+res+"›"
+            if self.flag_str:
+                res += " "+self.flag_str
+            return f"‹{res}›"
 
         @property
         def moves(self):
@@ -113,9 +131,16 @@ def SQL(cfg):
         label_y = Column(Float, default=0)
         flag = Column(Integer, nullable=False, default=0)
 
+        # room title from MUD
+        last_shortname = None
+
         # when changing an area
         orig_area = None
         info_area = None
+
+        F_NO_EXIT = (1<<0)
+        F_NO_GMCP_ID = (1<<1)
+        F_MOD_SHORTNAME = (2<<1)
 
         area = relationship(Area, back_populates="rooms")
         _exits = relationship(Exit,
@@ -155,11 +180,21 @@ def SQL(cfg):
 
         @property
         def id_str(self):
-            return f"{self.id_old or ''}/{self.id_mudlet or ''}"
+            if self.id_mudlet:
+                return str(self.id_mudlet)
+            else:
+                return str(-self.id_old)
 
         def next_word(self):
-            res = session.query(WordRoom).filter(WordRoom.room_id==self.id_old, WordRoom.flag == 0).first()
-            return res
+            while True:
+                res = session.query(WordRoom).filter(WordRoom.room_id==self.id_old, WordRoom.flag == 0).first()
+                if res is not None:
+                    wa = session.query(WordAlias).filter(WordAlias.name == res.word.name).one_or_none()
+                    if wa is not None:
+                        session.delete(res)
+                        continue
+                session.commit()
+                return res
 
         def reset_words(self):
             for wr in session.query(WordRoom).filter(WordRoom.room_id==self.id_old, WordRoom.flag == 1).all():
@@ -175,9 +210,9 @@ def SQL(cfg):
             """
             self.id_mudlet = id_mudlet
             for x in self._exits:
-                x.in_mudlet = False
+                x.flag &=~ Exit.F_IN_MUDLET;
             for x in self._r_exits:
-                x.in_mudlet = False
+                x.flag &=~ Exit.F_IN_MUDLET;
 
         def with_word(self, word, create=False):
             """
@@ -300,6 +335,15 @@ def SQL(cfg):
             if self.id_mudlet:
                 await mud.setRoomArea(self.id_mudlet,area.name)
 
+        async def set_name(self, name, force=False):
+            mud = self._m.mud
+
+            if self.name == name and not force:
+                return
+            self.name = name
+            if self.id_mudlet:
+                await self.mud.setRoomName(self.id_mudlet, name)
+
         @property
         def open_exits(self):
             """Does this room have open exits?
@@ -344,33 +388,43 @@ def SQL(cfg):
                         continue
                     heappush(res,(d+x.cost, h[:]+[x.dst_id]))
 
-        def exit_at(self,d):
+        def exit_at(self,d, prefer_feature=False):
             """
             Return the exit(s) in a specific direction
+            If prefer_feature is set, and another exits with a feature
+            ID set goes to the same place, use that.
             """
-            res = []
+            res = None
             for x in self._exits:
                 if x.dir == d:
-                    res.append(x)
-            if not res:
+                    res = x
+                    break
+            else:
                 raise KeyError()
-            if len(res) == 1:
-                return res[0]
+            if not prefer_feature or not res.dst_id or res.feature_id:
+                return res
+            for x in self._exits:
+                if x.dst_id == res.dst_id and x.feature_id:
+                    return x
             return res
 
         def exit_to(self,d):
             """
             Return (one of) the exit(s) to a specific room
+
+            If one of the exits has the Feature flag set, use that.
             """
-            res = []
+            res = None
             if isinstance(d,Room):
                 d = d.id_old
             for x in self._exits:
                 if x.dst_id == d:
-                    res.append(x)
+                    if x.feature_id:
+                        return x
+                    res = x
             if not res:
                 raise KeyError()
-            return res[0]
+            return res
 
         async def set_exit(self,d, v=True, *, force=True, skip_mud=False):
             """
@@ -418,8 +472,13 @@ def SQL(cfg):
                         self._s.add(x)
                         changed = True
 
-            if (changed or not x.in_mudlet) and not skip_mud:
-                x.in_mudlet = await self.set_mud_exit(d,v)
+            if (changed or not (x.flag & Exit.F_IN_MUDLET)) and not skip_mud:
+                if x.flag is None:
+                    x.flag = 0 ## DUH?
+                if await self.set_mud_exit(d,v):
+                    x.flag |= Exit.F_IN_MUDLET
+                else:
+                    x.flag &=~ Exit.F_IN_MUDLET
             #self._exits = ":".join(f"{k}={v}" if v else f"{k}" for k,v in x.items())
             self._s.commit()
 
@@ -503,6 +562,17 @@ def SQL(cfg):
 
         rooms = relationship("Room", secondary=assoc_seen_room, backref="things")
 
+    class Feature(_AddOn, Base):
+        F_BACKOUT = (1<<0)
+
+        __tablename__ = "feature"
+        id = Column(Integer, nullable=True, primary_key=True)
+        name = Column(String, nullable=False)
+        flag = Column(Integer, nullable=False, default=0)
+
+        enter = Column(Text, nullable=False, default="")
+        exit = Column(Text, nullable=False, default="")
+
     class Note(_AddOn, Base):
         __tablename__ = "notes"
         id = Column(Integer, nullable=True, primary_key=True)
@@ -532,6 +602,8 @@ def SQL(cfg):
             This word is an alias for another word.
             Replace it.
             """
+            if w is None:
+                import pdb;pdb.set_trace()
             if isinstance(w,str):
                 w = get_word(w, create=True)
             if w is self:
@@ -557,7 +629,7 @@ def SQL(cfg):
         name = Column(String, nullable=False)
         word_id = Column(Integer, ForeignKey("words.id", onupdate="CASCADE",ondelete="CASCADE"), nullable=False)
 
-        word = relationship("Word", backref="aliases")
+        word = relationship("Word", backref=backref("aliases", cascade="all, delete-orphan"))
 
     class WordRoom(_AddOn, Base):
         __tablename__ = "wordroom"
@@ -580,6 +652,84 @@ def SQL(cfg):
             ww = self.word.alias_for(w)
             return session.query(WordRoom).filter(Room.id_old == self.room.id_old, Word.id == ww.id).one_or_none()
 
+    class Quest(_AddOn, Base):
+        __tablename__ = "quest"
+        id = Column(Integer, nullable=True, primary_key=True)
+        name = Column(String, nullable=False)
+        flag = Column(Integer, nullable=False, default=0)
+        step = Column(Integer, nullable=True)
+
+        def id_str(self):
+            if self.step:
+                return _("‹{self.name}›").format(self=self)
+            else:
+                return _("‹{self.name}:{self.step}›").format(self=self)
+
+        def add_step(self, **kw):
+            step = (session.query(func.max(QuestStep.step)).filter(QuestStep.quest==self).scalar() or 0) +1
+            qs = QuestStep(quest_id=self.id, step=step, **kw)
+            session.add(qs)
+            return qs
+
+        def step_nr(self, nr=None):
+            if nr is None:
+                nr = self.step
+                if nr is None:
+                    return None
+            return session.query(QuestStep).filter(QuestStep.quest_id == self.id, QuestStep.step==nr).one_or_none()
+
+        @property
+        def current_step(self):
+            return self.step_nr(None)
+
+    class QuestStep(_AddOn, Base):
+        __tablename__ = "queststep"
+        id = Column(Integer, nullable=True, primary_key=True)
+
+        quest_id = Column(Integer, ForeignKey("quest.id", onupdate="CASCADE",ondelete="CASCADE"), nullable=False)
+        room_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE",ondelete="CASCADE"), nullable=False)
+        step = Column(Integer, nullable=False)
+        # WARNING quest_id+step should be unique but cannot be because
+        # renumbering then won't work because mysql doesn't support
+        # deferring unique key checks until commit, and sqlalchemy doesn't
+        # support order_by when updating
+        command = Column(String, nullable=False)
+
+        flag = Column(Integer, nullable=False, default=0)
+        # 1 command, 2 stop execution
+
+        quest = relationship("Quest", backref=backref("steps", cascade="all, delete-orphan"))
+        room = relationship("Room", backref=backref("queststeps", cascade="all, delete-orphan"))
+
+        def set_step(self, step):
+            """
+            Move steps around
+            """
+            # at first we always move the current step to the end
+            if step is not None and step == self.step:
+                return
+            nsteps = (session.query(func.max(Room.last_visit)).scalar() or 0)+1
+            if step is None:
+                step = nsteps
+            elif step >= nsteps: # don't put beyond the end
+                return
+            ostep,self.step = self.step,0
+
+            if ostep < step:
+                # move stuff down
+                session.query(QuestStep).filter(QuestStep.quest_id == self.quest_id, QuestStep.step > ostep, QuestStep.step <= step).update({QuestStep.step:QuestStep.step-1})
+            else:
+                # move stuff up
+                session.query(QuestStep).filter(QuestStep.quest_id == self.quest_id, QuestStep.step >= step, QuestStep.step < ostep).update({QuestStep.step:QuestStep.step+1})
+            self.step = step
+            session.commit()
+
+        def delete(self):
+            step = self.step
+            session.delete(self)
+            session.query(QuestStep).filter(QuestStep.quest_id == self.quest_id, QuestStep.step > step).update({QuestStep.step:QuestStep.step-1})
+            session.commit()
+
 
     def r_old(room):
         res = session.query(Room).filter(Room.id_old == room).one_or_none()
@@ -597,6 +747,8 @@ def SQL(cfg):
         res = session.query(Room).filter(Room.id_gmcp == room).one_or_none()
         if res is None:
             raise NoData("id_hash",room)
+        if res.flag & Room.F_NO_GMCP_ID:
+            raise NoData("id_hash:no_gmcp",room)
         return res
 
     def r_new():
@@ -634,6 +786,18 @@ def SQL(cfg):
             session.commit()
         return th
 
+    def get_quest(name):
+        q = session.query(Quest).filter(Quest.name == name).one_or_none()
+        if q is None:
+            raise KeyError(name)
+        return q
+
+    def get_feature(name):
+        f = session.query(Feature).filter(Feature.name == name).one_or_none()
+        if f is None:
+            raise KeyError(name)
+        return f
+
     def setup(server):
         session._mud__main = ref(server)
 
@@ -642,9 +806,11 @@ def SQL(cfg):
     session=Session()
     res = attrdict(db=session, q=session.query,
             setup=setup,
-            Room=Room, Area=Area, Exit=Exit, Skiplist=Skiplist,
+            Room=Room, Area=Area, Exit=Exit, Skiplist=Skiplist, Quest=Quest,
+            Thing=Thing, Feature=Feature,
             r_hash=r_hash, r_old=r_old, r_mudlet=r_mudlet, r_new=r_new,
             skiplist=get_skiplist, word=get_word, thing=get_thing,
+            quest=get_quest, feature=get_feature,
             commit=session.commit, rollback=session.rollback,
             add=session.add, delete=session.delete,
             WF_SCANNED=1, WF_SKIP=2, WF_IMPORTANT=3,

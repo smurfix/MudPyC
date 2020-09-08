@@ -475,6 +475,10 @@ class Server:
         except Exception as err:
             logger.warning("Error in alias %r", ocmd, exc_info=err)
             await self.mud.print(_("Error: {err!r}").format(err=err))
+            await self.post_error()
+
+    async def post_error(self):
+        pass
 
     def _cmdfix_i(self, cmd):
         return int(cmd)
