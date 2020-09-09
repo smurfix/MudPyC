@@ -2717,14 +2717,11 @@ class S(Server):
                 else:
                     await self.send_commands(msg)
 
+
         if self.logfile:
             print(">>>",msg, file=self.logfile)
         return
 
-    def maybe_close_descr(self):
-        if self.long_descr is None:
-            self.long_descr, self.long_lines = self.long_lines, []
-    
     @doc(_(
         """
         Stored long description
@@ -2769,7 +2766,6 @@ class S(Server):
         signalling readiness for the next line
         """
         logger.debug("NEXT")
-        self.maybe_close_descr()
         self.prompt(self.MP_TELNET)
 
     @doc(_(
@@ -2818,11 +2814,6 @@ class S(Server):
             if len(msg) == 2:
                 return
             msg = msg[2:]
-
-#       if exit_pat.match(msg):
-#           self.maybe_close_descr()
-#       elif self.long_descr is None:
-#           self.long_lines.apend(msg)
 
         msg = msg.rstrip()
         logger.debug("IN  : %s", msg)
