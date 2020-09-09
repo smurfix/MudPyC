@@ -149,6 +149,9 @@ def SQL(cfg):
         _r_exits = relationship(Exit,
             primaryjoin=id_old == Exit.dst_id, foreign_keys=[Exit.dst_id])
 
+        long_descr = relationship("LongDescr", uselist=False, cascade="delete")
+        note = relationship("Note", uselist=False, cascade="delete")
+
         @validates("id_mudlet")
         def mudlet_ok(self, key, id) -> str:
             if id is not None and id < 0:
@@ -258,56 +261,6 @@ def SQL(cfg):
             lv = session.query(func.max(Room.last_visit)).scalar() or 0
             if self.last_visit != lv:
                 self.last_visit = lv+1
-
-        @property
-        def long_descr(self):
-            d = session.query(LongDescr).filter(LongDescr.room_id==self.id_old).one_or_none()
-            if d is None:
-                return None
-            return d.descr
-
-        @long_descr.setter
-        def long_descr(self, descr):
-            if descr is None:
-                del self.long_descr
-                return
-            d = session.query(LongDescr).filter(LongDescr.room_id==self.id_old).one_or_none()
-            if d is None:
-                d = LongDescr(descr=descr, room_id=self.id_old)
-                session.add(d)
-            else:
-                d.descr = descr
-
-        @long_descr.deleter
-        def long_descr(self):
-            d = session.query(LongDescr).filter(LongDescr.room_id==self.id_old).one_or_none()
-            if d is not None:
-                session.delete(d)
-
-        @property
-        def note(self):
-            d = session.query(Note).filter(Note.room_id==self.id_old).one_or_none()
-            if d is None:
-                return None
-            return d.note
-
-        @note.setter
-        def note(self, note):
-            if note is None:
-                del self.note
-                return
-            d = session.query(Note).filter(Note.room_id==self.id_old).one_or_none()
-            if d is None:
-                d = Note(note=note, room_id=self.id_old)
-                session.add(d)
-            else:
-                d.note = note
-
-        @note.deleter
-        def note(self):
-            d = session.query(Note).filter(Note.room_id==self.id_old).one_or_none()
-            if d is not None:
-                session.delete(d)
 
         @property
         def cost(self):
@@ -813,7 +766,7 @@ def SQL(cfg):
     res = attrdict(db=session, q=session.query,
             setup=setup,
             Room=Room, Area=Area, Exit=Exit, Skiplist=Skiplist, Quest=Quest,
-            Thing=Thing, Feature=Feature,
+            Thing=Thing, Feature=Feature, LongDescr=LongDescr, Note=Note,
             r_hash=r_hash, r_old=r_old, r_mudlet=r_mudlet, r_new=r_new,
             skiplist=get_skiplist, word=get_word, thing=get_thing,
             quest=get_quest, feature=get_feature,

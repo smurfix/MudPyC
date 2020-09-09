@@ -496,10 +496,14 @@ class LookProcessor(Command):
         if self.current == self.P_BEFORE:
             await self.server.mud.print("?? no descr")
             return
-        old = room.long_descr
+        old = room.long_descr.descr if room.long_descr else ""
         nld = "\n".join(self.lines[self.P_BEFORE])
         if self.force or not old:
-            room.long_descr = nld
+            if room.long_descr:
+                room.long_descr.descr = nld
+            else:
+                descr = db.LongDescr(descr=nld, room_id=room.id_old)
+                db.add(descr)
             await self.server.mud.print(_("Long descr updated."))
         elif old != nld:
             await self.server.mud.print(_("Long descr differs."))
@@ -617,7 +621,6 @@ class S(Server):
 
         self.long_mode = True  # long
         self.long_lines = []
-        self.long_descr = None
 
         self.quest = None
         self.quest_edit_room = None
@@ -1022,7 +1025,7 @@ class S(Server):
             await self.print(_("No active room."))
             return
         if room.note:
-            await self.print(_("Note of {room.idn_str}:\n{room.note}"), room=room)
+            await self.print(_("Note of {room.idn_str}:\n{room.note.note}"), room=room)
         else:
             await self.print(_("No note for {room.idn_str}."), room=room)
 
@@ -1059,7 +1062,7 @@ class S(Server):
             return
         if room.note:
             await self.print(_("Note of {room.idn_str} deleted."), room=room)
-            room.note = None
+            self.db.delete(room.note)
             self.db.commit()
         else:
             await self.print(_("No note known."))
@@ -1098,16 +1101,19 @@ class S(Server):
         await self._add_room_note(cmd)
 
     async def _add_room_note(self, txt, prefix=False):
+        db = self.db
+        rn = self.room.note
         if self.room.note:
             if prefix:
-                self.room.note = txt + "\n" + self.room.note
+                rn.note = txt + "\n" + self.room.note
             else:
-                self.room.note += "\n" + txt
+                rn.note += "\n" + txt
             await self.print(_("Note of {room.idn_str} extended."), room=self.room)
         else:
-            self.room.note = txt
+            note = db.Note(note=txt, room_id=self.room.id_old)
+            db.add(note)
             await self.print(_("Note of {room.idn_str} created."), room=self.room)
-        self.db.commit()
+        db.commit()
         await self.show_room_note()
 
 
@@ -2347,7 +2353,7 @@ class S(Server):
             return
         await self.print(room.info_str)
         if room.note:
-            await self.print(room.note)
+            await self.print(room.note.note)
 
     @doc(_(
         """Things/NPCs in current room / a specific room"""))
@@ -2653,7 +2659,7 @@ class S(Server):
         else:
             await self.print(_("No text known for {room.idnn_str}"), room=room)
         if room.note:
-            await self.print(_("* Note:\n{room.note}"), room=room)
+            await self.print(_("* Note:\n{room.note.note}"), room=room)
 
     async def called_fnkey(self, key, mod):
         self.main.start_soon(self._fnkey, key,mod)
@@ -3802,9 +3808,13 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             if room is None:
                 return
         if room.note:
-            note = room.note
-            lf = note.find("\n")
-            if lf > 1: note = note[:lf]
+            note = room.note.note
+            try:
+                lf = note.index("\n")
+            except ValueError:
+                pass
+            else:
+                note = note[:lf]
         else:
             note = "-"
         await self.mmud.GUI.raumnotizen.echo(note)
