@@ -4485,8 +4485,16 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             return
 
         if qs.room != self.room:
-            await self.print(_("Quest: Going to room {room.idn_str}"), room=qs.room)
-            await self.run_to_room(qs.room)
+            w = self.current_walker
+            if w.dest == qs.room:
+                await self.print(_("Quest: Already walkting to room {room.idn_str}"), room=qs.room)
+                await self.print(_("Walker: {w}"), w=w)
+
+            elif self.path_gen and isinstance(self.path_gen.checker,RoomFinder) and self.path_gen.checker.room == qs.room):
+                await self.print(_("Quest: Patience! Still finding room {room.idn_str}"), room=qs.room)
+            else:
+                await self.print(_("Quest: Going to room {room.idn_str}"), room=qs.room)
+                await self.run_to_room(qs.room)
             return
 
         c = qs.command
