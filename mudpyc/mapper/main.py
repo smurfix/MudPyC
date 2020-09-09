@@ -3360,7 +3360,9 @@ class S(Server):
             self.logger.warning("I don't know where to place the room!")
             await self.print(_("I don't know where to place the room!"))
 
-        room = self.db.Room(name=descr, id_gmcp=id_gmcp, id_mudlet=id_mudlet)
+        room = self.db.Room(name=descr, id_mudlet=id_mudlet)
+        if id_gmcp:
+            room.id_gmcp = id_gmcp
         self.db.add(room)
         self.db.commit()
 
@@ -3637,6 +3639,9 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         if id_gmcp:
             try:
                 room2 = db.r_hash(id_gmcp)
+                if room2.flag & db.Room.F_NO_GMCP_ID:
+                    id_gmcp = ""
+                    raise NoData("NO-GMCP")
             except NoData:
                 pass
             else:
@@ -3645,11 +3650,11 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
                 elif not room2:
                     pass
                 elif room != room2:
-                    await self.print("")
+                    await self.print(_("MAP: Conflict! {room.id_str} vs. {room2.id_str}"), room2=room2, room=room)
                     room = room2
 
         if room is None:
-            id_mudlet = await self.mud.getRoomIDbyHash(id_gmcp)
+            id_mudlet = await self.mud.getRoomIDbyHash(id_gmcp) if id_gmcp else None
 
             if id_mudlet and id_mudlet[0] > 0 and not self.conf['mudlet_gmcp']:
                 # Ignore and delete this.
