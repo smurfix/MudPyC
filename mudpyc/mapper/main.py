@@ -2724,7 +2724,7 @@ class S(Server):
         else:
             room = self.room
         if room.long_descr:
-            await self.print(_("{room.info_str}:\n{room.long_descr}"), room=room)
+            await self.print(_("{room.info_str}:\n{room.long_descr.descr}"), room=room)
         else:
             await self.print(_("No text known for {room.idnn_str}"), room=room)
         if room.note:
