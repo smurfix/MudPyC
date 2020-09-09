@@ -4564,7 +4564,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
 
         if qs.room != self.room:
             w = self.current_walker
-            if w.dest == qs.room:
+            if w and w.dest == qs.room:
                 await self.print(_("Quest: Already walkting to room {room.idn_str}"), room=qs.room)
                 await self.print(_("Walker: {w}"), w=w)
 
