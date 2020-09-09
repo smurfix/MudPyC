@@ -3086,6 +3086,8 @@ class S(Server):
         """
         if self.exit_match:
             await self.print(_("WARNING: Exit matching failed halfway!"))
+        exits_seen = self.exit_match is False
+        self.exit_match = None
         await self._to_text_watchers(None)
 
         # finish the current command
@@ -3120,15 +3122,15 @@ class S(Server):
                 await self.print(_("Shortname differs. #mm?"))
                 # moved = True
 
-        d = self.named_exit or s.command
+        d = self.named_exit or short2loc(s.command)
         try:
             x = self.room.exit_at(d)
         except KeyError:
             x = None
 
-        if x and self.exit_match is None:
+        if x and not exits_seen:
             if x.dst and x.dst.flag & self.db.Room.F_NO_EXIT:
-                self.exit_match = False
+                exits_seen = True
 
         if isinstance(s, LookProcessor):
             # This command does not generate movement. Thus if it did
@@ -3139,12 +3141,13 @@ class S(Server):
             except KeyError:
                 d = TIME_DIR
 
-        if self.exit_match is not None:
+        if exits_seen:
             if x is not None:
                 # There is an exit thus we seem to have used it
                 moved = True
             elif is_std_dir(d):
                 # Standard directions generally indicate movement.
+                # Exit may be 'created' by opening a door or similar.
                 moved = True
 
         if nr or moved:
