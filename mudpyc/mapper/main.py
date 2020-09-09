@@ -2003,7 +2003,7 @@ class S(Server):
     def current_walker(self):
         p = self.process
         while p:
-            if isinstance(p, Walkprocess):
+            if isinstance(p, WalkProcess):
                 return p
             p = p.upstack
         return None
