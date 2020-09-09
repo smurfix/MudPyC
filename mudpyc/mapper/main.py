@@ -3645,7 +3645,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
 
         db = self.db
 
-        x,_ = await self.room.set_exit(d)
+        x,_x = await self.room.set_exit(d)
         is_new = False
         room = x.dst
         id_gmcp = info.get("id",None) if info else None
