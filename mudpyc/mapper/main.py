@@ -2439,6 +2439,17 @@ class S(Server):
             await self.print(room.note.note)
 
     @doc(_(
+        """Internal room info"""))
+    async def alias_rii(self, cmd):
+        cmd = self.cmdfix("r",cmd)
+        room = (cmd[0] if cmd else None) or self.room
+        if not room:
+            await self.print(_("No current room known!"))
+            return
+        await self.print(room.info_str)
+        await self.print(_("old={room.id_old} mudlet={room.id_mudlet} gmcp={room.id_gmcp} flag={room.flag}"), room=room)
+
+    @doc(_(
         """Things/NPCs in current room / a specific room"""))
     async def alias_rd(self, cmd):
         db = self.db
