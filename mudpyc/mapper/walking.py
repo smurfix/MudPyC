@@ -124,7 +124,7 @@ class PathGenerator:
             res["stall"] = "Y"
         res["sem"] = self._n_results.value
         res["semw"] = self._n_results.statistics().tasks_waiting
-        res["start"] = self.start_room.id_str
+        res["start"] = self.start_room.idn_str
         return res
 
     def is_running(self):
