@@ -9,3 +9,4 @@ Output colorization
 On-screen buttons
 View manipulation
 Support for multiple users/avatars
+Use a bunch of caches to speed up finding paths
