@@ -2960,6 +2960,7 @@ class S(Server):
             if not m:
                 m = EX4.search(msg)
             if m:
+                self.exit_match = False
                 matched()
                 return True
 
@@ -3084,7 +3085,6 @@ class S(Server):
         """
         if self.exit_match:
             await self.print(_("WARNING: Exit matching failed halfway!"))
-        self.exit_match = None  # might be False
         await self._to_text_watchers(None)
 
         # finish the current command
@@ -3106,28 +3106,28 @@ class S(Server):
             return
 
         moved = False
+        nr = None
         if s.info:
             i_gmcp = s.info.get("id","")
             i_short = s.info.get("short","")
 
             # Changing info data generally indicate movement.
-            if i_gmcp and r.id_gmcp and r.id_gmcp != i_gmcp:
+            nr = self.room_by_gmcp(i_gmcp)
+            if nr and r.id_gmcp != nr.id_gmcp:
                 moved = True
             elif i_short and self.clean_shortname(r.name) != self.clean_shortname(i_short) and not (r.flag & self.db.Room.F_MOD_SHORTNAME):
-                moved = True
+                await self.print(_("Shortname differs. #mm?"))
+                # moved = True
 
         d = self.named_exit or s.command
+        try:
+            x = self.room.exit_at(d)
+        except KeyError:
+            x = None
 
-        flag_no_exit = False
-        if not s.exits_text:
-            # check for flag
-            try:
-                x = self.room.exit_at(d)
-            except KeyError:
-                pass
-            else:
-                if x.dst and x.dst.flag & self.db.Room.F_NO_EXIT:
-                    flag_no_exit = True
+        if x and self.exit_match is None:
+            if x.dst and x.dst.flag & self.db.Room.F_NO_EXIT:
+                self.exit_match = False
 
         if isinstance(s, LookProcessor):
             # This command does not generate movement. Thus if it did
@@ -3138,27 +3138,28 @@ class S(Server):
             except KeyError:
                 d = TIME_DIR
 
-        if flag_no_exit or s.exits_text:
-            if is_std_dir(d):
+        if self.exit_match is not None:
+            if x is not None:
+                # There is an exit thus we seem to have used it
+                moved = True
+            elif is_std_dir(d):
                 # Standard directions generally indicate movement.
                 moved = True
-            else:
-                # If there already is an exit for the command, that should
-                # indicate movement.
-                try:
-                    self.room.exit_at(d)
-                except KeyError:
-                    pass
-                else:
-                    moved = True
 
-        if moved:
+        if nr or moved:
             # Consume the movement.
             self.named_exit = None
 
             await self.went_to_dir(d, info=s.info, exits_text=s.exits_text)
         self.db.commit()
 
+    def room_by_gmcp(self, id_gmcp):
+        if not id_gmcp:
+            return None
+        try:
+            return self.db.r_hash(id_gmcp)
+        except NoData:
+            return None
 
     async def process_exits_text(self, room, txt):
         xx = room.exits
