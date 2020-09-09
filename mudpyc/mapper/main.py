@@ -607,13 +607,14 @@ class S(Server):
         self.room = None
         self.is_new_room = False
         self.last_room = None
-        self.last_dir = None
+        self.last_dir = None  # direction that was actually used
         self.room_info = None
         self.last_room_info = None
         self.named_exit = None
         self.command = None
         self.process = None
         self.last_commands = deque()
+        self.last_cmd = None  # (compound) command sent
         self.cmd1_q = []
         self.cmd2_q = []
 
@@ -1538,7 +1539,7 @@ class S(Server):
         x = self.last_room.exit_at(self.last_dir)
         if not x.steps:
             x.steps = self.last_dir
-        x.steps += "\n" + (cmd[0] if cmd else self.last_commands[0].command)
+        x.steps += "\n" + (cmd[0] if cmd else self.last_cmd or self.last_commands[0].command)
         await self.print(_("Appended."))
         self.db.commit()
 
@@ -1728,16 +1729,16 @@ class S(Server):
 
     @doc(_(
         """
-        I moved.
-        Use with nonstandard directions.
-        (Standard directions should be automatic. So are rooms announced with GMCP.)
+        I moved. Use with nonstandard directions.
+        Should be unnecessary if GMCP, or known exit to non-GMCP room.
+
         Usage: #mm ‹room› ‹dir›
-        Leave room empty for new / known room. Direction defaults to last command.
+        Leave room empty for new destination. Direction defaults to last command.
         """))
     async def alias_mm(self, cmd):
         cmd = self.cmdfix("rx", cmd)
 
-        d = cmd[1] if len(cmd) > 1 else self.last_commands[0].command
+        d = cmd[1] if len(cmd) > 1 else self.last_cmd or self.last_commands[0].command
         if cmd:
             room = cmd[0] or self.room
             await self.room.set_exit(d, room)
@@ -2696,6 +2697,7 @@ class S(Server):
         if self.room is None:
             await self.send_commands(msg)
         else:
+            self.last_cmd = msg
             try:
                 x = self.room.exit_at(msg)
             except KeyError:
