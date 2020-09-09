@@ -60,6 +60,7 @@ EX1 = re.compile(r"^Es gibt \S+ sichtbare Ausgaenge:(.*)$")
 EX2 = re.compile(r"^Es gibt einen sichtbaren Ausgang:(.*)$")
 EX3 = re.compile(r"^Es gibt keinen sichtbaren Ausgang.\s*")
 EX4 = re.compile(r"^Es gibt keine sichtbaren Ausgaenge.\s*")
+EX5 = re.compile(r"^Du kannst keine Ausgaenge erkennen.\s*")
 EX9 = re.compile(r"\.\s*$")
 SPC = re.compile(r"\s{3,}")
 WORD = re.compile(r"(\w+)")
@@ -2960,6 +2961,8 @@ class S(Server):
             m = EX3.search(msg)
             if not m:
                 m = EX4.search(msg)
+            if not m:
+                m = EX5.search(msg)
             if m:
                 self.exit_match = False
                 matched()
