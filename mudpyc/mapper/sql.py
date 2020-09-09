@@ -364,29 +364,30 @@ def SQL(cfg):
         @property
         async def reachable(self):
             """
-            This iterator returns room IDs reachable from this one.
+            This iterator yields rooms (actually, paths to rooms)
+            reachable from this one. The room itself is included.
 
-            TODO use a cache to speed up that nonsense.
+            TODO use a cache to speed up all of this.
             """
-            res = [(0,[self.id_old])]
+            res = [(0,[self])]
             seen=set()
             c=None
             while res:
                 d,h = heappop(res)
                 r = h[-1]
-                if r in seen:
+                if r.id_old in seen:
                     continue
-                if seen:
-                    c = (yield h)
-                seen.add(r)
-                if c is SkipRoute or c is SkipSignal:
-                    continue
-                if c is StopIteration:
+                c = (yield h)
+                seen.add(r.id_old)
+                if c.done:
+                    import pdb;pdb.set_trace()
                     return
-                for x in session.query(Exit).filter(Exit.src_id==r):
+                if c.skip:
+                    continue
+                for x in session.query(Exit).filter(Exit.src==r):
                     if x.dst_id is None:
                         continue
-                    heappush(res,(d+x.cost, h[:]+[x.dst_id]))
+                    heappush(res,(d+x.cost, h+[x.dst]))
 
         def exit_at(self,d, prefer_feature=False):
             """
@@ -545,6 +546,11 @@ def SQL(cfg):
             t = get_thing(txt)
             self.things.append(t)
 
+
+        def __lt__(self, other):
+            if isinstance(other,Room):
+                other = other.id_old
+                return self.id_old < other
 
     class LongDescr(_AddOn, Base):
         __tablename__ = "longdescr"

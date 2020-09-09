@@ -19,9 +19,10 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
 from .sql import SQL, NoData
-from .const import SignalThis, SkipRoute, SkipSignal
+from .const import SignalThis, SkipRoute, SkipSignal, Continue
 from .const import ENV_OK,ENV_STD,ENV_SPECIAL,ENV_UNMAPPED
-from .walking import PathGenerator
+from .walking import PathGenerator, PathChecker, RoomFinder, LabelChecker, FulltextChecker, VisitChecker, ThingChecker, SkipFound
+    
 from ..util import doc
 
 import logging
@@ -153,6 +154,39 @@ def itl2loc(x):
     else:
         return _itl2loc.get(x,x)
 
+class MappedSkipMod:
+    """
+    A mix-in that doesn't walk through unmapped rooms
+    and which processes a skip list
+    """
+    def __init__(self, skiplist=(), **kw):
+        self.skiplist = skiplist
+        super().__init__(**kw)
+
+    async def check(self, room):
+        if not room.id_mudlet:
+            return SkipRoute
+
+        res = await super().check(room)
+        if room in self.skiplist and not res.skip:
+            res = res(skip=True)
+        return res
+
+class MappedLabelSkipChecker(MappedSkipMod, SkipFound, LabelChecker):
+    pass
+
+class MappedVisitSkipChecker(MappedSkipMod, VisitChecker):
+    pass
+
+class MappedFulltextSkipChecker(MappedSkipMod, FulltextChecker):
+    pass
+
+class MappedThingSkipChecker(MappedSkipMod, ThingChecker):
+    pass
+
+class MappedRoomFinder(MappedSkipMod, RoomFinder):
+    pass
+
 class Process:
     """
     Abstract class to assemble some job to be done
@@ -183,19 +217,28 @@ class Process:
         if s.process is self:
             s.trigger_sender.set()
 
-    async def next(self, go_on=False):
+    async def pause(self):
+        if self.stopped:
+            await self.server.print(_("The process is already stopped."))
+        else:
+            self.stopped = True
+            await self.print(_("Paused."))
+
+    async def resume(self):
+        if not self.stopped:
+            await self.server.print(_("The process is not stopped."))
+        else:
+            await self.print(_("Resumed."))
+            self.stopped = False
+            self._go_on()
+
+    async def next(self):
         """
-        Run the next job.
+        Run the next step.
 
         This obeys the stop flag.
         """
-        if go_on:
-            if not self.stopped:
-                await self.server.print(_("The process is not stopped."))
-            self.stopped = False
-            self._go_on()
-            return
-        elif self.stopped:
+        if self.stopped:
             return
         await self.queue_next()
 
@@ -298,7 +341,7 @@ class WalkProcess(Process):
         self.dest = dest
         super().__init__(server)
         r = next(self.rooms)
-        self.current_room = server.db.r_old(r)
+        self.current_room = r
 
     def _repr(self):
         r = super()._repr()
@@ -313,14 +356,10 @@ class WalkProcess(Process):
             self.state = _("Wait for room {nr.id_str}:{nr.name}").format(nr=self.current_room)
             return
         try:
-            r = next(self.rooms)
+            nr = next(self.rooms)
         except StopIteration:
             await super().queue_next()
         else:
-            nr = s.db.r_old(r)
-            if r is None:
-                await super().queue_next()
-                return
             self.current_room = nr
 
             await self.gen_step()
@@ -1717,20 +1756,22 @@ class S(Server):
         No parameters. Use the skip list to ignore "not interesting" rooms.
         """))
     async def alias_mud(self, cmd):
-        async def check(room):
-            # exits that are in Mudlet.
+        class NotInMudlet(PathChecker):
+            @staticmethod
+            async def check(room):
+                # exits that are in Mudlet.
 
-            if room.id_mudlet is None:
-                return SkipRoute
-            if room in self.skiplist:
-                return None
-            for x in room._exits:
-                if x.dst_id is None:
-                    continue
-                if x.dst.id_mudlet is None:
-                    return SkipSignal
-            return None
-        await self.gen_rooms(check)
+                if room.id_mudlet is None:
+                    return SkipRoute
+                if room in self.skiplist:
+                    return None
+                for x in room._exits:
+                    if x.dst_id is None:
+                        continue
+                    if x.dst.id_mudlet is None:
+                        return SkipSignal
+                return Continue
+        await self.gen_rooms(NotInMudlet())
 
     @doc(_(
         """
@@ -1741,13 +1782,15 @@ class S(Server):
         No parameters. Use the skip list to block ways to dangerous rooms.
         """))
     async def alias_mul(self, cmd):
-        async def check(room):
-            if room in self.skiplist:
-                return SkipRoute
-            if not room.long_descr:
-                return SkipSignal
-            return None
-        await self.gen_rooms(check)
+        class NoLong(PathChecker):
+            @staticmethod
+            async def check(room):
+                if room in self.skiplist:
+                    return SkipRoute
+                if not room.long_descr:
+                    return SkipSignal
+                return Continue
+        await self.gen_rooms(NoLong())
 
     @doc(_(
         """Mudlet rooms not in the database
@@ -1756,26 +1799,28 @@ class S(Server):
 
         No parameters."""))
     async def alias_mum(self, cmd):
-        async def check(room):
-            # These rooms are not in the database, so we check for unmapped
-            # exits that are in Mudlet.
-            mx = None
-            if room in self.skiplist:
-                return SkipRoute
-            for x in room._exits:
-                if x.dst_id is not None:
-                    continue
-                if mx is None:
-                    try:
-                        mx = await room.mud_exits
-                    except NoData:
-                        break
-                if mx.get(x.dir, None) is not None:
-                    return SkipSignal
-            return None
-        await self.gen_rooms(check)
+        class NotInDb(PathCHecker):
+            @staticmethod
+            async def check(room):
+                # These rooms are not in the database, so we check for unmapped
+                # exits that are in Mudlet.
+                mx = None
+                if room in self.skiplist:
+                    return SkipRoute
+                for x in room._exits:
+                    if x.dst_id is not None:
+                        continue
+                    if mx is None:
+                        try:
+                            mx = await room.mud_exits
+                        except NoData:
+                            break
+                    if mx.get(x.dir, None) is not None:
+                        return SkipSignal
+                return Continue
+        await self.gen_rooms(NotInDb())
 
-    async def gen_rooms(self, checkfn, room=None, n_results=None, off=999999):
+    async def gen_rooms(self, checker, n_results=None, off=999999):
         """
         Generate a room list. The check function is called with
         the room.
@@ -1786,28 +1831,24 @@ class S(Server):
         If n_results is 1, walk the first path immediately.
 
         """
-        async def _check(d,r,h):
-            res = await checkfn(r)
-            if res is True:
-                res = SkipSignal
-            elif res is False:
-                res = SkipRoute
-            if res is SignalThis or res is SkipSignal:
+        async def gen_reporter(d,r,h,res):
+            if res.signal:
                 if n_results == 1:
                     await self.print(_("{r.idnn_str} ({lh} steps)"), r=r,lh=len(h),d=d+1)
                 else:
                     await self.print(_("#gg {d} : {r.idn_str} ({lh})"), r=r,lh=len(h),d=d+1)
-            return res
 
         # If a prev generator is running, kill it
         await self.clear_gen()
 
+        checker.reporter = gen_reporter
         try:
-            async with PathGenerator(self, self.room, _check, **({"n_results":n_results} if n_results else {})) as gen:
+            async with PathGenerator(self, self.room, checker=checker, **({"n_results":n_results} if n_results else {})) as gen:
                 self.path_gen = gen
                 while await gen.wait_stalled():
                     await self.print(_("More results? #gn"))
                 if self.path_gen is gen:
+                    # check that it is still current
                     if n_results == 1:
                         if not gen.results:
                             await self.print(_("Cannot find a way there!"))
@@ -1820,8 +1861,9 @@ class S(Server):
                         return
                     await self.print(_("No more results."))
                 # otherwise we've been cancelled
-        finally:
+        except Exception:
             self.path_gen = None
+            raise
 
     async def found_path(self, n, room, h):
         await self.print(_("#gg {n} :d{lh} f{room.info_str}"), room=room, n=n, lh=len(h))
@@ -1883,6 +1925,14 @@ class S(Server):
         The current walker, if any, is stopped or resumed.
         """))
     async def alias_gp(self, cmd):
+        w = self.current_walker
+        if not w:
+            await w.resume(cmd[0] if cmd else 1)
+        elif w.stopped:
+            await w.resume()
+        else:
+            await w.pause()
+
 
     @doc(_(
         """
@@ -2173,18 +2223,8 @@ class S(Server):
         if not cmd:
             await self.print(_("Usage: #gt Kneipe / Kirche / Laden"))
             return
-        await self.gen_rooms(partial(self._check_type, cmd[0].lower()))
-
-    async def _check_type(self, t, r):
-        if not r.id_mudlet:
-            return SkipRoute
-        if r.label and r.label.lower() == t:
-            return SkipSignal
-#       i = await self.mud.getRoomUserData(r.id_mudlet, "type")
-#       if i and i[0] and i[0].lower() == t:
-#           return SkipSignal
-        if r in self.skiplist:
-            return SkipRoute
+        checker = MappedLabelSkipChecker(label=cmd[0].lower(), skiplist=self.skiplist)
+        await self.gen_rooms(checker=checker)
 
     @doc(_(
         """Go to first labeled room
@@ -2197,28 +2237,23 @@ class S(Server):
         if not cmd:
             await self.print(_("Usage: #gt Kneipe / Kirche / Laden"))
             return
-        await self.gen_rooms(partial(self._check_type, cmd[0].lower()), n_results=1)
+        checker = MappedLabelSkipChecker(label=cmd[0].lower(), skiplist=self.skiplist)
+        await self.gen_rooms(checker=checker)
 
 
     @doc(_(
         """Go to a not-recently-visited room
         Find the closest room not visited recently.
         Routes will not go through rooms on the current skiplist,
-        but they may end at a room that is.
+        but they may end at a room that is on it.
         Adding a number uses that as the minimum counter.
         """))
     async def alias_mv(self, cmd):
         cmd = self.cmdfix("i",cmd)
         lim = cmd[0] if cmd else 1
 
-        async def check(r):
-            if not r.id_mudlet:
-                return SkipRoute
-            if r.last_visit is None or r.last_visit < lim:
-                return SkipSignal
-            if r in self.skiplist:
-                return SkipRoute
-        await self.gen_rooms(check, n_results=1)
+        checker = MappedVisitSkipChecker(last_visit=lim, skiplist=self.skiplist)
+        await self.gen_rooms(checker, n_results=1)
 
 
     @doc(_(
@@ -2235,18 +2270,8 @@ class S(Server):
             return
         txt = cmd[0].lower()
 
-        async def check(r):
-            if not r.id_mudlet:
-                return SkipRoute
-            n = r.long_descr
-            if n and txt in n.lower():
-                return SkipSignal
-            n = r.note
-            if n and txt in n.lower():
-                return SkipSignal
-            if r in self.skiplist:
-                return SkipRoute
-        await self.gen_rooms(check)
+        checker = MappedFulltextSkipChecker(last_visit=lim, skiplist=self.skiplist)
+        await self.gen_rooms(checker)
 
     @doc(_(
         """Find something.
@@ -2261,12 +2286,7 @@ class S(Server):
             return
         txt = cmd[0].lower()
 
-        async def check(r):
-            if not r.id_mudlet:
-                return SkipRoute
-            for t in r.things:
-                if txt in t.name.lower():
-                    return SkipSignal
+        checker = MappedThingSkipChecker(thung=txt, skiplist=self.skiplist)
         await self.gen_rooms(check)
 
     async def clear_gen(self):
@@ -2388,19 +2408,8 @@ class S(Server):
             room = self.db.r_old(room)
         await self.clear_gen()
 
-        async def check(r):
-            # our room
-            mx = None
-            if r == room:
-                return SkipSignal
-            # if r in self.skiplist:
-            #     return SkipRoute
-            if not r.id_mudlet:
-                return SkipRoute
-            return None
-
         self.add_start_room(self.room)
-        await self.gen_rooms(check, n_results=1, off=off)
+        await self.gen_rooms(MappedRoomFinder(room=room), n_results=1, off=off)
 
     @doc(_(
         """
@@ -3988,7 +3997,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             return
         ri = ([],[],[],[])
         for rw in room.words:
-            ri[rw.flag].append(rw.word.name.lower())
+            ri[rw.flag].append(rw.word.name.lower() if rw.word.name else _("‹Room›"))
 
         seen = False
         for n,w in zip(ri,(
@@ -4428,7 +4437,12 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         if not self.quest:
             await self.print(_("No current quest."))
             return
-        self.quest_edit_room = cmd[0] if cmd else None
+        if cmd and cmd[0]:
+            self.quest_edit_room = cmd[0]
+            await self.print(_("New quest steps are for {room.idn_str}."), room=self.room)
+        else:
+            self.quest_edit_room = None
+            await self.print(_("New quest steps are for your current room."))
 
 
     @with_alias("qq=")
@@ -4457,11 +4471,9 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             await self.print(_("No current quest."))
             return
         if cmd:
-            s = cmd[0]
-            qs = self.quest.step_nr(cmd[0])
-        else:
-            s = self.quest.step
-            qs = self.quest.current_step
+            self.quest.step = cmd[0]
+        s = self.quest.step
+        qs = self.quest.current_step
         if qs is None:
             qs = self.quest.step_nr(1)
             if qs is None:
@@ -4473,9 +4485,10 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             return
 
         if qs.room != self.room:
-            await self.print(_("Quest: Room {room.idn_str}"), room=qs.room)
+            await self.print(_("Quest: Going to room {room.idn_str}"), room=qs.room)
             await self.run_to_room(qs.room)
             return
+
         c = qs.command
         if c[0] != '#':
             await self._do_move(c)
@@ -4505,7 +4518,8 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         print(f"""
 *** Start *** {datetime.now().strftime("%Y-%m-%d %H:%M")} ***
 """, file=logfile)
-        logfile.flush()
+        if logfile is not None:
+            logfile.flush()
 
         await self.setup(db)
 
