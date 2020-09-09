@@ -2056,8 +2056,7 @@ class S(Server):
         """
         await self.print(dest.info_str)
         prev = None
-        for rid in res:
-            room = self.db.r_old(rid)
+        for room in res:
             if prev is None:
                 d = _("Start")
             else:
