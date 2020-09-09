@@ -784,6 +784,8 @@ class S(Server):
 
         self.alias.at("cf").helptext = _("Change boolean settings")
         self.alias.at("co").helptext = _("Room and name positioning")
+        self.alias.at("d").helptext = _("Debugging")
+        self.alias.at("f").helptext = _("Find things, rooms")
         self.alias.at("g").helptext = _("Walking, paths")
         self.alias.at("mc").helptext = _("Map Colors")
         self.alias.at("md").helptext = _("Mudlet functions")
@@ -888,6 +890,84 @@ class S(Server):
         if id_mudlet:
             await self.mud.deleteRoom(id_mudlet)
             await self.mud.updateMap()
+
+    @doc(_(
+        """
+        Find room
+        List rooms with this text in their shortname.
+        """))
+    async def alias_fr(self, cmd):
+        cmd = self.cmdfix("*", cmd, min_words=1)
+        db = self.db
+        n = 0
+        for r in db.q(db.Room).filter(db.Room.name.like('%'+cmd[0]+'%')).all():
+            n += 1
+            await self.print(r.idnn_str)
+        if n == 0:
+            await self.print(_("No room name with {txt!r} found."), txt=cmd[0])
+        
+    @doc(_(
+        """
+        Find descriptions
+        List rooms with this text in their long description.
+        """))
+    async def alias_fd(self, cmd):
+        cmd = self.cmdfix("*", cmd, min_words=1)
+        db = self.db
+        n = 0
+        for r in db.q(db.Room).join(db.Room.long_descr).filter(db.LongDescr.descr.like('%'+cmd[0]+'%')).all():
+            n += 1
+            await self.print(r.idnn_str)
+        if n == 0:
+            await self.print(_("No room text with {txt!r} found."), txt=cmd[0])
+        
+    @doc(_(
+        """
+        Find label
+        List rooms with this label
+        """))
+    async def alias_fl(self, cmd):
+        cmd = self.cmdfix("*", cmd, min_words=1)
+        db = self.db
+        n = 0
+        for r in db.q(db.Room).filter(db.Room.label == cmd[0]).all():
+            n += 1
+            await self.print(r.idnn_str)
+        if n == 0:
+            await self.print(_("No room text with {txt!r} found."), txt=cmd[0])
+        
+    @doc(_(
+        """
+        Find note
+        List rooms with this text in their notes.
+        """))
+    async def alias_fn(self, cmd):
+        cmd = self.cmdfix("*", cmd, min_words=1)
+        db = self.db
+        n = 0
+        for r in db.q(db.Room).join(db.Room.note).filter(db.Note.note.like('%'+cmd[0]+'%')).all():
+            n += 1
+            await self.print(r.idnn_str)
+        if n == 0:
+            await self.print(_("No room note with {txt!r} found."), txt=cmd[0])
+        
+
+    @doc(_(
+        """
+        Find thing
+        List rooms with this text in the names of stuff in them
+        """))
+    async def alias_ft(self, cmd):
+        cmd = self.cmdfix("*", cmd, min_words=1)
+        db = self.db
+        n = 0
+        for r in db.q(db.Room).join(db.Room.things).filter(db.Thing.name.like('%'+cmd[0]+'%')).all():
+            n += 1
+            await self.print(r.idnn_str)
+        if n == 0:
+            await self.print(_("No room with {txt!r} found."), txt=cmd[0])
+        
+
 
     @doc(_(
         """Show room flags
