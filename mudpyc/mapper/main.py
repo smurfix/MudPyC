@@ -605,6 +605,7 @@ class S(Server):
         self.exit_match = None
         self.start_rooms = deque()
         self.room = None
+        self.view_room = None
         self.is_new_room = False
         self.last_room = None
         self.last_dir = None  # direction that was actually used
@@ -3957,40 +3958,43 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         self.main.start_soon(self.hello2,prompt,e)
         return e
 
-    async def called_view_go(self, d):
-        vr = self.view_room or self.room
-        self.view_room = vr = vr.exits[d].dst
-        if vr.id_mudlet:
-            await self.mud.centerview(vr.id_mudlet)
-        else:
-            await self.print(_("No mapped room to {d}"), d=d)
-
     @doc(_(
         """Shift the view to the room in this direction"""))
     async def alias_vg(self, cmd):
-        await self.called_view_go(cmd)
+        cmd = self.cmdfix("w", cmd, min_words=1)
+        try:
+            x = (self.view_room or self.room).exit_at(cmd[0])
+        except KeyError:
+            await self.print(_("No exit to {d}"), d=cmd[0])
+        else:
+            vr = x.dst
+            if not vr:
+                await self.print(_("No room to {d}"), d=cmd[0])
+            else:
+                await self.view_to(vr)
 
     @with_alias("v#")
     @doc(_(
         """Shift the view to this room"""))
     async def alias_v_h(self, cmd):
-        await self.called_view_goto(int(cmd))
+        cmd = self.cmdfix("r", cmd, min_words=1)
+        await self.view_to(cmd[0])
 
-    async def called_view_reset(self):
-        """Shift the view to the player's"""
-        self.view_room = self.room
-        await self.mud.centerview(self.room.id_mudlet)
+    async def view_to(self, room=None):
+        if not room:
+            room = self.room
+        self.view_room = room
+
+        if room.id_mudlet:
+            await self.mud.centerview(room.id_mudlet)
+        else:
+            await self.print(_("Not yet mapped: {room.idn_str}"), room=r)
 
     @doc(_(
         """Shift the view to the player's"""))
     async def alias_vr(self, cmd):
-        await self.called_view_reset()
+        await self.view_to(None)
 
-    async def called_view_goto(self, d):
-        """Shift the view to this room"""
-        vr = self.db.r_mudlet(d)
-        self.view_room = vd
-        await self.mud.centerview(vr.id_mudlet)
 
     @run_in_task
     async def called_label_shift(self, dx, dy):
