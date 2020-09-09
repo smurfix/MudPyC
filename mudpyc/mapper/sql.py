@@ -429,7 +429,7 @@ def SQL(cfg):
             if (changed or not (x.flag & Exit.F_IN_MUDLET)) and not skip_mud:
                 if x.flag is None:
                     x.flag = 0 ## DUH?
-                if await self.set_mud_exit(d,v):
+                if self.id_mudlet and await self.set_mud_exit(d,v):
                     x.flag |= Exit.F_IN_MUDLET
                 else:
                     x.flag &=~ Exit.F_IN_MUDLET
