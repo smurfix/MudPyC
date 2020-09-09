@@ -1967,6 +1967,9 @@ class S(Server):
             await self.print("Path: "+str(self.path_gen))
         else:
             await self.print(_("No active path generator."))
+        w = self.current_walker
+        if w:
+            await self.print("Walk: "+str(w))
 
     @doc(_(
         """
