@@ -2512,18 +2512,8 @@ class S(Server):
         dest = cmd[-1]
         src = cmd[0] if len(cmd) > 1 else self.room
 
-        async def check(d,r,h):
-            # our room
-            mx = None
-            if r == dest:
-                return SkipSignal
-            # if r in self.skiplist:
-            #     return SkipRoute
-            if not r.id_mudlet:
-                return SkipRoute
-            return None
-
-        async with PathGenerator(self, src, check, n_results=1) as gen:
+        await self.print(_("Scanning the map"))
+        async with PathGenerator(self, src, RoomFinder(dest), n_results=1) as gen:
             while await gen.wait_stalled():
                 raise RuntimeError("A lookup with n=1 cannot stall")
             if not gen.results:
