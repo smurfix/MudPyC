@@ -752,7 +752,7 @@ def SQL(cfg):
             qq = Quest.name == name_or_id
         q = session.query(Quest).filter(qq).one_or_none()
         if q is None:
-            raise KeyError(name)
+            raise KeyError(name_or_id)
         return q
 
     def get_feature(name):
