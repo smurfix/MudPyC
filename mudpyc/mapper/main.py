@@ -2599,20 +2599,14 @@ class S(Server):
         db = self.db
         cmd = self.cmdfix("r", cmd)
         if len(cmd):
-            room = self.room if cmd[0] is None else cmd[0]
+            room = cmd[0]
             if room.id_mudlet:
                 await self.update_room_color(room)
-            return
-        id_old = db.q(func.max(db.Room.id_old)).scalar()
-        while id_old:
-            try:
-                room = db.r_old(id_old)
-            except NoData:
-                pass
             else:
-                if room.id_mudlet:
-                    await self.update_room_color(room)
-            id_old -= 1
+                await self.print(_("Not yet mapped: {room.idn_str}"), room=room)
+            return
+        for room in db.q(db.Room).filter(db.Room.id_mudlet != None):
+            await self.update_room_color(room)
         await self.mud.updateMap()
 
     async def get_named_area(self, name, create=False):
