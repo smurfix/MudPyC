@@ -1424,10 +1424,10 @@ class S(Server):
             txt += ": "
             if x.dst:
                 txt += x.dst.idnn_str
-                if x.steps:
-                    txt += " +"+str(len(x.moves))
             else:
                 txt += _("‹unknown›")
+            if x.steps:
+                txt += " +"+str(len(x.moves))
             return txt
 
         if len(cmd) == 0:
