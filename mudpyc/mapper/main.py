@@ -677,7 +677,7 @@ class S(Server):
             for x in "base info vitals maxvitals attributes".split():
                 try: self.me[x] = AD(val['char'][x])
                 except AttributeError: pass
-            await self.gui_player()
+            await self.gui_show_player()
 
             try:
                 info = val["room"]["info"]
@@ -3226,83 +3226,27 @@ class S(Server):
     async def event_gmcp_MG_char_attributes(self, msg):
         logger.debug("AttrMG %s: %r",msg[1],msg[2])
         self.me.attributes = AD(msg[2])
-        await self.gui_player()
+        await self.gui_show_player()
 
     async def event_gmcp_MG_char_base(self, msg):
         logger.debug("BaseMG %s: %r",msg[1],msg[2])
         self.me.base = AD(msg[2])
-        await self.gui_player()
+        await self.gui_show_player()
 
     async def event_gmcp_MG_char_info(self, msg):
         logger.debug("InfoMG %s: %r",msg[1],msg[2])
         self.me.info = AD(msg[2])
-        await self.gui_player()
+        await self.gui_show_player()
 
     async def event_gmcp_MG_char_vitals(self, msg):
         logger.debug("VitalsMG %s: %r",msg[1],msg[2])
         self.me.vitals = AD(msg[2])
-        await self.gui_vitals()
+        await self.gui_show_vitals()
 
     async def event_gmcp_MG_char_maxvitals(self, msg):
         logger.debug("MaxVitalsMG %s: %r",msg[1],msg[2])
         self.me.maxvitals = AD(msg[2])
-        await self.gui_vitals()
-
-    # ### vitals ### #
-
-    async def _gui_vitals_color(self, lp_ratio=None):
-        if lp_ratio is None:
-            try:
-                lp_ratio = self.me.vitals.hp/self.me.maxvitals.hp
-            except AttributeError:
-                lp_ratio = 0.9
-        if lp_ratio > 1:
-            lp_ratio = 1
-        await self.mmud.GUI.lp_anzeige.setColor(255 * (1 - lp_ratio), 255 * lp_ratio, 50)
-
-    async def _gui_vitals_blink_hp(self, task_status=trio.TASK_STATUS_IGNORED):
-        with trio.CancelScope() as cs:
-            self.me.blink_hp = cs
-            task_status.started(cs)
-            try:
-                await self.mmud.GUI.lp_anzeige.setColor(255, 0, 50)
-                await trio.sleep(0.3)
-                await self._gui_vitals_color()
-            finally:
-                if self.me.blink_hp == cs:
-                    self.me.blink_hp = None
-
-    async def gui_vitals(self):
-        try:
-            v = self.me.vitals
-        except AttributeError:
-            return
-        try:
-            w = self.me.maxvitals
-        except AttributeError:
-            await self.mmud.GUI.lp_anzeige.setValue(1,1, f"<b> {v.hp}/?</b> ")
-            await self.mmud.GUI.kp_anzeige.setValue(1,1, f"<b> {v.sp}/?</b> ")
-            await self.mmud.GUI.gift.echo("")
-        else:
-            await self.mmud.GUI.lp_anzeige.setValue(v.hp,w.max_hp, f"<b> {v.hp}/{w.max_hp}</b> ")
-            await self.mmud.GUI.kp_anzeige.setValue(v.sp,w.max_sp, f"<b> {v.sp}/{w.max_sp}</b> ")
-            if v.poison:
-                r,g,b = 255,255-160*v.poison/w.max_poison,0
-                line = f"G I F T  {v.poison}/{w.max_poison}"
-            else:
-                r,g,b = 30,30,30
-                line = ""
-            await self.mmud.GUI.gift.echo(line, "white")
-            await self.mmud.GUI.gift.setColor(r, g, b)
-
-            if not self.me.blink_hp:
-                await self._gui_vitals_color(v.hp / w.max_hp)
-
-        if "last_hp" in self.me and self.me.last_hp > v.hp:
-            await self.main.start(self._gui_vitals_blink_hp)
-        self.me.last_hp = v.hp
-
-        # TODO flight
+        await self.gui_show_vitals()
 
 
     async def event_sysWindowResizeEvent(self, msg):
@@ -3672,7 +3616,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         #await self.check_walk()
         nr,self._wait_move = self._wait_move, trio.Event()
         nr.set()
-        await self.show_room_data()
+        await self.gui_show_room_data()
 
         if not self.last_room:
             return
@@ -3804,7 +3748,10 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             self.room.flag &=~ db.Room.F_MOD_SHORTNAME
         db.commit()
 
-    async def show_room_data(self, room=None):
+
+    # ### Status GUI ### #
+
+    async def gui_show_room_data(self, room=None):
         if room is None:
             room = self.room
         if room.id_mudlet:
@@ -3821,10 +3768,10 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
 
         await self.mmud.GUI.ort_raum.setColor(r, g, b)
         await self.mmud.GUI.ort_region.setColor(r, g, b)
-        await self.show_room_label(room)
-        await self.show_room_note(room)
+        await self.gui_show_room_label(room)
+        await self.gui_show_room_note(room)
 
-    async def show_room_note(self, room=None):
+    async def gui_show_room_note(self, room=None):
         if room is None:
             room = self.room
             if room is None:
@@ -3841,11 +3788,11 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             note = "-"
         await self.mmud.GUI.raumnotizen.echo(note)
 
-    async def show_room_label(self, room):
+    async def gui_show_room_label(self, room):
         label = room.label or "-"
         await self.mmud.GUI.raumtype.echo(label)
 
-    async def gui_player(self):
+    async def gui_show_player(self):
         try: name = self.me.base.name
         except AttributeError: name = "?"
         try: level = self.me.info.level
@@ -3858,44 +3805,62 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             #db.commit()
         #import pdb;pdb.set_trace()
         pass
-#
-#        if mapfile:
-#            m=yaml.safe_load(mapfile)
-#            from ppr import pprint
-#
-#            m=m["ROOM"]
-#            import pdb;pdb.set_trace()
-#            for i,room in enumerate(m):
-#                if "RSHORT" not in room: continue
-#                sql = "SELECT `name` FROM `rooms` WHERE `id_old`=%s"
-#                await cursor.execute(sql, (i,))
-#                result = await cursor.fetchone()
-#                if result is not None:
-#                    continue
-#                ex=[]
-#                for k,v in room["EXITS"].items():
-#                    v=int(v)
-#                    if v:
-#                        ex.append(_("{k}={v}").format(v=v, k=k))
-#                    else:
-#                        ex.append(_("{k}").format(k=k))
-#
-#                sql = "INSERT INTO `rooms` set id_old=%s,name=%s,long_descr=%s, note=%s, exits=%s,label=%s"
-#                await cursor.execute(sql, (i,room["RSHORT"],"\n".join(room.get("RLONG",())),
-#                    "\n".join(room.get("RNOTE",())),":".join(ex),
-#                    ":".join(room.get("LABEL",{}).keys())))
-#                await conn.commit()
 
-    async def hello2(self, prompt,e):
-        await trio.sleep(2)
-        # from here you could again call mudlet
-        e.set("Hello, "+prompt)
+    async def _gui_vitals_color(self, lp_ratio=None):
+        if lp_ratio is None:
+            try:
+                lp_ratio = self.me.vitals.hp/self.me.maxvitals.hp
+            except AttributeError:
+                lp_ratio = 0.9
+        if lp_ratio > 1:
+            lp_ratio = 1
+        await self.mmud.GUI.lp_anzeige.setColor(255 * (1 - lp_ratio), 255 * lp_ratio, 50)
 
-    def called_hello(self, prompt):
-        e = ValueEvent()
-        # do not call into Mudlet from here, you will deadlock
-        self.main.start_soon(self.hello2,prompt,e)
-        return e
+    async def _gui_vitals_blink_hp(self, task_status=trio.TASK_STATUS_IGNORED):
+        with trio.CancelScope() as cs:
+            self.me.blink_hp = cs
+            task_status.started(cs)
+            try:
+                await self.mmud.GUI.lp_anzeige.setColor(255, 0, 50)
+                await trio.sleep(0.3)
+                await self._gui_vitals_color()
+            finally:
+                if self.me.blink_hp == cs:
+                    self.me.blink_hp = None
+
+    async def gui_show_vitals(self):
+        try:
+            v = self.me.vitals
+        except AttributeError:
+            return
+        try:
+            w = self.me.maxvitals
+        except AttributeError:
+            await self.mmud.GUI.lp_anzeige.setValue(1,1, f"<b> {v.hp}/?</b> ")
+            await self.mmud.GUI.kp_anzeige.setValue(1,1, f"<b> {v.sp}/?</b> ")
+            await self.mmud.GUI.gift.echo("")
+        else:
+            await self.mmud.GUI.lp_anzeige.setValue(v.hp,w.max_hp, f"<b> {v.hp}/{w.max_hp}</b> ")
+            await self.mmud.GUI.kp_anzeige.setValue(v.sp,w.max_sp, f"<b> {v.sp}/{w.max_sp}</b> ")
+            if v.poison:
+                r,g,b = 255,255-160*v.poison/w.max_poison,0
+                line = f"G I F T  {v.poison}/{w.max_poison}"
+            else:
+                r,g,b = 30,30,30
+                line = ""
+            await self.mmud.GUI.gift.echo(line, "white")
+            await self.mmud.GUI.gift.setColor(r, g, b)
+
+            if not self.me.blink_hp:
+                await self._gui_vitals_color(v.hp / w.max_hp)
+
+        if "last_hp" in self.me and self.me.last_hp > v.hp:
+            await self.main.start(self._gui_vitals_blink_hp)
+        self.me.last_hp = v.hp
+
+        # TODO flight
+
+    # ### Viewpoint movement ### #
 
     @doc(_(
         """Shift the view to the room in this direction"""))
