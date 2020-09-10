@@ -4573,13 +4573,14 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
 @click.command()
 @click.option("-c","--config", type=click.File("r"), help="Config file")
 @click.option("-l","--log", type=click.File("a"), help="Log file")
-async def main(config,log):
+@click.option("-d","--debug", is_flag=True, help="Debug output")
+async def main(config,log,debug):
     m={}
     if config is None:
         config = open("mapper.cfg","r")
     cfg = yaml.safe_load(config)
     cfg = combine_dict(cfg, DEFAULT_CFG, cls=attrdict)
-    #logging.basicConfig(level=getattr(logging,cfg.log['level'].upper()))
+    logging.basicConfig(level=logging.DEBUG if debug else getattr(logging,cfg.log['level'].upper()))
 
     if not log and cfg.logfile is not None:
         log = open(cfg.logfile, "a")
