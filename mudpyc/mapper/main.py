@@ -631,7 +631,6 @@ class S(Server):
         self.long_lines = []
 
         self.quest = None
-        self.quest_edit_room = None
 
         #self.player_room = None
         self.path_gen = None
@@ -4361,8 +4360,6 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             return
 
         await self._q_state(q)
-        if self.quest_edit_room:
-            await self.print(_("Additions will associate with {room.idn_str}."), room=self.quest_edit_room)
 
 
     @doc(_("""
@@ -4418,7 +4415,6 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
                 await self.print(_("Active, no current step."), q=self.quest)
             else:
                 await self.print(_("Active, step {step.step}."), q=self.quest,step=q.current_step)
-            self.quest_edit_room = None
 
 
     @with_alias("qq+")
@@ -4433,7 +4429,6 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         db.add(q)
         db.commit()
         self.quest = q
-        self.quest_edit_room = None
 
 
     @with_alias("q+")
@@ -4481,25 +4476,6 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         self.db.commit()
 
 
-    @doc(_("""
-    Set room
-    Tell the quest mgr that the next coomand(s) you enter are
-    actually for room ‹room›.
-    No room: clear, use current room
-    """))
-    async def alias_qr(self, cmd):
-        cmd = self.cmdfix("r", cmd)
-        if not self.quest:
-            await self.print(_("No current quest."))
-            return
-        if cmd and cmd[0]:
-            self.quest_edit_room = cmd[0]
-            await self.print(_("New quest steps are for {room.idn_str}."), room=self.room)
-        else:
-            self.quest_edit_room = None
-            await self.print(_("New quest steps are for your current room."))
-
-
     @with_alias("qq=")
     @doc(_("""
     Delete Quest
@@ -4514,7 +4490,6 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         db.commit()
         if self.quest == q:
             self.quest = None
-            self.quest_edit_room = None
 
     @doc(_("""
     Quest Next Step
