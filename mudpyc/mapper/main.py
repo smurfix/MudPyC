@@ -1654,26 +1654,35 @@ class S(Server):
         db = self.db
         s=0
 
-        await self.print("Start map sync")
+        await self.print("Sync rooms")
+        await self.sync_areas()
         for r in db.q(db.Room).filter(db.Room.id_mudlet != None).order_by(db.Room.id_mudlet).all():
-            print(r.idnn_str)
-            s2 = r.id_mudlet // 500
+            s2 = r.id_mudlet // 100
             if s != s2:
                 s = s2
                 await self.print(_("… {room.id_mudlet}"), room=r)
+                await self.mud.updateMap()
             m = await self.mud.getRoomCoordinates(r.id_mudlet)
             if not m:
                 await self.mud.addRoom(r.id_mudlet)
             await self.mud.setRoomCoordinates(r.id_mudlet, r.pos_x, r.pos_y, r.pos_z)
+            await self.mud.setRoomName(r.id_mudlet, r.name)
             await self.mud.setRoomNameOffset(r.id_mudlet, r.label_x,r.label_y)
 
             if r.area_id:
                 await self.mud.setRoomArea(r.id_mudlet, r.area_id)
-            for x in r._exits:
-                await r.set_mud_exit(x.dir, x.dst if x.dst_id and x.dst.id_mudlet else True)
-
             db.commit()
 
+        await self.print("Sync exits")
+        s=0
+        for r in db.q(db.Room).filter(db.Room.id_mudlet != None).order_by(db.Room.id_mudlet).all():
+            s2 = r.id_mudlet // 100
+            if s != s2:
+                s = s2
+                await self.print(_("… {room.id_mudlet}"), room=r)
+                await self.mud.updateMap()
+            for x in r._exits:
+                await r.set_mud_exit(x.dir, x.dst if x.dst_id and x.dst.id_mudlet else True)
 
         await self.print("Done with map sync")
         await self.mud.updateMap()
