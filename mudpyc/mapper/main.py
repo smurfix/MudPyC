@@ -2985,7 +2985,7 @@ class S(Server):
                     self.last_commands.pop()
                 self.command = cmd
 
-                self._prompt_evt = p = trio.Event()
+                self._prompt_evt = trio.Event()
                 self._prompt_state = None
                 if self.logfile:
                     print(">>>",cmd.command, file=self.logfile)
@@ -2993,10 +2993,9 @@ class S(Server):
                     await self.mud.send(cmd.command)
                 else:
                     cmd.send_seen = True
-                await p.wait()
-                logger.info("PROMPT SEEN")
-                if self._prompt_evt is p:
-                    self._prompt_evt = None
+                await self._prompt_evt.wait()
+                self._prompt_evt = None
+                logger.debug("Prompt seen")
                 await self._process_prompt()
 
             except Exception as exc:
