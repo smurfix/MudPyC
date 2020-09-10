@@ -559,7 +559,7 @@ class WordProcessor(Command):
 
 class NoteProcessor(Command):
     async def done(self):
-        await self.server.add_processor_note(self)
+        await self.server.add_processor_note(self, self.server.room)
         await super().done()
 
 
@@ -708,6 +708,10 @@ class S(Server):
             msg = msg.format(**kw)
         await self._text_w.send(msg)
 
+    @property
+    def view_or_room(self):
+        return self.view_room or self.room
+
     async def set_long_mode(self, long_mode):
         """
         Set description mode. Called by walk code. Currently a no-op
@@ -802,7 +806,6 @@ class S(Server):
         self.alias.at("q").helptext = _("Quests")
         self.alias.at("qq").helptext = _("Quest management")
         self.alias.at("r").helptext = _("Rooms")
-        self.alias.at("v").helptext = _("View Map")
         self.alias.at("xf").helptext = _("Exit features")
     
     def _cmdfix_r(self,v):
@@ -814,6 +817,8 @@ class S(Server):
             return self.room
         elif v == ":":
             return self.last_room
+        elif v == "!":
+            return self.view_or_room
         v = int(v)
         if not v:
             # zero
@@ -889,6 +894,8 @@ class S(Server):
         if self.last_room == room:
             await self.print(_("You can't delete the room you just came from."))
             return
+        if self.view_room == room:
+            await self.view_to(None)
         await self._delete_room(room)
 
     async def _delete_room(self, room):
@@ -986,7 +993,7 @@ class S(Server):
         if cmd:
             room = cmd[0]
         else:
-            room = self.room
+            room = self.view_or_room
         flags = []
         if not room.flag:
             await self.print(_("No flag set."))
@@ -1008,7 +1015,7 @@ class S(Server):
         if cmd:
             room = cmd[0]
         else:
-            room = self.room
+            room = self.view_or_room
         flags = []
         if room.flag & F:
             room.flag &=~ F
@@ -1030,7 +1037,7 @@ class S(Server):
         if cmd:
             room = cmd[0]
         else:
-            room = self.room
+            room = self.view_or_room
         flags = []
         if not room.id_gmcp:
             await self.print(_("The Room doesn't have a GMCP ID!"))
@@ -1068,39 +1075,40 @@ class S(Server):
         """))
     async def alias_rt(self, cmd):
         cmd = self.cmdfix("w", cmd)
-        if not self.room:
+        room = self.view_or_room
+        if not room:
             await self.print(_("No active room."))
             return
         if not cmd:
-            if self.room.label:
-                await self.print(_("Label of {room.idn_str}: {room.label}"), room=self.room)
+            if room.label:
+                await self.print(_("Label of {room.idn_str}: {room.label}"), room=room)
             else:
-                await self.print(_("No label for {room.idn_str}."), room=self.room)
+                await self.print(_("No label for {room.idn_str}."), room=room)
         else:
             cmd = cmd[0]
             if cmd == "-":
-                if self.room.label:
-                    await self.print(_("Label of {room.idn_str} was {room.label}"), room=self.room)
-                    self.room.label = None
+                if room.label:
+                    await self.print(_("Label of {room.idn_str} was {room.label}"), room=room)
+                    room.label = None
                     self.db.commit()
-            elif self.room.label != cmd:
-                if self.room.label:
-                    await self.print(_("Label of {room.idn_str} was {room.label}"), room=self.room)
+            elif room.label != cmd:
+                if room.label:
+                    await self.print(_("Label of {room.idn_str} was {room.label}"), room=room)
                 else:
-                    await self.print(_("Label of {room.idn_str} set"), room=self.room)
-                self.room.label = cmd
+                    await self.print(_("Label of {room.idn_str} set"), room=room)
+                room.label = cmd
             else:
-                await self.print(_("Label of {room.idn_str} not changed"), room=self.room)
+                await self.print(_("Label of {room.idn_str} not changed"), room=room)
         self.db.commit()
-        await self.show_room_label(self.room)
+        await self.gui_show_room_label(room)
 
-    async def add_processor_note(self, proc):
+    async def add_processor_note(self, proc, room):
         """
         Take the output+input from a processor and add it to the text
         """
-        txt = _("> {cmd}").format(room=self.room, cmd=proc.command)
+        txt = _("> {cmd}").format(room=room, cmd=proc.command)
         txt += "\n"+"\n".join(proc.lines[proc.P_BEFORE])
-        await self._add_room_note(txt)
+        await self._add_room_note(txt, room)
 
     @doc(_(
         """Show room note.
@@ -1108,7 +1116,7 @@ class S(Server):
         """))
     async def alias_rn(self, cmd):
         cmd = self.cmdfix("r", cmd)
-        room = cmd[0] if cmd else self.room
+        room = cmd[0] if cmd else self.view_or_room
         if not room:
             await self.print(_("No active room."))
             return
@@ -1122,12 +1130,13 @@ class S(Server):
         Add the n'th last command and its output to the note.
         """))
     async def alias_rna(self, cmd):
-        cmd = self.cmdfix("i", cmd)
+        cmd = self.cmdfix("ir", cmd)
+        room = cmd[1] if len(cmd)>1 else self.view_or_room
         if not cmd:
             for i,s in enumerate(self.last_commands):
                 await self.print(_("{i}: {cmd}"), i=i+1,cmd=s.command)
             return
-        await self.add_processor_note(self.last_commands[cmd[0]-1])
+        await self.add_processor_note(self.last_commands[cmd[0]-1], room)
 
     @doc(_(
         """Add new command as room note.
@@ -1144,7 +1153,7 @@ class S(Server):
         """Delete a room's notes."""))
     async def alias_rn_m(self, cmd):
         cmd = self.cmdfix("i", cmd)
-        room = cmd[0] if cmd else self.room
+        room = cmd[0] if cmd else self.view_or_room
         if not room:
             await self.print(_("No room given and no active room."))
             return
@@ -1162,8 +1171,8 @@ class S(Server):
         End input with a single dot .
         """))
     async def alias_rn_dot(self, cmd):
-        cmd = self.cmdfix("i", cmd)
-        room = cmd[0] if cmd else self.room
+        cmd = self.cmdfix("r", cmd)
+        room = cmd[0] if cmd else self.view_or_room
         if not room:
             await self.print(_("No room given and no active room."))
             return
@@ -1172,7 +1181,7 @@ class S(Server):
         async with self.input_grabber() as g:
             async for line in g:
                 txt += line+"\n"
-        await self._add_room_note(txt)
+        await self._add_room_note(txt, room)
 
     @with_alias("rn+")
     @doc(_(
@@ -1180,64 +1189,68 @@ class S(Server):
         This command's arguments are added as-is to the current room's note.
         """))
     async def alias_rn_plus(self, cmd):
-        if not self.room:
+        room = self.view_or_room
+        if not room:
             await self.print(_("No active room."))
             return
         if not cmd:
             await self.print(_("No text."))
             return
-        await self._add_room_note(cmd)
+        await self._add_room_note(cmd, room)
 
-    async def _add_room_note(self, txt, prefix=False):
+    async def _add_room_note(self, txt, room, prefix=False):
         db = self.db
-        rn = self.room.note
-        if self.room.note:
+        rn = room.note
+        if room.note:
             if prefix:
-                rn.note = txt + "\n" + self.room.note
+                rn.note = txt + "\n" + room.note
             else:
                 rn.note += "\n" + txt
-            await self.print(_("Note of {room.idn_str} extended."), room=self.room)
+            await self.print(_("Note of {room.idn_str} extended."), room=room)
         else:
-            note = db.Note(note=txt, room_id=self.room.id_old)
+            note = db.Note(note=txt, room_id=room.id_old)
             db.add(note)
-            await self.print(_("Note of {room.idn_str} created."), room=self.room)
+            await self.print(_("Note of {room.idn_str} created."), room=room)
         db.commit()
-        await self.show_room_note()
+        await self.gui_show_room_note()
 
 
     @with_alias("rn*")
     @doc(_(
         """Prepend a line to the current room's note."""))
     async def alias_rn_star(self, cmd):
-        if not self.room:
+        room = self.view_or_room
+        if not room:
             await self.print(_("No active room."))
             return
         if not cmd:
             await self.print(_("No text."))
             return
-        await self._add_room_note(cmd, prefix=True)
+        await self._add_room_note(cmd, room, prefix=True)
 
 
     @doc(_(
-        """Show/change the room's area/domain."""))
+        """Show/change the room's area/domain.
+        Parameters: domain ‹room›"""))
     async def alias_ra(self, cmd):
-        cmd = self.cmdfix("w", cmd)
-        if not self.room:
+        cmd = self.cmdfix("wr", cmd)
+        room = cmd[1] if len(cmd)>1 else self.view_or_room
+        if not room:
             await self.print(_("No active room."))
             return
-        if not cmd:
-            if self.room.area:
-                await self.print(self.room.area.name)
+        if not cmd or not cmd[0]:
+            if room.area:
+                await self.print(room.area.name)
             else:
                 await self.print(_("No area/domain set."))
             return
 
         area = await self.get_named_area(cmd[0], False)
-        if self.room.info_area == area:
+        if room.info_area == area:
             pass
-        elif self.room.orig_area != area:
-            self.room.orig_area = self.room.area
-        await self.room.set_area(area, force=True)
+        elif room.orig_area != area:
+            room.orig_area = room.area
+        await room.set_area(area, force=True)
         self.db.commit()
 
     @doc(_(
@@ -1258,15 +1271,16 @@ class S(Server):
     @doc(_(
         """Set the room to its 'other' area, or to a new named one"""))
     async def alias_ra_b(self, cmd):
-        cmd = self.cmdfix("w", cmd)
-        if cmd:
+        cmd = self.cmdfix("wr", cmd)
+        room = cmd[1] if len(cmd)>1 else self.view_or_room
+        if cmd and cmd[0]:
             cmd = cmd[0]
             area = await self.get_named_area(cmd, True)
         else:
-            if self.room.orig_area and self.room.orig_area != self.room.area:
-                area = self.room.orig_area
-            elif self.room.info_area and self.room.info_area != self.room.area:
-                area = self.room.info_area
+            if room.orig_area and room.orig_area != room.area:
+                area = room.orig_area
+            elif room.info_area and room.info_area != room.area:
+                area = room.info_area
             else:
                 await self.print(_("No alternate area/domain known."))
         return await self.alias_ra(area.name)
@@ -1346,7 +1360,7 @@ class S(Server):
         Usage: #x= ‹exit› ‹room›"""))
     async def alias_x_del(self, cmd):
         cmd = self.cmdfix("xr",cmd, min_words=1)
-        room = self.room if len(cmd) < 2 else cmd[1]
+        room = self.view_or_room if len(cmd) < 2 else cmd[1]
         cmd = cmd[0]
         try:
             x = room.exit_at(cmd)
@@ -1364,7 +1378,7 @@ class S(Server):
         Usage: #x- ‹exit› ‹room›"""))
     async def alias_x_m(self, cmd):
         cmd = self.cmdfix("xr",cmd, min_words=1)
-        room = self.room if len(cmd) < 2 else cmd[1]
+        room = self.view_or_room if len(cmd) < 2 else cmd[1]
         cmd = cmd[0]
         try:
             x = room.exit_at(cmd)
@@ -1379,24 +1393,31 @@ class S(Server):
     @with_alias("x+")
     @doc(_(
         """Add an exit from this room to some other / an unknown room.
-        Usage: #x+ ‹exit› ‹room›
+        Usage: #x+ ‹exit› ‹dest_room›
         """))
     async def alias_x_p(self, cmd):
         cmd = self.cmdfix("xr",cmd)
+        room = self.view_or_room
+        if not room:
+            await self.print(_("No active room."))
+            return
         if len(cmd) == 2:
             d,r = cmd
         else:
             d = cmd[0]
             r = True
-        if (await self.room.set_exit(d, r))[1]:
-            await self.update_room_color(self.room)
+        if (await room.set_exit(d, r))[1]:
+            await self.update_room_color(room)
         await self.mud.updateMap()
 
     @doc(_(
         """Show exit details
-        Either of a single exit (including steps if present), or all of them."""))
+        Either of a single exit (including steps if present), or all of them.
+        The second parameter can be an explicit room.
+        """))
     async def alias_xs(self,cmd):
-        cmd = self.cmdfix("x",cmd)
+        cmd = self.cmdfix("xr",cmd)
+        room = cmd[1] if len(cmd)>1 else self.view_or_room
         def get_txt(x):
             txt = x.dir
             if x.cost != 1:
@@ -1411,12 +1432,12 @@ class S(Server):
             return txt
 
         if len(cmd) == 0:
-            for x in self.room._exits:
+            for x in room._exits:
                 txt = get_txt(x)
                 await self.print(txt)
         else:
             try:
-                x = self.room.exit_at(cmd[0])
+                x = room.exit_at(cmd[0])
             except KeyError:
                 await self.print(_("Exit unknown."))
                 return
@@ -1433,10 +1454,7 @@ class S(Server):
         """))
     async def alias_xp(self, cmd):
         cmd = self.cmdfix("xir", cmd, min_words=2)
-        if len(cmd) > 2:
-            room = cmd[2]
-        else:
-            room = self.room
+        room = cmd[2] if len(cmd) > 2 else self.view_or_room
         x = room.exit_at(cmd[0])
         c = x.cost
         if c != cmd[1]:
@@ -1457,10 +1475,7 @@ class S(Server):
         """))
     async def alias_xd(self, cmd):
         cmd = self.cmdfix("xir", cmd, min_words=2)
-        if len(cmd) > 2:
-            room = cmd[2]
-        else:
-            room = self.room
+        room = cmd[2] if len(cmd) > 2 else self.view_or_room
         x = room.exit_at(cmd[0])
         c = x.delay
         if c != cmd[1]:
@@ -1480,7 +1495,11 @@ class S(Server):
         """))
     async def alias_xc(self, cmd):
         cmd = self.cmdfix("x*", cmd, min_words=2)
-        x = (await self.room.set_exit(cmd[0]))[0]
+        room = self.view_or_room
+        if not room:
+            await self.print(_("No active room."))
+            return
+        x = (await room.set_exit(cmd[0]))[0]
         x.steps = ((x.steps + "\n") if x.steps else "") + cmd[1]
         await self.print(_("Added."))
         self.db.commit()
@@ -1491,8 +1510,12 @@ class S(Server):
         Remove special commands for this exit.
         """))
     async def alias_xc_m(self, cmd):
-        cmd = self.cmdfix("x", cmd, min_words=1)
-        x = (await self.room.set_exit(cmd[0]))[0]
+        cmd = self.cmdfix("xr", cmd, min_words=1)
+        room = cmd[1] if len(cmd)>1 else self.view_or_room
+        if not room:
+            await self.print(_("No active room."))
+            return
+        x = (await room.set_exit(cmd[0]))[0]
         if x.steps:
             await self.print(_("Steps:"))
             for m in x.moves:
@@ -1727,12 +1750,9 @@ class S(Server):
             if not r:
                 r = await self.new_room("unknown", offset_from=self.last_room, offset_dir=self.last_dir)
                 self.db.commit()
-        elif self.room:
-            await self.mud.centerview(self.room.id_mudlet)
+            await self.went_to_room(r, repair=True)
         else:
-            await self.print(_("MAP: I have no idea where you are."))
-            return
-        await self.went_to_room(r, repair=True)
+            await self.view_to(None)
 
     @doc(_(
         """
@@ -2196,7 +2216,7 @@ class S(Server):
     async def alias_gs_p(self,cmd):
         db = self.db
         cmd = self.cmdfix("r", cmd)
-        room = cmd[0] if cmd else self.room
+        room = cmd[0] if cmd else self.view_or_room
         if not room:
             await self.print(_("No current room known"))
             return
@@ -2216,12 +2236,10 @@ class S(Server):
     async def alias_gs_m(self,cmd):
         db = self.db
         cmd = self.cmdfix("r", cmd)
-        if not cmd:
-            cmd = self.room
-            if not cmd:
-                await self.print(_("No current room known"))
-                return
-        room = cmd[0]
+        room = cmd[0] if cmd else self.view_or_room
+        if not room:
+            await self.print(_("No current room known"))
+            return
         try:
             self.skiplist.remove(room)
             db.commit()
@@ -2406,11 +2424,11 @@ class S(Server):
         Exits (short)
         Print a one-line list of exits of the current / a given room"""))
     async def alias_x(self, cmd):
-        cmd = self.cmdfix("i",cmd)
-        if not cmd:
-            room = self.room
-        else:
-            room = self.db.r_mudlet(cmd[0])
+        cmd = self.cmdfix("r",cmd)
+        room = cmd[0] if cmd else self.view_or_room
+        if not room:
+            await self.print(_("No current room known"))
+            return
         await self.print(room.exit_str)
 
     @doc(_(
@@ -2419,10 +2437,10 @@ class S(Server):
         Print a multi-line list of exits of the current / a given room"""))
     async def alias_xx(self, cmd):
         cmd = self.cmdfix("r",cmd)
-        if not cmd:
-            room = self.room
-        else:
-            room = cmd[0]
+        room = cmd[0] if cmd else self.view_or_room
+        if not room:
+            await self.print(_("No current room known"))
+            return
         exits = room.exits
         rl = max(len(x) for x in exits.keys())
         for d,dst in exits.items():
@@ -2437,7 +2455,7 @@ class S(Server):
         """Detail info for current room / a specific room"""))
     async def alias_ri(self, cmd):
         cmd = self.cmdfix("r",cmd)
-        room = (cmd[0] if cmd else None) or self.room
+        room = (cmd[0] if cmd else None) or self.view_or_room
         if not room:
             await self.print(_("No current room known!"))
             return
@@ -2449,7 +2467,7 @@ class S(Server):
         """Internal room info"""))
     async def alias_rii(self, cmd):
         cmd = self.cmdfix("r",cmd)
-        room = (cmd[0] if cmd else None) or self.room
+        room = (cmd[0] if cmd else None) or self.view_or_room
         if not room:
             await self.print(_("No current room known!"))
             return
@@ -2461,7 +2479,7 @@ class S(Server):
     async def alias_rd(self, cmd):
         db = self.db
         cmd = self.cmdfix("r",cmd)
-        room = (cmd[0] if cmd else None) or self.room
+        room = (cmd[0] if cmd else None) or self.view_or_room
         if not room:
             await self.print(_("No current room known!"))
             return
@@ -2473,7 +2491,7 @@ class S(Server):
         """Show rooms that have exits to this one"""))
     async def alias_rq(self, cmd):
         cmd = self.cmdfix("r",cmd)
-        room = (cmd[0] if cmd else None) or self.room
+        room = (cmd[0] if cmd else None) or self.view_or_room
         if not room:
             await self.print(_("No current room known!"))
             return
@@ -2529,7 +2547,7 @@ class S(Server):
     async def alias_gd(self, cmd):
         cmd = self.cmdfix("rr", cmd, min_words=1)
         dest = cmd[-1]
-        src = cmd[0] if len(cmd) > 1 else self.room
+        src = cmd[0] if len(cmd) > 1 else self.view_or_room
 
         await self.print(_("Scanning the map"))
         async with PathGenerator(self, src, RoomFinder(dest), n_results=1) as gen:
@@ -2739,10 +2757,10 @@ class S(Server):
         """))
     async def alias_rl(self, cmd):
         cmd = self.cmdfix("r", cmd)
-        if cmd:
-            room = cmd[0]
-        else:
-            room = self.room
+        room = cmd[0] if cmd else self.view_or_room
+        if not room:
+            await self.print(_("No current room known!"))
+            return
         if room.long_descr:
             await self.print(_("{room.info_str}:\n{room.long_descr.descr}"), room=room)
         else:
@@ -3303,9 +3321,10 @@ class S(Server):
                 await self.print(_("MAP: I do not know room ?/{id}."), id=msg[0])
             room = None
         self.room = room
+        await self.view_to(None)
         self.next_word = None
         self.trigger_sender.set()
-        await self.show_room_data(room)
+        await self.gui_show_room_data(room)
 
     async def event_sysDataSendRequest(self, msg):
         logger.debug("OUT : %s", msg[1])
@@ -3641,6 +3660,8 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             if d:
                 self.last_dir = d
             last_room,self.room = self.room,room
+            if self.view_room == last_room or self.view_room == room:
+                await self.view_to(None)
             self.is_new_room = is_new
             self.next_word = None
             self.trigger_sender.set()
@@ -3880,9 +3901,9 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
     @doc(_(
         """Shift the view to the room in this direction"""))
     async def alias_vg(self, cmd):
-        cmd = self.cmdfix("w", cmd, min_words=1)
+        cmd = self.cmdfix("x", cmd, min_words=1)
         try:
-            x = (self.view_room or self.room).exit_at(cmd[0])
+            x = self.view_or_room.exit_at(cmd[0])
         except KeyError:
             await self.print(_("No exit to {d}"), d=cmd[0])
         else:
@@ -3892,22 +3913,41 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             else:
                 await self.view_to(vr)
 
-    @with_alias("v#")
     @doc(_(
-        """Shift the view to this room"""))
-    async def alias_v_h(self, cmd):
-        cmd = self.cmdfix("r", cmd, min_words=1)
-        await self.view_to(cmd[0])
+        """Focus on a room
+        Either a room# or the selected room on the map or the current room
+        """))
+    async def alias_v(self, cmd):
+        cmd = self.cmdfix("r", cmd)
+        if cmd:
+            await self.view_to(cmd[0])
+        else:
+            msg = await self.mud.getMapSelection()
+            if msg and msg[0] and msg[0].get("center",None):
+                room = self.db.r_mudlet(msg[0]["center"])
+                if room:
+                    await self.view_to(room)
+                else:
+                    await self.print(_("The selected room is not in the database."))
+            elif self.room:
+                await self.view_to(self.room)
+            else:
+                await self.print(_("No current room known!"))
+
 
     async def view_to(self, room=None):
         if not room:
             room = self.room
-        self.view_room = room
+        self.view_room = None if room == self.room else room
 
         if room.id_mudlet:
             await self.mud.centerview(room.id_mudlet)
+            if self.view_room:
+                await self.print(_("Set view to {room.idnn_str}"), room=room)
+            else:
+                await self.print(_("Reset view to current room: {room.idnn_str}"), room=room)
         else:
-            await self.print(_("Not yet mapped: {room.idn_str}"), room=r)
+            await self.print(_("Not yet mapped: {room.idn_str}"), room=room)
 
     @doc(_(
         """Shift the view to the player's"""))
@@ -4006,7 +4046,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
     # 0 notscanned, 1 scanned, 2 skipped, 3 marked important?
     async def alias_sl(self, cmd):
         cmd = self.cmdfix("r", cmd)
-        room = cmd[0] if cmd and cmd[0] else self.room
+        room = cmd[0] if cmd and cmd[0] else self.view_or_room
         if not room:
             await self.print(_("No active room."))
             return
@@ -4034,11 +4074,11 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
     """))
     async def alias_sc(self, cmd):
         cmd = self.cmdfix("", cmd)
-        room = self.room
+        room = self.view_or_room
         if not room:
             await self.print(_("No active room."))
             return
-        self.room.reset_words()
+        room.reset_words()
 
 
     async def next_search(self, mark=False, again=True):
@@ -4406,7 +4446,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         if not self.quest:
             await self.print(_("No current quest."))
             return
-        self.quest.add_step(command=cmd[0],room=self.quest_edit_room or self.room)
+        self.quest.add_step(command=cmd[0],room=self.view_or_room)
         self.db.commit()
 
 
