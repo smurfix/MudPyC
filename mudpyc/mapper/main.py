@@ -4237,7 +4237,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
     Commands for entering
     Set/replace the commands sent when passing a feature'd exit
     """))
-    async def alias_xfle(self, cmd):
+    async def alias_xfla(self, cmd):
         db = self.db
         cmd = self.cmdfix("w", cmd, min_words=1)
         f = db.feature(cmd[0])
@@ -4258,7 +4258,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
     Commands for exiting
     Set/replace the commands sent when passing a feature'd exit
     """))
-    async def alias_xfle(self, cmd):
+    async def alias_xflb(self, cmd):
         db = self.db
         cmd = self.cmdfix("w", cmd, min_words=1)
         f = db.feature(cmd[0])
@@ -4306,30 +4306,28 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         if d == self.last_dir:  # could not reverse
             x = self.room.exit_to(self.last_room)
         else:
-            x = self.room.exit_at(d)
+            x = self.room.exit_at(d, prefer_feature=True)
         x.feature = f
         db.commit()
         await self.print(_("Feature {f.name} set for {x.info_str}."), f=f, x=x)
 
-    
+    @with_alias("xf=")
     @doc(_("""
-    Set feature
-    Set the exit which you would use to go back to the room you just came
-    from to have this feature.
-    Does not actually un-apply the feature.
+    Remove feature
+    Drop a feature from the current or named room's exit
+    Parameters: exit [room]
     """))
-    async def alias_xf_m(self, cmd):
+    async def alias_xf_q(self, cmd):
         db = self.db
-        cmd = self.cmdfix("w", cmd, min_words=1)
-        f = db.feature(cmd[0])
-        d = loc2rev(self.last_dir)
-        if d == self.last_dir:  # could not reverse
-            x = self.room.exit_to(self.last_room)
-        else:
-            x = self.room.exit_at(d)
-        x.feature = f
+        cmd = self.cmdfix("xr", cmd, min_words=1)
+        room = cmd[1] if len(cmd) > 1 else self.view_or_room
+        x = room.exit_at(cmd[0])
+        if x.feature is None:
+            await self.print(_("No feature set on {x.info_str}."), f=f, x=x)
+            return
+        f,x.feature = x.feature,None
         db.commit()
-        await self.print(_("Feature {f.name} set for {x.info_str}."), f=f, x=x)
+        await self.print(_("Feature {f.name} removed from {x.info_str}."), f=f, x=x)
 
     
     # ### Quests ### #
