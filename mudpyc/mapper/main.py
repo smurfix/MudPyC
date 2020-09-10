@@ -1687,6 +1687,31 @@ class S(Server):
         await self.print("Done with map sync")
         await self.mud.updateMap()
          
+    @doc(_(
+        """
+        Sync/update Database
+        
+        Assume that the Mudlet map has been modified (rooms moved):
+        copy current positions to the database.
+
+        Rooms in the Mudlet map which we don't have are not touched.
+        """))
+    async def alias_mdt(self, cmd):
+        db = self.db
+        s=0
+
+        await self.print("Sync room positions")
+        await self.sync_areas()
+        for r in db.q(db.Room).filter(db.Room.id_mudlet != None).order_by(db.Room.id_mudlet).all():
+            s2 = r.id_mudlet // 100
+            if s != s2:
+                s = s2
+                await self.print(_("… {room.id_mudlet}"), room=r)
+            m = await self.mud.getRoomCoordinates(r.id_mudlet)
+            r.pos_x,r.pos_y,r.pos_z = m
+        db.commit()
+        await self.print("Sync done")
+         
     async def alias_mdi(self, cmd):
         """
         Basic sync when some mudlet IDs got deleted due to out-of-sync-ness
