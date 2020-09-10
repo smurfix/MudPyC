@@ -3200,11 +3200,9 @@ class S(Server):
 
         if isinstance(s, LookProcessor):
             # This command does not generate movement. Thus if it did
-            # anyway the move was probably timed and we have a collision,
-            # except when the exit already exists. Life is complicated.
-            try:
-                x = self.room.exit_at(d)
-            except KeyError:
+            # anyway the move was probably timed, except when the exit
+            # already exists. Life is complicated.
+            if x is None:
                 d = TIME_DIR
 
         if exits_seen:
@@ -3293,6 +3291,7 @@ class S(Server):
             room = self.db.r_mudlet(msg[1])
         except NoData:
             if self.room and not self.room.id_mudlet:
+                # this mostly can't happen.
                 self.room.set_id_mudlet(msg[1])
                 self.db.commit()
                 await self.print(_("MAP: Room ID is now {room.id_str}."), room=self.room)
@@ -3326,16 +3325,13 @@ class S(Server):
         else:
             info = await self.mud.gmcp.MG.room.info
 
-        if self.command is not None:
-            if self.command.info is not None:
-                await self.print(_("Too many INFO messages!"))
+        if self._prompt_evt is not None and self.command.info is None:
+            # waiting for prompt, during a command
             self.command.info = info
         else:
-            h = info.get("id", None)
-            room = None
-            if h is not None:
-                room = self.db.r_hash(h)
-            await self.maybe_moved(room)
+            # not waiting, so process it from the main loop
+            self.info = info
+            self.trigger_sender.set()
 
     async def event_gmcp_comm_channel(self, msg):
         # don't do a thing
@@ -3585,7 +3581,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
                     await self.print(_("MAP: Conflict! {room.id_str} vs. {room2.id_str}"), room2=room2, room=room)
                     room = room2
 
-        if room is None:
+        if room is None or room.id_mudlet is None:
             id_mudlet = await self.mud.getRoomIDbyHash(id_gmcp) if id_gmcp else None
 
             if id_mudlet and id_mudlet[0] > 0 and not self.conf['mudlet_gmcp']:
@@ -3603,9 +3599,12 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
                 rn = self.command.lines[0][-1]
             except (AttributeError,IndexError):
                 rn = "unknown"
-            room = await self.new_room(rn, offset_from=self.room, offset_dir=d, id_mudlet=id_mudlet, id_gmcp=id_gmcp)
+            if room is None:
+                room = await self.new_room(rn, offset_from=self.room, offset_dir=d, id_mudlet=id_mudlet, id_gmcp=id_gmcp)
+                is_new = True
+            else:
+                room.id_mudlet = id_mudlet
             await self.room.set_exit(d, room)
-            is_new = True
             db.commit()
 
         await self.went_to_room(room, d=d, is_new=is_new, info=info, exits_text=exits_text)
