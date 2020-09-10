@@ -2620,6 +2620,14 @@ class S(Server):
             if create is False:
                 raise ValueError(_("Area '{name} does not exist").format(name=name))
             aid = await self.mud.addAreaName(name)
+            if len(aid) > 1:
+                aid,err = aid
+            else:
+                aid = aid[0]
+            if aid is None or aid < 1 or err:
+                await self.print(_("Could not create area {name!r}: {err}"), name=name,err=err or _("unknown error"))
+                return None
+
             area = self.db.Area(id=aid, name=name)
             db.add(area)
             db.commit()
