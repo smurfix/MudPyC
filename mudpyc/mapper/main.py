@@ -2506,6 +2506,7 @@ class S(Server):
             return
         await self.print(room.info_str)
         await self.print(_("old={room.id_old} mudlet={room.id_mudlet} gmcp={room.id_gmcp} flag={room.flag}"), room=room)
+        await self.print(_("pos={room.pos_x}/{room.pos_y}/{room.pos_z} layer={room.area.name}"), room=room)
 
     @doc(_(
         """Things/NPCs in current room / a specific room"""))
