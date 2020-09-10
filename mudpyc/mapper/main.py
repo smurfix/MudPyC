@@ -3995,7 +3995,6 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             room = self.room
         txt = txt.replace("\n"," ")
         txt = DASH.sub("",txt)
-        print("\n\nADD "+txt+"\n")
         start = True
         nstart = False
         for ww in txt.split():
