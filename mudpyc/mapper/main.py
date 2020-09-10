@@ -203,7 +203,9 @@ class Process:
         n = self.__class__.__name__
         if self.stopped:
             res["stop"]="y"
-        if n.endswith("Process"):
+        if n == "Process":
+            res["_t"] = "?"  # shouldn't happen
+        elif n.endswith("Process"):
             res["_t"] = n[:-7]
         else:
             res["_t"] = n
@@ -447,7 +449,9 @@ class Command:
     def _repr(self):
         res = {}
         n = self.__class__.__name__
-        if n.endswith("Command"):
+        if n == "Command":
+            res["_t"] = "Std"
+        elif n.endswith("Command"):
             res["_t"] = n[:-7]
         else:
             res["_t"] = n
