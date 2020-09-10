@@ -745,8 +745,12 @@ def SQL(cfg):
             session.commit()
         return th
 
-    def get_quest(name):
-        q = session.query(Quest).filter(Quest.name == name).one_or_none()
+    def get_quest(name_or_id):
+        if isinstance(name_or_id, int):
+            qq = Quest.id == name_or_id
+        else:
+            qq = Quest.name == name_or_id
+        q = session.query(Quest).filter(qq).one_or_none()
         if q is None:
             raise KeyError(name)
         return q

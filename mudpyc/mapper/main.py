@@ -4404,7 +4404,11 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
     async def alias_qqa(self, cmd):
         cmd = self.cmdfix("w", cmd, min_words=1)
         try:
-            self.quest = q = self.db.quest(cmd[0])
+            qn = int(cmd[0])
+        except ValueError:
+            qn = cmd[0]
+        try:
+            self.quest = q = self.db.quest(qn)
         except KeyError:
             await self.print(_("No quest with that name known."))
         else:
