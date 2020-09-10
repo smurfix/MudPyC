@@ -621,6 +621,7 @@ class S(Server):
         self.process = None
         self.last_commands = deque()
         self.last_cmd = None  # (compound) command sent
+        self.info = None
         self.cmd1_q = []
         self.cmd2_q = []
 
@@ -2891,6 +2892,11 @@ class S(Server):
         seen = True
         while True:
             try:
+                if self.info:
+                    info,self.info = self.info,None
+                    await self.went_to_dir(TIME_DIR, info=info)
+                    continue
+
                 if self.cmd1_q:
                     # Command transmitted by Mudlet.
                     cmd = self.cmd1_q.pop(0)
