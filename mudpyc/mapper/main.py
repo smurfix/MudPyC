@@ -4201,13 +4201,13 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
 
         else:
             n = 0
-            for q in db.q(db.Feature).all():
-                await self.print(_("{q.id} {q.name}"), q=q)
+            for f in db.q(db.Feature).all():
+                await self.print(_("{f.id} {f.name}"), f=f)
                 n += 1
             if n:
-                await self.print(_("{n} quests."), n=n)
+                await self.print(_("{n} features."), n=n)
             else:
-                await self.print(_("No quests yet known."))
+                await self.print(_("No features yet known."))
 
     @with_alias("xfl+")
     @doc(_("""
