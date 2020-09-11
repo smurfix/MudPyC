@@ -1452,9 +1452,12 @@ class S(Server):
         Params: exit cost [room]
         """))
     async def alias_xp(self, cmd):
-        cmd = self.cmdfix("xir", cmd, min_words=2)
+        cmd = self.cmdfix("xir", cmd, min_words=1)
         room = cmd[2] if len(cmd) > 2 else self.view_or_room
         x = room.exit_at(cmd[0])
+        if len(cmd) == 1:
+            await self.print(_("Cost of {exit.dir} from {room.idn_str} is {exit.cost}"), room=room,exit=x)
+            return
         c = x.cost
         if c != cmd[1]:
             await self.print(_("Cost of {exit.dir} from {room.idn_str} changed from {room.cost} to {cost}"), room=room,exit=x,cost=cmd[1])
