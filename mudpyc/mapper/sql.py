@@ -6,11 +6,11 @@ from heapq import heappush,heappop
 from sqlalchemy import ForeignKey, Column, Integer, MetaData, Table, String, Float, Text, create_engine, select, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, object_session, validates, backref
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.schema import CreateTable, DropTable
+from sqlalchemy.schema import Index
 
 from .const import SignalThis, SkipRoute, SkipSignal
 from .const import ENV_OK,ENV_STD,ENV_SPECIAL,ENV_UNMAPPED
+
 
 class NoData(RuntimeError):
     def __str__(self):
@@ -28,7 +28,14 @@ def SQL(cfg):
             cfg.sql.url,
             #strategy=TRIO_STRATEGY
     )
-    Base = declarative_base()
+    convention = {
+        "ix": 'ix_%(column_0_label)s',
+        "uq": "uq_%(table_name)s_%(column_0_name)s",
+        "ck": "ck_%(table_name)s_%(constraint_name)s",
+        "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+        "pk": "pk_%(table_name)s"
+    }
+    Base = declarative_base(metadata=MetaData(naming_convention=convention))
     class _AddOn:
         @property
         def _s(self):
@@ -39,12 +46,15 @@ def SQL(cfg):
 
     assoc_skip_room = Table('assoc_skip_room', Base.metadata,
         Column('skip_id', Integer, ForeignKey('skip.id')),
-        Column('room_id', Integer, ForeignKey('rooms.id_old'))
+        Column('room_id', Integer, ForeignKey('rooms.id_old'), index=True),
+        Index("assoc_skip_idx","skip_id","room_id",unique=True),
+        
     )
 
     assoc_seen_room = Table('seen_in', Base.metadata,
         Column('seen_id', Integer, ForeignKey('seen.id')),
-        Column('room_id', Integer, ForeignKey('rooms.id_old'))
+        Column('room_id', Integer, ForeignKey('rooms.id_old'), index=True),
+        Index("assoc_seen_idx","seen_id","room_id",unique=True),
     )
 
     class Area(_AddOn, Base):
