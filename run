@@ -5,7 +5,7 @@ import os
 import trio
 
 sys.argv[0:1] = [sys.argv[0], "-c","mapper.cfg"]
-sys.path[0:0] = ["../trio"]
+sys.path[0:0] = ["../trio","../alembic","../sqlalchemy/lib"]
 
 from mudpyc.mapper.main import main
 try:

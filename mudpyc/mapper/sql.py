@@ -28,7 +28,14 @@ def SQL(cfg):
             cfg.sql.url,
             #strategy=TRIO_STRATEGY
     )
-    Base = declarative_base()
+    convention = {
+        "ix": 'ix_%(column_0_label)s',
+        "uq": "uq_%(table_name)s_%(column_0_name)s",
+        "ck": "ck_%(table_name)s_%(constraint_name)s",
+        "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+        "pk": "pk_%(table_name)s"
+    }
+    Base = declarative_base(metadata=MetaData(naming_convention=convention))
     class _AddOn:
         @property
         def _s(self):
@@ -39,12 +46,15 @@ def SQL(cfg):
 
     assoc_skip_room = Table('assoc_skip_room', Base.metadata,
         Column('skip_id', Integer, ForeignKey('skip.id')),
-        Column('room_id', Integer, ForeignKey('rooms.id_old'))
+        Column('room_id', Integer, ForeignKey('rooms.id_old'), index=True),
+        Index("assoc_skip_idx","skip_id","room_id",unique=True),
+        
     )
 
     assoc_seen_room = Table('seen_in', Base.metadata,
         Column('seen_id', Integer, ForeignKey('seen.id')),
-        Column('room_id', Integer, ForeignKey('rooms.id_old'))
+        Column('room_id', Integer, ForeignKey('rooms.id_old'), index=True),
+        Index("assoc_seen_idx","seen_id","room_id",unique=True),
     )
 
     class Area(_AddOn, Base):

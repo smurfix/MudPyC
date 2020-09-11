@@ -4608,19 +4608,51 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         else:
             logger.error("END")
             pass
-#       async with self.events("*") as h:
-#           async for msg in h:
-#               print(msg)
-#       async with self.events("gmcp.MG.room.info") as h:
-#           async for msg in h:
-#               info = await self.mud.gmcp.MG.room.info
-#               print("ROOM",info)
+
+
+def run_alembic(db, migrate):
+    """
+    This magic incantation updates your database unconditionally.
+
+    If migrate>1 then delete non-table things
+    if migrate>2 then delete tables
+    """
+    from alembic.runtime.migration import MigrationContext
+    from alembic.autogenerate import api
+    from alembic.operations.base import Operations
+
+    ctx = MigrationContext(dialect=db.db.bind.dialect, connection=db.db.connection(), opts={})
+    res = api.produce_migrations(ctx,db.Room.__table__.metadata)
+    ops = Operations(ctx, ctx.impl)
+    def all_ops(op,drops):
+        if hasattr(op,"ops"):
+            for o in op.ops:
+                yield from all_ops(o,drops)
+        else:
+            n = type(op).__name__
+            if n.startswith("DropIndex") != drops:
+                return
+
+            if n.startswith("DropTable"):
+                ml = 3
+            elif n.startswith("Drop"):
+                ml  = 2
+            else:
+                ml = 1
+            logger.debug("DB update %s", op)
+            if ml >= migrate:
+                yield op
+    for op in all_ops(res.upgrade_ops,False):
+        ops.invoke(op)
+    for op in all_ops(res.upgrade_ops,True):
+        ops.invoke(op)
 
 @click.command()
 @click.option("-c","--config", type=click.File("r"), help="Config file")
 @click.option("-l","--log", type=click.File("a"), help="Log file")
 @click.option("-d","--debug", is_flag=True, help="Debug output")
-async def main(config,log,debug):
+@click.option("-m","--migrate", count=True, help="do SQL migration? use -mm for deleting anything, -mmm for dropping tables")
+async def main(config,log,debug,migrate):
     m={}
     if config is None:
         config = open("mapper.cfg","r")
@@ -4631,6 +4663,10 @@ async def main(config,log,debug):
     if not log and cfg.logfile is not None:
         log = open(cfg.logfile, "a")
     with SQL(cfg) as db:
+        logger.debug("checking database")
+        if migrate:
+            run_alembic(db, migrate)
+
         logger.debug("waiting for connection from Mudlet")
         async with S(cfg=cfg) as mud:
             await mud.run(db=db, logfile=log)
