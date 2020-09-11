@@ -3623,6 +3623,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
                 is_new = True
             else:
                 room.id_mudlet = id_mudlet
+                room.area = None
             await self.room.set_exit(d, room)
             db.commit()
 
