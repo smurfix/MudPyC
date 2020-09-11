@@ -6,11 +6,11 @@ from heapq import heappush,heappop
 from sqlalchemy import ForeignKey, Column, Integer, MetaData, Table, String, Float, Text, create_engine, select, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, object_session, validates, backref
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.schema import CreateTable, DropTable
+from sqlalchemy.schema import Index
 
 from .const import SignalThis, SkipRoute, SkipSignal
 from .const import ENV_OK,ENV_STD,ENV_SPECIAL,ENV_UNMAPPED
+
 
 class NoData(RuntimeError):
     def __str__(self):
