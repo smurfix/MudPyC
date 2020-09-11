@@ -1469,6 +1469,22 @@ class S(Server):
 
     @doc(_(
         """
+        Cost of walking through this room
+        Set the cost of passing through this room, defined as the min cost
+        of leaving it
+        Params: [cost [room]]
+        """))
+    async def alias_rp(self, cmd):
+        cmd = self.cmdfix("ir", cmd, min_words=0)
+        room = cmd[2] if len(cmd) > 2 else self.view_or_room
+        if cmd:
+            room.set_cost(cmd[0])
+        await self.print(_("Cost of {room.idn_str} is {room.cost}"), room=room)
+
+
+
+    @doc(_(
+        """
         delay for an exit
         Set the delay when using an exit.
         Params: exit delay [room]
