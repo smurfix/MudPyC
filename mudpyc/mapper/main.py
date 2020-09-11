@@ -4412,6 +4412,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             cmd[0] = self.room
         await self.print(_("{q.id} {q.name}:"), q=self.quest)
         room = None
+        n = 0
         for qs in self.quest.steps:
             if cmd and cmd[0] != qs.room:
                 continue
@@ -4419,6 +4420,9 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
                 await self.print(_("{qs.step}: Go to {qs.room.idnn_str}"), qs=qs)
                 room = qs.room
             await self.print(_("{qs.step}: {qs.command}"), qs=qs)
+            n += 1
+        if not n:
+            await self.print(_("No steps yet."))
 
 
     @doc(_("""
