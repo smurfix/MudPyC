@@ -4480,7 +4480,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         if not self.quest:
             await self.print(_("No current quest."))
             return
-        qs = self.quest.step_nr(cmd[0])
+        qs = self.quest.step_at(cmd[0])
         qs.delete()
         self.db.commit()
 
@@ -4496,8 +4496,8 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             await self.print(_("No current quest."))
             return
         ns = cmd[-1]
-        qs = self.quest.step_nr(cmd[0] if len(cmd) > 1 else None)
-        qs.set_step(ns)
+        qs = self.quest.step_at(cmd[0] if len(cmd) > 1 else self.quest.last_step_nr)
+        qs.set_step_nr(ns)
         self.db.commit()
 
 
@@ -4530,7 +4530,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         s = self.quest.step
         qs = self.quest.current_step
         if qs is None:
-            qs = self.quest.step_nr(1)
+            qs = self.quest.step_at(1)
             if qs is None:
                 await self.print(_("Quest: empty!"))
                 return
@@ -4565,7 +4565,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         else:
             await self.print("***??? "+c[1:])
         s = qs.step + 1
-        if self.quest.step_nr(s):
+        if self.quest.step_at(s):
             self.quest.step = s
         else:
             self.quest.step = None

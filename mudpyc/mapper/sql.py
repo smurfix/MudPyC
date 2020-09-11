@@ -625,12 +625,15 @@ def SQL(cfg):
                 return _("‹{self.name}:{self.step}›").format(self=self)
 
         def add_step(self, **kw):
-            step = (session.query(func.max(QuestStep.step)).filter(QuestStep.quest==self).scalar() or 0) +1
+            step = self.last_step_nr +1
             qs = QuestStep(quest_id=self.id, step=step, **kw)
             session.add(qs)
             return qs
 
-        def step_nr(self, nr=None):
+        @property
+        def last_step_nr(self):
+            return session.query(func.max(QuestStep.step)).filter(QuestStep.quest==self).scalar() or 0
+        def step_at(self, nr=None):
             if nr is None:
                 nr = self.step
                 if nr is None:
@@ -639,7 +642,7 @@ def SQL(cfg):
 
         @property
         def current_step(self):
-            return self.step_nr(None)
+            return self.step_at(None)
 
     class QuestStep(_AddOn, Base):
         __tablename__ = "queststep"
@@ -660,7 +663,7 @@ def SQL(cfg):
         quest = relationship("Quest", backref=backref("steps", cascade="all, delete-orphan"))
         room = relationship("Room", backref=backref("queststeps", cascade="all, delete-orphan"))
 
-        def set_step(self, step):
+        def set_step_nr(self, step):
             """
             Move steps around
             """
