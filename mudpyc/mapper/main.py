@@ -3648,6 +3648,10 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
 
         if exits_text:
             await self.process_exits_text(room, exits_text)
+        if info and 'exits' in info:
+            for x in info["exits"]:
+                await room.set_exit(x, True)
+
         if self.room and d:
             await self.update_exit(room, d=d)
 
