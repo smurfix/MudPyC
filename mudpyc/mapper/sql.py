@@ -11,6 +11,7 @@ from sqlalchemy.schema import Index
 from .const import SignalThis, SkipRoute, SkipSignal
 from .const import ENV_OK,ENV_STD,ENV_SPECIAL,ENV_UNMAPPED
 
+import trio
 
 class NoData(RuntimeError):
     def __str__(self):
@@ -336,6 +337,7 @@ def SQL(cfg):
             seen=set()
             c=None
             while res:
+                await trio.sleep(0)
                 d,h = heappop(res)
                 r = h[-1]
                 if r.id_old in seen:
@@ -348,6 +350,7 @@ def SQL(cfg):
                 if c.skip:
                     continue
                 for x in session.query(Exit).filter(Exit.src==r):
+                    await trio.sleep(0)
                     if x.dst_id is None:
                         continue
                     heappush(res,(d+x.cost, h+[x.dst]))
