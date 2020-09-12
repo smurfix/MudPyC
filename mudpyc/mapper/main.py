@@ -1714,6 +1714,86 @@ class S(Server):
 
     @doc(_(
         """
+        Match SQL to Mudlet rooms
+        Given a SQL room ID (negative number) and a Mudlet room ID
+        (positive number), teach the mapper that these are the same rooms.
+        This is automatic if the Mudlet map contains hashes.
+        """))
+    async def alias_mda(self, cmd):
+        db = self.db
+        cmd = self.cmdfix("ii", cmd, min_words=2)
+        if cmd[0]>=0 or cmd[1]<0:
+            await self.print(_("Params: negative-DB-ID positive-Mudlet-ID-or-zero"))
+            return
+        r1 = db.r_old(-cmd[0])
+        if cmd[1]:
+            try:
+                r2 = db.r_mudlet(cmd[1])
+            except NoData:
+                m = await self.mud.getRoomCoordinates(cmd[1])
+                if m:
+                    r1.pos_x,r1.pos_y,r1.pos_z = m
+                    r1.id_mudlet = cmd[1]
+                else:
+                    await self.print(_("Huh? Mudlet doesn't know room {id}!"), id=cmd[1])
+            else:
+                await self.print(_("Huh? This Mudlet ID is room -{room.id_old}: {room.idnn_str}."), room=r2)
+        else:
+            if r1.id_mudlet:
+                await self.print(_("Disassociated, was {mudlet}."), mudlet=r1.id_mudlet)
+                r1.id_mudlet = None
+            else:
+                await self.print(_("Huh? This room didn't have a Mudlet ID."))
+        db.commit()
+
+
+    @doc(_(
+        """
+        Merge rooms
+        
+        Given a room / the room you're viewing / located at, and a selected
+        room on the map, zap your current room and associate the selected
+        room with it.
+
+        Exits are taken from the database.
+        """))
+    async def alias_mdm(self, cmd):
+        db = self.db
+        cmd = self.cmdfix("r", cmd)
+        room = cmd[0] if cmd else self.view_or_room
+
+        sel = await self.mud.getMapSelection()
+        if not sel or not sel[0] or len(sel.get("rooms",()) != 1):
+            await self.print(_("No single room selected."))
+            return
+        r = sel[0]["rooms"][0]
+        try:
+            rooom = db.r_mudlet(r)
+        except NoData:
+            pass
+        else:
+            await self.print(_("Error: Selection is known: {room.idnn_str}"), room=room)
+            return
+        old_r,room.id_mudlet = room.id_mudlet,r
+
+        m = await self.mud.getRoomCoordinates(cmd[1])
+        if m:
+            room.pos_x,room.pos_y,room.pos_z = m
+        ra = (await self.mud.getRoomArea(r.id_mudlet))[0]
+        r.area_id = ra
+
+        # will raise an error if the area doesn't exist.
+        # Shouldn't play with them in Mudlet while running.
+        db.commit()
+        await self.print(_("Reassigned: {room.idnn_str}"), room=room)
+        if self.view_or_room == room:
+            await self.mud.centerview(room.id_mudlet)
+        await self.mud.deleteRoom(old_r)
+        for x in room._exits:
+            await room.set_mud_exit(x.dir, x.dst if x.dst_id and x.dst.id_mudlet else True)
+
+    @doc(_(
+        """
         Sync/update Mudlet map.
         
         Assume that the Mudlet map is out of date / has not been saved:
