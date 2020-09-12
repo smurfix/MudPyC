@@ -170,10 +170,14 @@ class PathGenerator:
             with trio.CancelScope() as self._scope:
                 task_status.started()
 
+                first = True
                 seq = self.start_room.reachable.__aiter__()
                 p = None
                 while True:
                     await trio.sleep(0)
+                    if first and p:
+                        p = p(skip=False)
+                        first = False
                     try:
                         h = await seq.asend(p)
                     except StopAsyncIteration:
