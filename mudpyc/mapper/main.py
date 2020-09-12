@@ -1854,7 +1854,7 @@ class S(Server):
         await self.print("Sync room positions")
         await self.sync_areas()
         for r in db.q(db.Room).filter(db.Room.id_mudlet != None).order_by(db.Room.id_mudlet).all():
-            s2 = r.id_mudlet // 100
+            s2 = r.id_mudlet // 250
             if s != s2:
                 s = s2
                 await self.print(_("… {room.id_mudlet}"), room=r)
