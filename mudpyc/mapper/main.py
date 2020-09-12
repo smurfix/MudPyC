@@ -611,6 +611,7 @@ class S(Server):
         self.start_rooms = deque()
         self.room = None
         self.view_room = None
+        self.selected_room = None  # on the map
         self.is_new_room = False
         self.last_room = None
         self.last_dir = None  # direction that was actually used
@@ -641,6 +642,7 @@ class S(Server):
         self._text_w,rd = trio.open_memory_channel(1000)
         self.main.start_soon(self._text_writer,rd)
         self.main.start_soon(self._send_loop)
+        self.main.start_soon(self._monitor_selection)
 
         #await self.set_long_mode(True)
         await self.init_mud()
@@ -687,6 +689,46 @@ class S(Server):
                 await self.new_info(info)
 
         self.main.start_soon(self._sql_keepalive)
+
+    async def _monitor_selection(self):
+        db = self.db
+        selected = set()
+        while True:
+            await trio.sleep(1)
+            sel = await self.mud.getMapSelection()
+            if sel and sel[0]:
+                try:
+                    self.selected_room = db.r_mudlet(sel[0].get("center",None))
+                except NoData:
+                    self.selected_room = None
+                sel = set(sel[0]["rooms"])
+            else:
+                sel = set()
+                self.selected_room = None
+            selected, sel = sel, selected - sel
+
+            chg = False
+            if sel:
+                print(sel)
+            for r in sel:
+                try:
+                    room = db.r_mudlet(r)
+                except NoData:
+                    await self.print(_("Not mapped: room {id} is not known"),id=r)
+                    continue
+                m = await self.mud.getRoomCoordinates(r)
+                if m:
+                    op = [room.pos_x,room.pos_y,room.pos_z]
+                    if op != m:
+                        room.pos_x,room.pos_y,room.pos_z = m
+                        await self.print(_("Moved: {room.idn_str}"),room=room)
+                        chg = True
+                else:  # deleted
+                    await self.print(_("Unmapped: -{room.id_old}: {room.idn_str}"),room=room)
+                    room.id_mudlet = None
+                    chg = True
+            if chg:
+                db.commit()
 
     async def init_mud(self):
         """
