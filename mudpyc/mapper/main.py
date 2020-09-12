@@ -1333,6 +1333,7 @@ class S(Server):
                 area = room.info_area
             else:
                 await self.print(_("No alternate area/domain known."))
+                return
         return await self.alias_ra(area.name)
 
     @doc(_(
