@@ -2444,7 +2444,7 @@ class S(Server):
         if cmd:
             cmd = cmd[0]
             try:
-                sk = db.r_skiplist(cmd)
+                sk = db.skiplist(cmd)
             except NoData:
                 await self.print(_("List {cmd} doesn't exist"))
             else:
@@ -2476,7 +2476,7 @@ class S(Server):
 
         cmd = cmd[0]
         self.last_saved_skiplist = cmd
-        sk = db.r_skiplist(cmd, create=True)
+        sk = db.skiplist(cmd, create=True)
         for room in self.skiplist:
             sk.rooms.append(room)
         db.commit()
