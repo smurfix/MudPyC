@@ -345,7 +345,6 @@ def SQL(cfg):
                 c = (yield h)
                 seen.add(r.id_old)
                 if c.done:
-                    import pdb;pdb.set_trace()
                     return
                 if c.skip:
                     continue
