@@ -853,13 +853,22 @@ class S(Server):
         """
         cmdfix add-on that interprets room names.
         Negative=ours, positive=Mudlet's
+        . current room
+        : last room
+        ! map viewpoint
+        ? map selection center
+        #n the n'th generated path
         """
         if v == ".":
             return self.room
         elif v == ":":
             return self.last_room
+        elif v == "?":
+            return self.selected_room or self.room
         elif v == "!":
             return self.view_or_room
+        elif v[0] == '#':
+            return self.path_gen.results[int(v[1:])-1][0]
         v = int(v)
         if not v:
             # zero
