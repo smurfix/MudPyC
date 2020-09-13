@@ -708,8 +708,6 @@ class S(Server):
             selected, sel = sel, selected - sel
 
             chg = False
-            if sel:
-                print(sel)
             for r in sel:
                 try:
                     room = db.r_mudlet(r)
