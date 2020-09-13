@@ -10,4 +10,5 @@ On-screen buttons
 View manipulation
 Support for multiple users/avatars
 Use a bunch of caches to speed up finding paths
-Continually grab the room selection and update a room whenever it is deselected
+Move comm channels to their own subwindow
+Stop printing stuff twice
