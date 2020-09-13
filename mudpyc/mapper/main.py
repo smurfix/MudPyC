@@ -3116,7 +3116,7 @@ class S(Server):
             try:
                 if self.info:
                     info,self.info = self.info,None
-                    await self.went_to_dir(TIME_DIR, info=info)
+                    await self.went_to_dir(TIME_DIR, info=info, skip_if_noop=True)
                     continue
 
                 if self.cmd1_q:
@@ -3721,33 +3721,42 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         name = name.rstrip(".")
         return name
 
-    async def went_to_dir(self, d, info=None, exits_text=None):
+    async def went_to_dir(self, d, info=None, exits_text=None, skip_if_noop=False):
         if not self.room:
             await self.print("No current room")
             return
 
         db = self.db
-
-        x,_x = await self.room.set_exit(d)
-        is_new = False
-        room = x.dst
+        room_gmcp = None
         id_gmcp = info.get("id",None) if info else None
         if id_gmcp:
             try:
-                room2 = db.r_hash(id_gmcp)
-                if room2.flag & db.Room.F_NO_GMCP_ID:
+                room_gmcp = db.r_hash(id_gmcp)
+            except NoData:
+                pass
+            else:
+                if skip_if_noop and room_gmcp == self.room:
+                    return
+        x,_x = await self.room.set_exit(d)
+        is_new = False
+        room = x.dst
+        if id_gmcp:
+            try:
+                if room_gmcp is None:
+                    raise NoData
+                if room_gmcp.flag & db.Room.F_NO_GMCP_ID:
                     id_gmcp = ""
                     raise NoData("NO-GMCP")
             except NoData:
                 pass
             else:
                 if not room:
-                    room = room2
-                elif not room2:
+                    room = room_gmcp
+                elif not room_gmcp:
                     pass
-                elif room != room2:
-                    await self.print(_("MAP: Conflict! {room.id_str} vs. {room2.id_str}"), room2=room2, room=room)
-                    room = room2
+                elif room != room_gmcp:
+                    await self.print(_("MAP: Conflict! {room.id_str} vs. {room2.id_str}"), room2=room_gmcp, room=room)
+                    room = room_gmcp
 
         if room is None or room.id_mudlet is None:
             id_mudlet = await self.mud.getRoomIDbyHash(id_gmcp) if id_gmcp else None
