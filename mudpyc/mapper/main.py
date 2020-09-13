@@ -499,7 +499,7 @@ class LookProcessor(Command):
         room = self.server.room
         db = self.server.db
         if self.current == self.P_BEFORE:
-            await self.server.mud.print("?? no descr")
+            await self.server.print("?? no descr")
             return
         old = room.long_descr.descr if room.long_descr else ""
         nld = "\n".join(self.lines[self.P_BEFORE])
@@ -509,9 +509,9 @@ class LookProcessor(Command):
             else:
                 descr = db.LongDescr(descr=nld, room_id=room.id_old)
                 db.add(descr)
-            await self.server.mud.print(_("Long descr updated."))
+            await self.server.print(_("Long descr updated."))
         elif old != nld:
-            await self.server.mud.print(_("Long descr differs."))
+            await self.server.print(_("Long descr differs."))
             print(f"""\
 *** 
 *** Descr: {room.idnn_str}
