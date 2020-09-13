@@ -1574,6 +1574,24 @@ class S(Server):
         await self.print(_("Added."))
         self.db.commit()
 
+    @doc(_(
+        """
+        Pre-Command for an exit.
+        Usage: #xcp ‹exit› ‹whatever to send›
+        Prepend to the list of things to send.
+        If the list was previously empty, the exit itself is also added.
+        """))
+    async def alias_xcp(self, cmd):
+        cmd = self.cmdfix("x*", cmd, min_words=2)
+        room = self.view_or_room
+        if not room:
+            await self.print(_("No active room."))
+            return
+        x = (await room.set_exit(cmd[0]))[0]
+        x.steps = cmd[1] + "\n" + (x.steps or x.dir)
+        await self.print(_("Prepended."))
+        self.db.commit()
+
     @with_alias("xc-")
     @doc(_(
         """
