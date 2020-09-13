@@ -2553,7 +2553,7 @@ class S(Server):
             await self.print(_("Usage: #gt Kneipe / Kirche / Laden"))
             return
         checker = MappedLabelSkipChecker(label=cmd[0].lower(), skiplist=self.skiplist)
-        await self.gen_rooms(checker=checker)
+        await self.gen_rooms(checker=checker, n_results=1)
 
 
     @doc(_(
