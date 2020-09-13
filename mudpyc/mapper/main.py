@@ -1781,24 +1781,24 @@ class S(Server):
         room = cmd[0] if cmd else self.view_or_room
 
         sel = await self.mud.getMapSelection()
-        if not sel or not sel[0] or len(sel.get("rooms",()) != 1):
+        if not sel or not sel[0] or len(sel[0].get("rooms",())) != 1:
             await self.print(_("No single room selected."))
             return
         r = sel[0]["rooms"][0]
         try:
-            rooom = db.r_mudlet(r)
+            xroom = db.r_mudlet(r)
         except NoData:
             pass
         else:
-            await self.print(_("Error: Selection is known: {room.idnn_str}"), room=room)
+            await self.print(_("Error: Selection is known: {room.idnn_str}"), room=xroom)
             return
         old_r,room.id_mudlet = room.id_mudlet,r
 
-        m = await self.mud.getRoomCoordinates(cmd[1])
+        m = await self.mud.getRoomCoordinates(r)
         if m:
             room.pos_x,room.pos_y,room.pos_z = m
-        ra = (await self.mud.getRoomArea(r.id_mudlet))[0]
-        r.area_id = ra
+        ra = (await self.mud.getRoomArea(r))[0]
+        room.area_id = ra
 
         # will raise an error if the area doesn't exist.
         # Shouldn't play with them in Mudlet while running.
@@ -1809,6 +1809,7 @@ class S(Server):
         await self.mud.deleteRoom(old_r)
         for x in room._exits:
             await room.set_mud_exit(x.dir, x.dst if x.dst_id and x.dst.id_mudlet else True)
+        await self.mud.updateMap()
 
     @doc(_(
         """
