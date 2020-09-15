@@ -284,10 +284,12 @@ class SeqProcess(Process):
     Process that simply runs a sequence of events
     """
     sleeping = False
-    def __init__(self, server, cmds, real_dir=None, room=None, **kw):
-        self.cmds = iter(cmds)
+    def __init__(self, server, cmds, real_dir=None, room=None, send_echo=True, **kw):
+        self.cmds = cmds
+        self.current = 0
         self.real_dir = real_dir
         self.room = room
+        self.send_echo = send_echo
         super().__init__(server, **kw)
 
     def _repr(self):
@@ -298,6 +300,8 @@ class SeqProcess(Process):
             r["room"] = self.room.id_str
         if self.sleeping:
             r["delay"] = self.sleeping
+        for i,c in enumerate(self.cmds):
+            r["cmd%02d"%i] = ("*" if i == self.current else "") + repr(c)
         return r
 
     async def _sleep(self, d, *, task_status=trio.TASK_STATUS_IGNORED):
@@ -322,8 +326,9 @@ class SeqProcess(Process):
             s.named_exit,self.real_dir = self.real_dir,None
         while True:
             try:
-                d = next(self.cmds)
-            except StopIteration:
+                d = self.cmds[self.current]
+                self.current += 1
+            except IndexError:
                 break
 
             if isinstance(d,str):
@@ -332,6 +337,7 @@ class SeqProcess(Process):
                     continue
                 if d[0] != '#':
                     d = Command(s,d)
+                    d.send_echo = self.send_echo
                 elif d[1:4] == "dly": # time
                     d = float(d[4:])
                 else:
@@ -455,6 +461,9 @@ class Command:
     send_seen = False
     # Echo of our own send command present?
     
+    send_echo = True
+    # echo this output to the user?
+
     room = None
     # room I was in, presumably, when issuing this
 
@@ -2824,12 +2833,12 @@ class S(Server):
             db.commit()
         return area
 
-    async def send_commands(self, *cmds, err_str="", real_dir=None):
+    async def send_commands(self, *cmds, err_str="", real_dir=None, send_echo=True):
         """
         Send this list of commands to the MUD.
         The list may include special processing or delays.
         """
-        p = SeqProcess(self, cmds, real_dir)
+        p = SeqProcess(self, cmds, real_dir, send_echo=send_echo)
         await self.run_process(p)
 
     async def sync_map(self):
@@ -2952,7 +2961,7 @@ class S(Server):
             return None
         return await self._do_move(msg)
 
-    async def _do_move(self, msg):
+    async def _do_move(self, msg, send_echo=None):
         # return None if the input has been handled.
         # Otherwise return the same (or some other) text to be sent.
         self.named_exit = None
@@ -2964,13 +2973,10 @@ class S(Server):
             try:
                 x = self.room.exit_at(msg)
             except KeyError:
-                await self.send_commands(msg)
+                await self.send_commands(msg, send_echo=False if send_echo is None else send_echo)
             else:
                 self.named_exit = msg
-                if x.steps:
-                    await self.send_commands(*x.moves)
-                else:
-                    await self.send_commands(msg)
+                await self.send_commands(*x.moves, send_echo=bool(x.steps) if send_echo is None else send_echo)
 
 
         if self.logfile:
@@ -3005,7 +3011,7 @@ class S(Server):
             await self.print(f"No shortcut {mod}/{key} found.")
         else:
             if isinstance(s,str):
-                await self._do_move(s)
+                await self._do_move(s, send_echo=True)
                 return
             if isinstance(s,Command):
                 s = (s,)
@@ -3052,7 +3058,7 @@ class S(Server):
     async def check_more(self, msg):
         if not msg.startswith("--mehr--("):
             return False
-        self.main.start_soon(self.mud.send,"")
+        self.main.start_soon(self.mud.send,"\n",False)
         return True
 
     async def called_text(self, msg):
@@ -3181,7 +3187,7 @@ class S(Server):
                 if self.logfile:
                     print(">>>",cmd.command, file=self.logfile)
                 if xmit:
-                    await self.mud.send(cmd.command)
+                    await self.mud.send(cmd.command, cmd.send_echo)
                 else:
                     cmd.send_seen = True
                 await self._prompt_evt.wait()
