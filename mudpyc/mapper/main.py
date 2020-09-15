@@ -482,6 +482,7 @@ class Command:
     def _repr(self):
         res = {}
         n = self.__class__.__name__
+        res["send"] = self.command
         if n == "Command":
             res["_t"] = "Std"
         elif n.endswith("Command"):
