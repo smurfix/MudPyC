@@ -870,6 +870,8 @@ class S(Server):
         self.alias.at("cf").helptext = _("Change boolean settings")
         self.alias.at("co").helptext = _("Room and name positioning")
         self.alias.at("d").helptext = _("Debugging")
+        self.alias.at("db").helptext = _("Python console debugging")
+        self.alias.at("ds").helptext = _("Command processor debugging")
         self.alias.at("f").helptext = _("Find things, rooms")
         self.alias.at("g").helptext = _("Walking, paths")
         self.alias.at("mc").helptext = _("Map Colors")
