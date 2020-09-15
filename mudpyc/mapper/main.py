@@ -4307,7 +4307,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
     Given a list of words from the description, get the next one and 'examine' it.
     """))
     async def alias_s(self, cmd):
-        cmd = self.cmdfix("w", cmd)
+        cmd = self.cmdfix("*", cmd)
         room = self.room
         if not room:
             await self.print(_("No active room."))
