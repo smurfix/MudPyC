@@ -3150,6 +3150,52 @@ class S(Server):
             await self.print(_("Stack: {x!r}"), x=x)
             x = x.upstack
 
+    @with_alias("##")
+    @doc(_("""
+        Sender reset
+        Shortcut to '#dsr' for emergencies
+    """))
+    async def alias_hash_hash(self, cmd):
+        await self.alias_dsr(cmd)
+
+    async def alias_dsr(self, cmd):
+        """
+        Sender reset
+        """
+        self.command = None
+        # self.cmd1_q = []  # already sent, so no
+        self.cmd2_q = []
+        self.process = None
+        if self._prompt_evt:
+            self._prompt_evt.set()
+        await self.print(_("Cleared."))
+
+    @with_alias("#")
+    @doc(_("""
+        Sender block
+        Block further command execution by queueing a FixCommand.
+    """))
+    async def alias__hash(self, cmd):
+        p = FixProcess(self, "halt", "paused by console command")
+        await self.run_process(p)
+
+    @with_alias("#g")
+    @doc(_("""
+        Sender unblock
+        Unblock further command execution by removing the FixCommand.
+    """))
+    async def alias__hash_g(self, cmd):
+        p = self.process
+        if p is None:
+            await self.print(_("No command is running."))
+        elif not isinstance(p, FixProcess):
+            await self.print(_("Sorry but the current command is {cmd!r}."), cmd=p)
+        else:
+            self.process = self.process.upstack
+            await self.print(_("The current command is now {cmd!r}."), cmd=p)
+            self.trigger_sender.set()
+
+
     async def _send_loop(self):
         """
         Main send-some-commands loop.
