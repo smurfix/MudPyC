@@ -1566,7 +1566,7 @@ class S(Server):
         """))
     async def alias_rp(self, cmd):
         cmd = self.cmdfix("ir", cmd, min_words=0)
-        room = cmd[2] if len(cmd) > 2 else self.view_or_room
+        room = cmd[1] if len(cmd) > 1 else self.view_or_room
         if cmd:
             room.set_cost(cmd[0])
         await self.print(_("Cost of {room.idn_str} is {room.cost}"), room=room)
@@ -1717,7 +1717,7 @@ class S(Server):
             await self.print(_("Exit name cleared."))
         else:
             self.named_exit = cmd[0]
-            await self.print(_("Exit name '{self.named_exit}' set."), self=self)
+            await self.print(_("Exit name '{s.named_exit}' set."), s=self)
 
     @doc(_(
         """
@@ -3898,7 +3898,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
                 await self.print(_("Name: new: {name}"), room=room,name=rn)
                 await self.print(_("Use '#rs' to update it"))
 
-        if room.long_descr:
+        if p and room.long_descr:
             for t in p.lines[p.P_AFTER]:
                 for tt in SPC.split(t):
                     room.has_thing(tt)
@@ -4063,7 +4063,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
     async def _gui_vitals_color(self, lp_ratio=None):
         if lp_ratio is None:
             try:
-                lp_ratio = self.me.vitals.hp/self.me.maxvitals.hp
+                lp_ratio = self.me.vitals.hp/self.me.maxvitals.max_hp
             except AttributeError:
                 lp_ratio = 0.9
         if lp_ratio > 1:
@@ -4344,7 +4344,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         else:
             alias,real = db.word(cmd[0]), cmd[1]
         nw = self.room.with_word(alias.alias_for(real))
-        if self.next_word.word == alias:
+        if self.next_word and self.next_word.word == alias:
             self.next_word = nw
         else:
             nw = self.next_word
