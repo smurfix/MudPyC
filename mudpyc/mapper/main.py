@@ -3439,11 +3439,12 @@ class S(Server):
 
             # Changing info data generally indicate movement.
             nr = self.room_by_gmcp(i_gmcp)
-            if nr and r.id_gmcp != nr.id_gmcp:
+            if nr is not None:
+                moved = r.id_gmcp != nr.id_gmcp
+            elif i_gmcp or self.room.id_gmcp:
                 moved = True
             elif i_short and self.clean_shortname(r.name) != self.clean_shortname(i_short) and not (r.flag & self.db.Room.F_MOD_SHORTNAME):
                 await self.print(_("Shortname differs. #mm?"))
-                # moved = True
 
         d = self.named_exit or short2loc(s.command)
         try:
