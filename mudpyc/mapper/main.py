@@ -1765,6 +1765,7 @@ class S(Server):
             return
         x.steps = x.dir
         x.dir = cmd
+        await self.print(_("Exit renamed from {src} to {dst}"),src=x.steps,dst=cmd)
         self.db.commit()
 
     @doc(_(
@@ -4358,6 +4359,9 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             alias,real = self.next_word.word,cmd[0]
         else:
             alias,real = db.word(cmd[0]), cmd[1]
+        if not alias:
+            await self.print(_("Not found? DEBUG"))
+            return
         nw = self.room.with_word(alias.alias_for(real))
         if self.next_word and self.next_word.word == alias:
             self.next_word = nw
@@ -4430,8 +4434,10 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             if f is None:
                 await self.print(_("Feature unknown."))
             else:
-                for x in f.exits:
-                    await self.print(x.info_str)
+                await self.print(_("* Enter:"))
+                await self.print(f.enter)
+                await self.print(_("* Leave:"))
+                await self.print(f.exit)
 
         else:
             n = 0
