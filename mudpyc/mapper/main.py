@@ -1026,14 +1026,18 @@ class S(Server):
         List rooms with this label
         """))
     async def alias_fl(self, cmd):
-        cmd = self.cmdfix("*", cmd, min_words=1)
+        cmd = self.cmdfix("*", cmd)
         db = self.db
-        n = 0
-        for r in db.q(db.Room).filter(db.Room.label == cmd[0]).all():
-            n += 1
-            await self.print(r.idnn_str)
-        if n == 0:
-            await self.print(_("No room text with {txt!r} found."), txt=cmd[0])
+        if not cmd:
+            for label,count in db.q(db.Room.label, func.count(db.Room.label)).group_by(db.Room.label).all():
+                await self.print(f"{count} {label}")
+        else:
+            n = 0
+            for r in db.q(db.Room).filter(db.Room.label == cmd[0]).all():
+                n += 1
+                await self.print(r.idnn_str)
+            if n == 0:
+                await self.print(_("No room text with {txt!r} found."), txt=cmd[0])
         
     @doc(_(
         """
