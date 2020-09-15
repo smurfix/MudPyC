@@ -1598,8 +1598,7 @@ class S(Server):
         """
         Commands for an exit.
         Usage: #xc ‹exit› ‹whatever to send›
-        "-": remove commands.
-        Otherwise, add to the list of things to send.
+        Add to the list of things to send.
         """))
     async def alias_xc(self, cmd):
         cmd = self.cmdfix("x*", cmd, min_words=2)
@@ -2954,6 +2953,9 @@ class S(Server):
                     # otherwise done above
 
     async def called_input(self, msg):
+        """
+        Text which the user entered
+        """
         if self._input_grab:
             await self._input_grab(msg)
             return None
@@ -3510,9 +3512,12 @@ class S(Server):
         await self.gui_show_room_data(room)
 
     async def event_sysDataSendRequest(self, msg):
+        """
+        This will report both the commands we send, and those Mudlet emits
+        when bypassing our macros.
+        The latter isn't supposed to happen, but ...
+        """
         logger.debug("OUT : %s", msg[1])
-        # We are sending data. Thus there won't be a prompt, thus we take
-        # the prompt signal that might already be there out of the channel.
         if not self.command or self.command.send_seen:
             pass
         elif self.command.command != msg[1]:
@@ -3661,6 +3666,9 @@ class S(Server):
         """
 
     async def alias_dbg(self, cmd):
+        """
+        Enter Python debugger
+        """
         breakpoint()
         pass
 
@@ -4132,14 +4140,21 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
                 await self.view_to(vr)
 
     @doc(_(
-        """Focus on a room
-        Either a room# or the selected room on the map or the current room
+        """Focus on a room.
+        Room selection:
+        .    the room you're in
+        :    the room you came from
+        !    the currently-viewed room
+        ?    the room that's selected on the map
+        NUM  some room on the Mudlet map
+        -NUM some room in the database
         """))
     async def alias_v(self, cmd):
         cmd = self.cmdfix("r", cmd)
         if cmd:
             await self.view_to(cmd[0])
         else:
+            # The background task might be too slow
             msg = await self.mud.getMapSelection()
             if msg and msg[0] and msg[0].get("center",None):
                 room = self.db.r_mudlet(msg[0]["center"])
@@ -4405,7 +4420,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
 
     @doc(_("""
     Feature list
-    List all known features / a feature's exits.
+    List all known features / a feature's commands.
     """))
     async def alias_xfl(self, cmd):
         db = self.db
