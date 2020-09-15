@@ -4135,7 +4135,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             task_status.started(cs)
             try:
                 await self.mmud.GUI.lp_anzeige.setColor(255, 0, 50)
-                await trio.sleep(0.3)
+                await trio.sleep(0.5)
                 await self._gui_vitals_color()
             finally:
                 if self.me.blink_hp == cs:
