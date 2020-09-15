@@ -3128,23 +3128,26 @@ class S(Server):
         Sender state
         """
         if not self.command:
-            await self.print("No command")
+            await self.print(_("No command"))
         else:
-            await self.print(f"Command: {self.command}")
+            await self.print(_("Command: {s.command}"), s=self)
         if not self._prompt_evt:
-            await self.print("No prompt wait")
+            await self.print(_("Not waiting for prompt"))
         elif self._prompt_evt.is_set():
-            await self.print("Prompt event set")
+            await self.print(_("Prompt trigger set"))
         else:
-            await self.print(f"Prompt event waiting {self._prompt_state}")
+            await self.print(_("Waiting for prompt (state={ps})"), ps=self._prompt_state)
+        if not self.trigger_sender.is_set():
+            await self.print(_("waiting for continuation"))
+            self.trigger_sender.wait()
 
         for x in self.cmd1_q:
-            await self.print(f"Mudlet: {x}")
+            await self.print(_("Mudlet: {x!r}"), x=x)
         for x in self.cmd2_q:
-            await self.print(f"Mapper: {x}")
+            await self.print(_("Mapper: {x!r}"), x=x)
         x = self.process
         while x:
-            await self.print(f"Stack: {x}")
+            await self.print(_("Stack: {x!r}"), x=x)
             x = x.upstack
 
     async def _send_loop(self):
