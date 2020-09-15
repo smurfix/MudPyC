@@ -256,6 +256,29 @@ class Process:
         if np is not None:
             await np.queue_next()
 
+class FixProcess(Process):
+    """
+    Fix me.
+    """
+    emitted = False
+
+    def __init__(self, server, short_reason:str, reason:str):
+        self.short_reason = reason
+        self.reason = reason
+        super().__init__(self, server)
+
+    def _repr(self):
+        r = super()._repr()
+        r["reason"] = self.short_reason
+        return r
+
+    async def queue_next(self):
+        if self.emitted:
+            return
+        self.emitted = True
+        await self.server.print(_("*** Stopped ***"))
+        await self.server.print(self.reason)
+
 class SeqProcess(Process):
     """
     Process that simply runs a sequence of events
