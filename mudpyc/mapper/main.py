@@ -417,6 +417,7 @@ class WalkProcess(Process):
             self.state = _("Please enter room {nr.id_str}:{nr.name}").format(nr=nr)
         else:
             self.state = _("step to {exit.dst.id_str}").format(exit=x)
+            self.named_exit = x.dir
             await s.send_commands(*x.moves)
             return True
 
