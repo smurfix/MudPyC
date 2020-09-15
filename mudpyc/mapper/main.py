@@ -4552,20 +4552,22 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
     """))
     async def alias_xflb(self, cmd):
         db = self.db
-        cmd = self.cmdfix("w", cmd, min_words=1)
+        cmd = self.cmdfix("w*", cmd, min_words=1)
         f = db.feature(cmd[0])
 
         txt = ""
-        if f.enter:
-            await self.print(_("Old content:\n{txt}"), txt=f.enter)
+        if f.exit:
+            await self.print(_("Old content:\n{txt}"), txt=f.exit)
         await self.print(_("Set feature-enter text. End with '.'."))
         async with self.input_grabber() as g:
             async for line in g:
-                txt += line+"\n"
+                if txt:
+                    txt += "\n"
+                txt += line
 
-        f.enter = txt
+        f.exit = txt
         db.commit()
-        await self.print(_("{f.name}: enter commands set"), f=f)
+        await self.print(_("{f.name}: exit commands set"), f=f)
 
     @with_alias("xf+")
     @doc(_("""
