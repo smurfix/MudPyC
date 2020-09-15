@@ -4538,7 +4538,9 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         await self.print(_("Set feature-enter text. End with '.'."))
         async with self.input_grabber() as g:
             async for line in g:
-                txt += line+"\n"
+                if txt:
+                    txt += "\n"
+                txt += line
 
         f.enter = txt
         db.commit()
