@@ -534,7 +534,8 @@ def SQL(cfg):
                         if d in m.itl_names:
                             await mud.setExitStub(self.id_mudlet, d, True)
                         else: # special exit
-                            await mud.addSpecialExit(self.id_mudlet,0,d) # ?
+                            # a special exit without a destination doesn't work
+                            pass # await mud.addSpecialExit(self.id_mudlet,0,d) # ?
                         changed = True
 
             await mud.setRoomEnv(self.id_mudlet, ENV_OK+self.open_exits)
