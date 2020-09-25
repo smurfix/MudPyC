@@ -4,7 +4,7 @@ from weakref import ref
 from heapq import heappush,heappop
 import simplejson as json
 
-from sqlalchemy import ForeignKey, Column, Integer, MetaData, Table, String, Float, Text, create_engine, select, func
+from sqlalchemy import ForeignKey, Column, Integer, MetaData, Table, String, Float, Text, create_engine, select, func, Binary
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, object_session, validates, backref
 from sqlalchemy.schema import Index
@@ -101,7 +101,7 @@ def SQL(cfg):
         feature_id = Column(Integer, ForeignKey("feature.id", onupdate="CASCADE", ondelete="SET NULL"), nullable=True)
 
         src = relationship("Room", back_populates="_exits", foreign_keys="Exit.src_id")
-        dst = relationship("Room", foreign_keys="Exit.dst_id")
+        dst = relationship("Room", back_populates="_r_exits", foreign_keys="Exit.dst_id")
         feature = relationship("Feature", backref="exits")
 
         F_IN_MUDLET = (1<<0)
@@ -144,21 +144,31 @@ def SQL(cfg):
             else:
                 return [self.dir]
 
+        @property
+        def back_feature(self):
+            if self.dst is None:
+                return None
+            try:
+                x = self.dst.exit_to(self.src)
+            except KeyError:
+                return None
+            return x.feature
+
     class Room(_AddOn, Base):
         __tablename__ = "rooms"
         id_old = Column(Integer, nullable=True, primary_key=True)
-        id_mudlet = Column(Integer, nullable=True)
+        id_mudlet = Column(Integer, nullable=True, unique=True)
         id_gmcp = Column(String, nullable=True, unique=True)
         name = Column(String, nullable=True, index=True)
-        label = Column(String)
+        label = Column(String, nullable=True)
         # long_descr = Column(Text)
-        pos_x = Column(Integer)
-        pos_y = Column(Integer)
-        pos_z = Column(Integer)
+        pos_x = Column(Integer, nullable=False, default=0)
+        pos_y = Column(Integer, nullable=False, default=0)
+        pos_z = Column(Integer, nullable=False, default=0)
         last_visit = Column(Integer, nullable=True, unique=True)
         area_id = Column(Integer, ForeignKey("area.id", onupdate="CASCADE",ondelete="RESTRICT"), nullable=True)
-        label_x = Column(Float, default=0)
-        label_y = Column(Float, default=0)
+        label_x = Column(Float, nullable=False, default=0)
+        label_y = Column(Float, nullable=False, default=0)
         flag = Column(Integer, nullable=False, default=0)
 
         # room title from MUD
