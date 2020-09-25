@@ -42,6 +42,7 @@ DEFAULT_CFG=attrdict(
             force_area = False,
             mudlet_gmcp = True,
             add_reverse = True,
+            show_intermediate = True,
             dir_use_z = True,
             debug_new_room = False,
             label_shift_x = 2.0,
@@ -73,6 +74,7 @@ CFG_HELP=attrdict(
         force_area=_("Modify existing rooms' area when visiting them"),
         mudlet_gmcp=_("Use GMCP IDs stored in Mudlet's map"),
         add_reverse=_("Link back when creating an exit"),
+        show_intermediate=_("show movement during command sequences"),
         dir_use_z=_("Allow new rooms in Z direction"),
         debug_new_room=_("Debug room allocation"),
         label_shift_x=_("X shift, moving room labels"),
@@ -197,18 +199,64 @@ class Process:
     def __init__(self, server, *, stopped=False):
         self.server = server
         self.stopped = stopped
+        self.commands = deque()
+        self.n_moves = 0
+
+    def append(self, cmd):
+        """
+        Add this command/process to those I sent, or saw, or whatever
+        """
+        self.n_moves += cmd.n_moves
+        self.commands.appendleft(cmd)
+
+    @property
+    def last_move(self):
+        """
+        Return the last-recent command in my sequence that contained (perceived) movement.
+        """
+        for c in self.commands:
+            res = c.last_move
+            if res is not None:
+                return res
+        return None
+
+    
+    async def setup(self):
+        """
+        Set myself up.
+        """
+        s = self.server
+        print("SETUP",repr(self))
+        self.upstack = s.process
+        s.process = self
+        self.upstack.append(self)
+        s.trigger_sender.set()
+
+    async def finish(self):
+        """
+        Clean up after myself.
+
+        Does NOT continue the sender loop.
+        """
+        s = self.server
+        if s.process is not self:
+            raise RuntimeError("Process hook mismatch")
+        s.process = self.upstack
+        print("FINISH",repr(self))
 
     def _repr(self):
         res = {}
         n = self.__class__.__name__
-        if self.stopped:
-            res["stop"]="y"
         if n == "Process":
             res["_t"] = "?"  # shouldn't happen
         elif n.endswith("Process"):
             res["_t"] = n[:-7]
         else:
             res["_t"] = n
+        if self.stopped:
+            res["stop"]="y"
+        if self.commands:
+            res["cmds"] = len(self.commands)
         return res
 
     def __repr__(self):
@@ -216,11 +264,13 @@ class Process:
         return "P‹%s›" % (" ".join("%s=%s" % (k,v) for k,v in self._repr().items()),)
 
     def _go_on(self):
+        """Continue the sender loop"""
         s = self.server
         if s.process is self:
             s.trigger_sender.set()
 
     async def pause(self):
+        """Stop this process"""
         if self.stopped:
             await self.server.print(_("The process is already stopped."))
         else:
@@ -228,6 +278,7 @@ class Process:
             await self.print(_("Paused."))
 
     async def resume(self):
+        """Continue this command"""
         if not self.stopped:
             await self.server.print(_("The process is not stopped."))
         else:
@@ -252,13 +303,71 @@ class Process:
         The default does nothing, i.e. it finishes this command and gets
         back to the next one on the list.
         """
-        self.server.process = np = self.upstack
-        if np is not None:
+        np = self.upstack
+        await self.finish()
+        if np is not None and self.server.process is np:
             await np.queue_next()
+
+class TopProcess(Process):
+    """
+    Top process, does nothing
+    """
+    def __init__(self,*a,**kw):
+        kw['stopped'] = True
+        super().__init__(*a,**kw)
+
+    def _repr(self):
+        res = super()._repr()
+        del res["stop"]  # always true
+        return res
+
+    def append(self, cmd):
+        """
+        Add this command/process to those I sent, or saw, or whatever
+        """
+        super().append(cmd)
+        if len(self.commands) > 10:
+            c = self.commands.pop()
+            self.n_moves -= cmd.n_moves
+        self.n_moves += cmd.n_moves
+
+    async def setup(self):
+        """
+        Set myself up. Does NOT call Process.setup.
+        """
+        s = self.server
+        if s.top is not None:
+            raise RuntimeError("dup Top Process")
+        s.top = self
+
+        s.process = self
+
+    async def finish(self):
+        """
+        Clean up after myself.
+        """
+        s = self.server
+        if s.process is not self:
+            raise RuntimeError("Process hook mismatch")
+        await super().finish()
+        s.top = None
+
+    async def pause(self):
+        await self.server.print(_("The top process is always 'stopped'."))
+
+    async def resume(self):
+        await self.server.print(_("There is nothing to resume."))
+
+    async def queue_next(self):
+        """
+        Would run the next step if there was one, which there is not.
+        """
+        return
+
 
 class FixProcess(Process):
     """
-    Fix me.
+    Fix me: suspends the current processing.
     """
     emitted = False
 
@@ -281,28 +390,61 @@ class FixProcess(Process):
 
 class SeqProcess(Process):
     """
-    Process that simply runs a sequence of events
+    Process that runs a sequence of commands
     """
     sleeping = False
-    def __init__(self, server, cmds, real_dir=None, room=None, send_echo=True, **kw):
+    next_seq = None
+
+    def __init__(self, server, name, cmds, exit=None, room=None, send_echo=True, **kw):
         self.cmds = cmds
         self.current = 0
-        self.real_dir = real_dir
+        self.exit = exit
         self.room = room
+        self.name = name
+        if self.exit is not None:
+            if self.room is None:
+                self.room = self.exit.src
+            elif self.room != self.exit.src:
+                raise RuntimeError(f"exit does not match room: {self.exit.id_str} vs {self.room.id_str}")
         self.send_echo = send_echo
         super().__init__(server, **kw)
 
     def _repr(self):
         r = super()._repr()
-        if self.real_dir:
-            r["dir"] = self.real_dir
+        if self.exit:
+            r["exit"] = self.exit.id_str
         if self.room:
             r["room"] = self.room.id_str
         if self.sleeping:
             r["delay"] = self.sleeping
+        if self.next_seq:
+            r["next"] = repr(self.next_seq)
+        cp = "c%02d" if len(self.cmds) > 9 else "c%d"
         for i,c in enumerate(self.cmds):
-            r["cmd%02d"%i] = ("*" if i == self.current else "") + repr(c)
+            r[cp%i] = ("*" if i == self.current else "") + repr(c)
         return r
+
+    async def setup(self):
+        """
+        Set myself up.
+        """
+        s = self.server
+        print("SETUP",repr(self))
+        if isinstance(s.process, SeqProcess):
+            p = s.process
+            while p.next_seq is not None:
+                p = p.next_seq
+            p.next_seq = self
+            return
+        await super().setup()
+
+    async def finish(self):
+        """
+        Clean up after myself.
+        """
+        await super().finish()
+        if self.next_seq is not None:
+            await self.next_seq.setup()
 
     async def _sleep(self, d, *, task_status=trio.TASK_STATUS_IGNORED):
         s = self.server
@@ -315,15 +457,13 @@ class SeqProcess(Process):
     async def queue_next(self):
         if self.sleeping:
             return
+        s = self.server
         if self.room is not None:
             if s.room != self.room:
                 self.state = _("Wait for room {nr.id_str}:{nr.name}").format(nr=self.current_room)
                 await s.print(self.state)
                 return
             self.room = None
-        s = self.server
-        if self.real_dir:
-            s.named_exit,self.real_dir = self.real_dir,None
         while True:
             try:
                 d = self.cmds[self.current]
@@ -336,6 +476,10 @@ class SeqProcess(Process):
                 if not d:
                     continue
                 if d[0] != '#':
+                    if s.command is not None:
+                        if isinstance(s.command,IdleCommand):
+                            await s.command.done()
+                        # else Command raises an exception. TODO?
                     d = Command(s,d)
                     d.send_echo = self.send_echo
                 elif d[1:4] == "dly": # time
@@ -361,7 +505,21 @@ class SeqProcess(Process):
                 continue
             return
 
+        # Done.
+        await self.finish_move()
         await super().queue_next()
+
+    async def finish_move(self, moved=False):
+        cmd=self.name or self.cmds[-1]
+        await self.server.finish_move(cmd,False)
+
+
+class MoveProcess(SeqProcess):
+    async def finish_move(self):
+        s = self.server
+        if self.exit:
+            s.this_exit = self.exit
+        await super().finish_move(moved=True)
 
 
 class WalkProcess(Process):
@@ -417,8 +575,7 @@ class WalkProcess(Process):
             self.state = _("Please enter room {nr.id_str}:{nr.name}").format(nr=nr)
         else:
             self.state = _("step to {exit.dst.id_str}").format(exit=x)
-            self.named_exit = x.dir
-            await s.send_commands(*x.moves)
+            await s.send_exit_commands(x, send_echo=True)
             return True
 
 
@@ -428,6 +585,8 @@ class WalkProcess(Process):
         
         The idea of this code is to go back to the previous room, light a
         torch or whatever, and then continue.
+
+        UNTESTED
         """
         s = self.server
         nr = self.current_room
@@ -444,55 +603,59 @@ class WalkProcess(Process):
             await s.print(_("No step-back from {r.idn_str} to {nr.idn_str}").format(r=nr, nr=s.room))
         else:
             self.state = _("stepback to {exit.dst.id_str}").format(exit=x)
-            await s.send_commands(*x.moves, room=s.room)
+            await self.send_exit_commands(x)
 
 
-class Command:
+class BaseCommand:
     """
-    Class to send one line to the MUD and collect whatever input you get in
-    response.
+    Base class to collect lines from the MUD.
     """
     P_BEFORE = 0
     P_AFTER = 1
-    P_LATE = 2
 
     info = None
-    # None: not yet
-
-    send_seen = False
-    # Echo of our own send command present?
-    
-    send_echo = True
-    # echo this output to the user?
+    # None: not seen
 
     room = None
     # room I was in, presumably, when issuing this
 
-    def __init__(self, server, command):
+    def __init__(self, server):
+        if server.command is not None:
+            raise RuntimeError(f"Command already running: {server.command}")
         self.server = server
-        self.command = command
-        self.lines = ([],[],[])
-        self.exits_text = None
+        self.room = self.server.room
+        self.lines = ([],[])
         self._done = trio.Event()
-        # before reporting exits or whatever
-        # after reporting exits but before the prompt
-        # after the prompt
         self.current = self.P_BEFORE
+        self.exits_text = None
+
+    @property
+    def n_moves(self):
+        return 1 if self.last_move is not None else 0
+
+    @property
+    def last_move(self):
+        """
+        Return self if this command resulted in movement, according to the MUD.
+        """
+        if self.info or self.exits_text:
+            return self
+        return None
 
     def _repr(self):
         res = {}
         n = self.__class__.__name__
-        res["send"] = self.command
         if n == "Command":
             res["_t"] = "Std"
         elif n.endswith("Command"):
             res["_t"] = n[:-7]
         else:
             res["_t"] = n
+        res["send"] = self.command
         if self._done.is_set:
             res["s"] = "done"
         else:
-            res["s"] = ["before","after","late"][self.current]
+            res["s"] = ["before","after"][self.current]
         if self.exits_text:
             res["exits"] = "y"
         return res
@@ -502,27 +665,151 @@ class Command:
         return "C‹%s›" % (" ".join("%s=%s" % (k,v) for k,v in self._repr().items()),)
 
     def dir_seen(self, exits_line):
+        """
+        Directions.
+        """
         if self.current == self.P_BEFORE:
             self.current = self.P_AFTER
             if exits_line:
                 self.exits_text = exits_line
-        elif self.current == self.P_AFTER and not self.lines[1]:
-            if exits_line:
-                self.exits_text += " " + exits_line
+        elif exits_line and not self.lines[1]:
+            self.exits_text += " " + exits_line
 
-    def prompt_seen(self):
-        self.current = self.P_LATE
+        if self.exits_text and exits_line is None:
+            self.set_exits()
 
     def add(self, msg):
         self.lines[self.current].append(msg)
 
     async def done(self):
-        # a prompt: text is finished
+        # prompt seen: finished
+        s = self.server
         self._done.set()
-        pass
+        print("DONE",repr(self))
+        if s.command is self:
+            s.command = None
 
     async def wait(self):
         await self._done.wait()
+
+    async def set_info(self, info):
+        """
+        An Info message arrived while the command was running.
+        """
+        if self.info is not None:
+            return False
+        self.info = info
+        return True
+
+    async def set_exits(self):
+        pass
+
+
+class IdleCommand(BaseCommand):
+    """
+    Something happened while you were not doing anything.
+
+    This command auto-runs "timed_move" if it sees a new room.
+    """
+    location_trigger = None
+
+    @property
+    def command(self):
+        return None
+
+    def _repr(self):
+        res = {}
+        n = self.__class__.__name__
+        res["_t"] = "‹Idle›"
+        return res
+
+    async def done(self):
+        if self.info or self.exits_text:
+            self.location_seen()
+        await super().done()
+
+    async def location_seen(self):
+        if self.location_trigger is not None:
+            if self.location_trigger.is_set():
+                return
+            self.location_trigger.set()
+        await self.done()
+        await self.server.timed_move(info=self.info, exits_text=self.exits_text)
+
+    async def set_info(self, info):
+        """
+        An Info message arrived while the command was running.
+        """
+        if not await super().set_info(info):
+            return
+        id_gmcp = info.get("id",None)
+        now = self.exits_text is not None
+        r = None
+        db = self.server.db
+
+        if not now:
+            if id_gmcp:
+                try:
+                    r = db.r_hash(id_gmcp)
+                except NoData:
+                    pass
+            if not r:
+                try:
+                    x = self.server.room.exit_at(TIME_DIR)
+                except KeyError:
+                    pass
+                else:
+                    r = x.dst
+            if r and r.flag & db.Room.F_NO_GMCP_ID:
+                now = True
+
+        if now:
+            self.location_trigger.set()
+            await self.location_seen()
+            return
+        self.server.main.start_soon(self._wait_for_location)
+
+    async def _wait_for_location(self):
+        if self.location_trigger is not None:
+            raise RuntimeError("Trigger already primed?")
+            return
+        self.location_trigger = trio.Event()
+        with trio.move_on_after(0.5):
+            await self.location_trigger.wait()
+            return
+        await self.location_seen()
+
+    def set_exits(self):
+        if not super().set_exits():
+            return
+        start_soon = self.server.main.start_soon
+        if self.info is not None:
+            self.location_trigger.set()
+            start_soon(self.location_seen)
+            return
+        start_soon(self._wait_for_location)
+
+
+class Command(BaseCommand):
+    """
+    Send one line to the MUD and collect whatever input you get in response.
+    """
+    send_seen = False
+    # Echo of our own send command present?
+    
+    send_echo = True
+    # echo this output to the user?
+
+    def __init__(self, server, command):
+        super().__init__(server)
+        self.command = command
+
+    def _repr(self):
+        res = super()._repr()
+        n = self.__class__.__name__
+        res["send"] = self.command
+        return res
+
 
 class LookProcessor(Command):
     def __init__(self, server, command, *, force=False):
@@ -530,10 +817,11 @@ class LookProcessor(Command):
         self.force = force
 
     async def done(self):
-        room = self.server.room
-        db = self.server.db
+        s = self.server
+        room = s.room
+        db = s.db
         if self.current == self.P_BEFORE:
-            await self.server.print("?? no descr")
+            await s.print("?? no descr")
             return
         old = room.long_descr.descr if room.long_descr else ""
         nld = "\n".join(self.lines[self.P_BEFORE])
@@ -543,9 +831,9 @@ class LookProcessor(Command):
             else:
                 descr = db.LongDescr(descr=nld, room_id=room.id_old)
                 db.add(descr)
-            await self.server.print(_("Long descr updated."))
+            await s.print(_("Long descr updated."))
         elif old != nld:
-            await self.server.print(_("Long descr differs."))
+            await s.print(_("Long descr differs."))
             print(f"""\
 *** 
 *** Descr: {room.idnn_str}
@@ -555,7 +843,7 @@ class LookProcessor(Command):
 {nld}
 ***""")
         if self.exits_text:
-            await self.server.process_exits_text(room, self.exits_text)
+            await s.process_exits_text(room, self.exits_text)
 
         for t in self.lines[self.P_AFTER]:
             for tt in SPC.split(t):
@@ -648,17 +936,22 @@ class S(Server):
         self.selected_room = None  # on the map
         self.is_new_room = False
         self.last_room = None
-        self.last_dir = None  # direction that was actually used
+
+        self.this_exit = None  # direction that we're using right now
+
         self.room_info = None
         self.last_room_info = None
-        self.named_exit = None
         self.command = None
-        self.process = None
+
+        self.top = None
+        self.process = tp = TopProcess(self)
+        await tp.setup()
         self.last_commands = deque()
         self.last_cmd = None  # (compound) command sent
-        self.info = None
+        self.idle_info = None
         self.cmd1_q = []
         self.cmd2_q = []
+        self.dring_move = False
 
         self.next_word = None  # word to search for
 
@@ -677,6 +970,7 @@ class S(Server):
         self.main.start_soon(self._text_writer,rd)
         self.main.start_soon(self._send_loop)
         self.main.start_soon(self._monitor_selection)
+        self.main.start_soon(self._sql_keepalive)
 
         #await self.set_long_mode(True)
         await self.init_mud()
@@ -716,13 +1010,17 @@ class S(Server):
             await self.gui_show_player()
 
             try:
-                info = val["room"]["info"]
+                id_gmcp = val["room"]["info"]["id"]
             except KeyError:
                 pass
             else:
-                await self.new_info(info)
-
-        self.main.start_soon(self._sql_keepalive)
+                if id_gmcp:
+                    try:
+                        room = db.r_hash(id_gmcp)
+                    except NoData:
+                        pass
+                    else:
+                        await self.went_to_room(room)
 
     async def _monitor_selection(self):
         db = self.db
@@ -762,6 +1060,17 @@ class S(Server):
             if chg:
                 db.commit()
 
+    @property
+    def current_exit(self):
+        if self.this_exit is not None:
+            return self.this_exit
+        if self.last_room is None:
+            return None
+        try:
+            return self.last_room.exit_to(self.room)
+        except KeyError:
+            return None
+
     async def init_mud(self):
         """
         Send mud specific commands to set the thing to something we understand
@@ -774,7 +1083,10 @@ class S(Server):
 
     async def _text_writer(self, rd):
         async for line in rd:
-            await self.mud.print(line)
+            if isinstance(line,trio.Event):
+                line.set()
+            else:
+                await self.mud.print(line)
 
     async def print(self, msg, **kw):
         if kw:
@@ -797,7 +1109,7 @@ class S(Server):
             ml = "kurz"
         else:
             ml = "ultrakurz"
-        await self.send_commands(ml)
+        await self.send_commands("",ml)
 
     async def _sql_keepalive(self):
         """
@@ -1234,7 +1546,7 @@ class S(Server):
         if not cmd:
             await self.print(_("No command given."))
             return
-        self.main.start_soon(self.send_commands, NoteProcessor(self, cmd))
+        self.main.start_soon(self.send_commands, "",NoteProcessor(self, cmd))
 
     @with_alias("rn=")
     @doc(_(
@@ -1266,7 +1578,7 @@ class S(Server):
             return
         txt = cmd +"\n" if cmd else ""
         await self.print(_("Extending note. End with '.'."))
-        async with self.input_grabber() as g:
+        async with self.input_grab_multi() as g:
             async for line in g:
                 txt += line+"\n"
         await self._add_room_note(txt, room)
@@ -1375,6 +1687,11 @@ class S(Server):
         return await self.alias_ra(area.name)
 
     @doc(_(
+        """Update on-map location during movement"""))
+    async def alias_cfi(self, cmd):
+        await self._conf_flip("show_intermediate")
+
+    @doc(_(
         """When creating an exit, also link back?"""))
     async def alias_cfr(self, cmd):
         await self._conf_flip("add_reverse")
@@ -1456,6 +1773,8 @@ class S(Server):
         except KeyError:
             await self.print(_("Exit unknown."))
             return
+        if self.this_exit is x:
+            self.this_exit = None
         if (await room.set_exit(cmd.strip(), None))[1]:
             await self.update_room_color(room)
         await self.mud.updateMap()
@@ -1516,8 +1835,12 @@ class S(Server):
                 txt += x.dst.idnn_str
             else:
                 txt += _("‹unknown›")
+            if x.feature:
+                txt += " +"+x.feature.name
+            if x.back_feature:
+                txt += " -"+x.back_feature.name
             if x.steps:
-                txt += " +"+str(len(x.moves))
+                txt += " ."+str(len(x.moves))
             return txt
 
         if len(cmd) == 0:
@@ -1546,15 +1869,15 @@ class S(Server):
         room = cmd[2] if len(cmd) > 2 else self.view_or_room
         x = room.exit_at(cmd[0])
         if len(cmd) == 1:
-            await self.print(_("Cost of {exit.dir} from {room.idn_str} is {exit.cost}"), room=room,exit=x)
+            await self.print(_("Cost of {exit.dir!r} from {room.idn_str} is {exit.cost}"), room=room,exit=x)
             return
         c = x.cost
         if c != cmd[1]:
-            await self.print(_("Cost of {exit.dir} from {room.idn_str} changed from {room.cost} to {cost}"), room=room,exit=x,cost=cmd[1])
+            await self.print(_("Cost of {exit.dir!r} from {room.idn_str} changed from {exit.cost} to {cost}"), room=room,exit=x,cost=cmd[1])
             x.cost = cmd[1]
             self.db.commit()
         else:
-            await self.print(_("Cost of {exit.dir} from {room.idn_str} unchanged"), room=room,exit=x)
+            await self.print(_("Cost of {exit.dir!r} from {room.idn_str} is {exit.cost} (unchanged)"), room=room,exit=x)
 
 
     @doc(_(
@@ -1567,9 +1890,14 @@ class S(Server):
     async def alias_rp(self, cmd):
         cmd = self.cmdfix("ir", cmd, min_words=0)
         room = cmd[1] if len(cmd) > 1 else self.view_or_room
-        if cmd:
+        if not cmd:
+            await self.print(_("Cost of {room.idn_str} is {room.cost}"), room=room)
+        elif cmd[0] != room.cost:
+            await self.print(_("Cost of {room.idn_str} changed from {room.cost} to {cost}"), room=room, cost=cmd[0])
             room.set_cost(cmd[0])
-        await self.print(_("Cost of {room.idn_str} is {room.cost}"), room=room)
+            self.db.commit()
+        else:
+            await self.print(_("Cost of {room.idn_str} is {room.cost} (unchanged)"), room=room)
 
 
 
@@ -1661,15 +1989,12 @@ class S(Server):
         """))
     async def alias_xtp(self, cmd):
         cmd = self.cmdfix("*", cmd, min_words=1)
-        if not self.last_room:
-            await self.print(_("I have no idea where you were."))
-            return
-        if not self.last_dir:
+        x = self.current_exit
+        if not x:
             await self.print(_("I have no idea how you got here."))
             return
-        x = self.last_room.exit_at(self.last_dir)
         if not x.steps:
-            x.steps = self.last_dir
+            x.steps = x.dir
         x.steps = cmd[0] + "\n" + x.steps
         await self.print(_("Prepended."))
         self.db.commit()
@@ -1677,7 +2002,7 @@ class S(Server):
     @doc(_(
         """
         Suffix for the last move.
-        Applied to the room you just came from!
+        Applied to the exit you just arrived with!
         Usage: #xts ‹whatever to send›
         Put at end of the list of things to send.
         If the list was empty, the exit name is added also.
@@ -1685,15 +2010,12 @@ class S(Server):
         """))
     async def alias_xts(self, cmd):
         cmd = self.cmdfix("*", cmd)
-        if not self.last_room:
-            await self.print(_("I have no idea where you were."))
-            return
-        if not self.last_dir:
+        x = self.current_exit
+        if not x:
             await self.print(_("I have no idea how you got here."))
             return
-        x = self.last_room.exit_at(self.last_dir)
         if not x.steps:
-            x.steps = self.last_dir
+            x.steps = x.dir
         x.steps += "\n" + (cmd[0] if cmd else self.last_cmd or self.last_commands[0].command)
         await self.print(_("Appended."))
         self.db.commit()
@@ -1715,8 +2037,24 @@ class S(Server):
             self.named_exit = None
             await self.print(_("Exit name cleared."))
         else:
-            self.named_exit = cmd[0]
-            await self.print(_("Exit name '{s.named_exit}' set."), s=self)
+            await self._prep_exit(cmd[0])
+
+    async def _prep_exit(self, d):
+        try:
+            x = self.room.exit_at(d)
+        except KeyError:
+            x = self.db.Exit(dir=d, src=self.room)
+            self.db.add(x)
+            self.db.commit()
+            await self.print(_("Exit {exit.dir!r} prepated (new)"), exit=x)
+        else:
+            if x.dst is None:
+                await self.print(_("Exit {exit.dir!r} prepared (unknown dest)"), exit=x)
+            else:
+                await self.print(_("Exit {exit.dir!r} prepared, goes to {exit.dst.idnn_str}"), exit=x)
+
+        self.named_exit = x
+        await self.print(_("Exit {exit.dir!r} prepared."), exit=x)
 
     @doc(_(
         """
@@ -1851,7 +2189,7 @@ class S(Server):
 
     @doc(_(
         """
-        Sync/update Mudlet map.
+        Update Mudlet map from database.
         
         Assume that the Mudlet map is out of date / has not been saved:
         write our room data to Mudlet.
@@ -1897,7 +2235,7 @@ class S(Server):
          
     @doc(_(
         """
-        Sync/update Database
+        Update database from Mudlet map.
         
         Assume that the Mudlet map has been modified (rooms moved):
         copy current positions to the database.
@@ -1922,9 +2260,30 @@ class S(Server):
          
     async def alias_mdi(self, cmd):
         """
+        Import Mudlet map
+
+        Incrementally imports a Mudlet map by following exits that are only in Mudlet.
+        Typical usage: select an initial room, then '#mdi ??'.
+        """
+        cmd = self.cmdfix("r"*99, cmd, min_words=1)
+        await self.sync_map(*cmd)
+
+    @with_alias("mdi!")
+    @doc(_("""
+        Import Mudlet map, clearing all old associations
+
+        Incrementally imports a Mudlet map by following exits that are only in Mudlet.
+        Typical usage: select an initial room, then '#mdi ??'.
+
+        WARNING: this command erases all old associations between the Mudlet
+        and MudMyC maps.
+        """))
+    async def alias_mdi_b(self, cmd):
+        """
         Basic sync when some mudlet IDs got deleted due to out-of-sync-ness
         """
-        await self.sync_map()
+        cmd = self.cmdfix("r"*99, cmd, min_words=1)
+        await self.sync_map(*cmd, clear=True)
 
     @doc(_(
         """Current description state
@@ -2011,6 +2370,8 @@ class S(Server):
             room = cmd[0] or self.room
             await self.room.set_exit(d, room)
             await self.went_to_room(room, d)
+        elif self.named_exit:
+            await self.went_to_room(room, self.named_exit)
         else:
             await self.went_to_dir(d)
 
@@ -2130,6 +2491,76 @@ class S(Server):
 
     @doc(_(
         """
+        Exits with unknown destination
+
+        Find routes to (but not through) rooms with those exits.
+
+        No parameters. Use the skip list to ignore "not interesting" rooms.
+        """))
+    async def alias_mux(self, cmd):
+        class UnknownExit(PathChecker):
+            @staticmethod
+            async def check(room):
+                if room.id_mudlet is None:
+                    return SkipRoute
+                if room in self.skiplist:
+                    return None
+                for x in room._exits:
+                    if x.dst_id is None:
+                        return SkipSignal
+                return Continue
+        await self.gen_rooms(UnknownExit())
+
+    @doc(_(
+        """
+        Exits with unknown destination
+
+        Find routes to rooms with those exits.
+
+        No parameters. Use the skip list to ignore "not interesting" rooms.
+        """))
+    async def alias_muxx(self, cmd):
+        class UnknownExit(PathChecker):
+            @staticmethod
+            async def check(room):
+                if room.id_mudlet is None:
+                    return SkipRoute
+                if room in self.skiplist:
+                    return None
+                for x in room._exits:
+                    if x.dst_id is None:
+                        return SignalThis
+                return Continue
+        await self.gen_rooms(UnknownExit())
+
+    @doc(_(
+        """
+        Database area not in Mudlet
+
+        Given a room, list all reachable form there until we get to the
+        Mudlet-mapped area.
+
+        Parameter: the room to start in.
+        """))
+    async def alias_muf(self, cmd):
+        cmd = self.cmdfix("r", cmd, min_words=1)
+
+        gen = cmd[0].reachable.__aiter__()
+        v = None
+        while True:
+            try:
+                h = await gen.asend(v)
+            except StopAsyncIteration:
+                break
+            r = h[-1]
+            await self.print(r.idnn_str)
+            if r.id_mudlet:
+                v = SkipRoute
+                continue
+            v = SignalThis
+
+    @doc(_(
+        """
         Rooms without long descr
 
         Find routes to those rooms. Use #gg to use one.
@@ -2154,7 +2585,7 @@ class S(Server):
 
         No parameters."""))
     async def alias_mum(self, cmd):
-        class NotInDb(PathCHecker):
+        class NotInDb(PathChecker):
             @staticmethod
             async def check(room):
                 # These rooms are not in the database, so we check for unmapped
@@ -2652,13 +3083,12 @@ class S(Server):
 
     @doc(_(
         """
-        Cancel path generation and whatnot
+        Cancel path generation and whatnot.
 
         No parameters.
         """))
     async def alias_gc(self, cmd):
         await self.clear_gen()
-        self.process = None
 
     @doc(_(
         """
@@ -2841,15 +3271,19 @@ class S(Server):
             db.commit()
         return area
 
-    async def send_commands(self, *cmds, err_str="", real_dir=None, send_echo=True):
+    async def send_commands(self, name, *cmds, err_str="", move=False, exit=None, send_echo=True):
         """
         Send this list of commands to the MUD.
         The list may include special processing or delays.
         """
-        p = SeqProcess(self, cmds, real_dir, send_echo=send_echo)
+        if move:
+            PP = MoveProcess
+        else:
+            PP = SeqProcess
+        p = PP(self, name, cmds, exit=exit, send_echo=send_echo)
         await self.run_process(p)
 
-    async def sync_map(self):
+    async def sync_map(self, *rooms, clear=False):
         db=self.db
         done = set()
         broken = set()
@@ -2863,9 +3297,16 @@ class S(Server):
             area_rev[v] = k
         logger.debug("AREAS:%r",area_names)
 
-        for r in db.q(db.Room).filter(db.Room.id_old != None, db.Room.id_mudlet != None):
+        if clear:
+            r_old = {}
+            for r in rooms:
+                r_old[r.id_old] = id_mudlet
+            db.q(db.Room).update().values(id_mudlet = None).execute()
+            for r in rooms:
+                r.id_mudlet = r_old[r.id_old]
+
+        for r in rooms:
             todo.append(r)
-        db.rollback()
 
         def know_area(self, ra):
             if isinstance(ra,str):
@@ -2880,61 +3321,63 @@ class S(Server):
 
         while todo:
             r = todo.pop()
-            done.add(r.id_old)
-            x = r.exits
-
-            if r.id_old in broken: continue
-            if not r.id_gmcp:
-                id_gmcp = (await self.mud.getRoomHashByID(r.id_mudlet))[0]
-                if id_gmcp:
-                    r.id_gmcp = id_gmcp
-                    db.commit()
-
-            if False and r.area_id is None:
-                ra = (await self.mud.getRoomArea(r.id_mudlet))[0]
-                know_area(ra)
-                r.area_id = ra
-
+            if r.id_old in done:
+                continue
 
             try:
                 y = await r.mud_exits
             except NoData:
-                # didn't go there yet
+                # didn't go there yet?
                 logger.debug("EXPLORE %s %s",r.id_str,r.name)
                 explore.add(r.id_old)
                 continue
-            # print(r.id_old,r.id_mudlet,r.name,":".join(f"{k}={v}" for k,v in y.items()), v=v, k=k)
-            for d,nr in x.items():
-                if not nr: continue
-                if nr.id_old in done: continue
-                if nr.id_old in broken: continue
-                if nr.id_mudlet: continue
-                mid = y.get(d,None)
+
+            # Iterate exits but do the "standard" directions first
+            def exits(y):
+                for d,mid in y.items():
+                    if is_std_dir(d):
+                        yield d,mid
+                for d,mid in y.items():
+                    if not is_std_dir(d) and loc2rev(d) is not None:
+                        yield d,mid
+                for d,mid in y.items() and loc2rev(d) is None:
+                    if not is_std_dir(d):
+                        yield d,mid
+
+            for d,mid in exits(y):
                 if not mid:
-                    continue
-                # print(_("{nr.id_old} = {mid} {d}").format(nr=nr, d=d, mid=mid))
+                    continue  # unknown
                 try:
-                    nr.set_id_mudlet(mid)
-                    db.commit()
-                except IntegrityError:
-                    # GAAH
-                    db.rollback()
+                    x = r.exit_at(d)
+                    nr = x.dst
+                except KeyError:
+                    x = None
+                    nr = None
+                if nr is not None:
+                    continue
 
-                    done.add(nr.id_old)
-                    broken.add(nr.id_old)
-                    xr = db.r_mudlet(mid)
-                    logger.warning("BAD %s %s = %s %s",nr.id_old,xr.id_old,mid,nr.name)
-                    xr.set_id_mudlet(None)
-                    #xr.id_gmcp = None
-                    #nr.id_gmcp = None
-                    broken.add(xr.id_old)
-                    db.commit()
-                else:
-                    todo.appendleft(nr)
+                try:
+                    if nr is None:
+                        nr = db.r_mudlet(mid)
+                    elif nr.id_mudlet is not None:
+                        continue
+                except NoData:
+                    name = await self.mud.getRoomName(mid)
+                    name = name[0] if name and name[0] else None
+                    gmcp = await self.mud.getRoomHashByID(mid)
+                    gmcp = gmcp[0] if gmcp and gmcp[0] else None
+                    nr = await self.new_room(name, id_gmcp=gmcp, id_mudlet=mid, offset_from=r, offset_dir=d)
 
+                if x is None:
+                    x,_ = await r.set_exit(d,nr,skip_mud=True)
+                elif x.dst is None:
+                    x.dst = nr
+                todo.append(nr)
+
+        db.commit()
 
     @asynccontextmanager
-    async def input_grabber(self):
+    async def input_grab_multi(self):
         w,r = trio.open_memory_channel(1)
         try:
             async def send(x):
@@ -2943,6 +3386,8 @@ class S(Server):
                     self._input_grab = None
                     return
                 await w.send(x)
+            if self._input_grab is not None:
+                raise RuntimeError("already capturing")
             self._input_grab = send
             yield r
         finally:
@@ -2952,6 +3397,21 @@ class S(Server):
                     self._input_grab = None
                     await w.aclose()
                     # otherwise done above
+
+    @asynccontextmanager
+    async def input_grab(self):
+        evt = ValueEvent()
+        try:
+            async def send(x):
+                evt.set(x)
+                self._input_grab = None
+            if self._input_grab is not None:
+                raise RuntimeError("already capturing")
+            self._input_grab = send
+            yield evt
+        finally:
+            if self._input_grab is send:
+                self._input_grab = None
 
     async def called_input(self, msg):
         """
@@ -2970,29 +3430,39 @@ class S(Server):
             return None
         if msg.startswith("lua "):
             return None
-        return await self._do_move(msg)
+        return await self._do_manual_command(msg)
 
-    async def _do_move(self, msg, send_echo=None):
-        # return None if the input has been handled.
-        # Otherwise return the same (or some other) text to be sent.
-        self.named_exit = None
+    async def _do_manual_command(self, msg, send_echo=None):
+        """
+        return None if the input has been handled.
+        Otherwise return the same (or some other) text to be sent.
+        """
+        self.this_exit = None
+
         ms = short2loc(msg)
         if self.room is None:
-            await self.send_commands(msg)
+            await self.send_commands(msg, msg)
         else:
             self.last_cmd = msg
             try:
                 x = self.room.exit_at(msg)
             except KeyError:
-                await self.send_commands(msg, send_echo=False if send_echo is None else send_echo)
+                await self.send_commands(msg, msg, send_echo=False if send_echo is None else send_echo)
             else:
-                self.named_exit = msg
-                await self.send_commands(*x.moves, send_echo=bool(x.steps) if send_echo is None else send_echo)
-
+                self.this_exit = x
+                await self.send_exit_commands(x, send_echo=send_echo)
 
         if self.logfile:
             print(">>>",msg, file=self.logfile)
-        return
+
+    async def send_exit_commands(self, x, send_echo=None):
+        m = list(x.moves)
+        if x.feature:
+            m = x.feature.enter_moves + m
+        if x.back_feature:
+            m = m + x.back_feature.exit_moves
+        await self.send_commands(x.dir, *m, send_echo=bool(x.steps) if send_echo is None else send_echo)
+
 
     @doc(_(
         """
@@ -3022,11 +3492,11 @@ class S(Server):
             await self.print(f"No shortcut {mod}/{key} found.")
         else:
             if isinstance(s,str):
-                await self._do_move(s, send_echo=True)
+                await self._do_manual_command(s, send_echo=True)
                 return
             if isinstance(s,Command):
                 s = (s,)
-            await self.send_commands(*s)
+            await self.send_commands("",*s)
 
 
     # ### Basic command handling ### #
@@ -3063,8 +3533,7 @@ class S(Server):
         Run a complex command.
         """
         assert isinstance(p, Process)
-        self.process, p.upstack = p, self.process
-        self.trigger_sender.set()
+        await p.setup()
 
     async def check_more(self, msg):
         if not msg.startswith("--mehr--("):
@@ -3081,11 +3550,9 @@ class S(Server):
         m = self.is_prompt(msg)
         if isinstance(m,str):
             msg = m
-            self.log_text_prompt()
             self.prompt(self.MP_TEXT)
-            if len(msg) == 2:
+            if not msg:
                 return
-            msg = msg[2:]
 
         msg = msg.rstrip()
         logger.debug("IN  : %s", msg)
@@ -3126,7 +3593,28 @@ class S(Server):
     async def alias_dss(self, cmd):
         """
         Sender state
+        When used with a number, dump its n'th command
         """
+        cmd = self.cmdfix("iiiiiiiii", cmd)
+        if len(cmd):
+            x = self.process
+            n = 1
+            while n < cmd[0]:
+                x = x.upstack
+                n += 1
+            cmd = cmd[1:]
+            while cmd:
+                x = x.commands[cmd[0]-1]
+                cmd = cmd[1:]
+            await self.print(_("Target: {cmd!r}"), cmd=x)
+            if hasattr(x,"cmds"):
+                for i,command in enumerate(x.cmds):
+                    await self.print(_("Step {n}: {cmd}"), n=i+1, cmd=command)
+            if hasattr(x,"commands"):
+                for i,command in enumerate(x.commands):
+                    await self.print(_("Sub {n}: {cmd!r}"), n=i+1, cmd=command)
+            return
+
         if not self.command:
             await self.print(_("No command"))
         else:
@@ -3139,15 +3627,23 @@ class S(Server):
             await self.print(_("Waiting for prompt (state={ps})"), ps=self._prompt_state)
         if not self.trigger_sender.is_set():
             await self.print(_("waiting for continuation"))
-            self.trigger_sender.wait()
 
         for x in self.cmd1_q:
             await self.print(_("Mudlet: {x!r}"), x=x)
         for x in self.cmd2_q:
             await self.print(_("Mapper: {x!r}"), x=x)
+
+        if self.this_exit:
+            await self.print(_("Current Move: {x!r}"), x=self.this_exit)
+        else:
+            x = self.current_exit
+            await self.print(_("Last Move: {x!r}"), x=x)
+
         x = self.process
+        n = 0
         while x:
-            await self.print(_("Stack: {x!r}"), x=x)
+            n += 1
+            await self.print(_("Stack {n}: {x!r}"), n=n, x=x)
             x = x.upstack
 
     @with_alias("##")
@@ -3156,24 +3652,36 @@ class S(Server):
         Shortcut to '#dsr' for emergencies
     """))
     async def alias_hash_hash(self, cmd):
-        await self.alias_dsr(cmd)
+        await self._reset_stack()
 
     async def alias_dsr(self, cmd):
         """
         Sender reset
         """
+        await self._reset_stack()
+
+    async def _reset_stack(self):
         self.command = None
         # self.cmd1_q = []  # already sent, so no
         self.cmd2_q = []
-        self.process = None
+        while self.process is not self.top:
+            p = self.process
+            try:
+                await p.finish()
+                if self.process is p:
+                    raise RuntimeError("No takedown")
+            except Exception as exc:
+                await self.print(f"ERROR {p!r}: {exc!r}")
+                logger.exception(f"Takedown {p!r}")
+                self.process = None
         if self._prompt_evt:
             self._prompt_evt.set()
         await self.print(_("Cleared."))
 
     @with_alias("#")
     @doc(_("""
-        Sender block
-        Block further command execution by queueing a FixCommand.
+        Stop automation
+        Halt command execution until '#g'.
     """))
     async def alias__hash(self, cmd):
         p = FixProcess(self, "halt", "paused by console command")
@@ -3182,7 +3690,7 @@ class S(Server):
     @with_alias("#g")
     @doc(_("""
         Sender unblock
-        Unblock further command execution by removing the FixCommand.
+        Unblock command execution and continue.
     """))
     async def alias__hash_g(self, cmd):
         p = self.process
@@ -3190,9 +3698,10 @@ class S(Server):
             await self.print(_("No command is running."))
         elif not isinstance(p, FixProcess):
             await self.print(_("Sorry but the current command is {cmd!r}."), cmd=p)
+            self.trigger_sender.set()
         else:
-            self.process = self.process.upstack
-            await self.print(_("The current command is now {cmd!r}."), cmd=p)
+            await p.finish()
+            await self.print(_("The current command is now {cmd!r}."), cmd=self.process)
             self.trigger_sender.set()
 
 
@@ -3203,11 +3712,6 @@ class S(Server):
         seen = True
         while True:
             try:
-                if self.info:
-                    info,self.info = self.info,None
-                    await self.went_to_dir(TIME_DIR, info=info, skip_if_noop=True)
-                    continue
-
                 if self.cmd1_q:
                     # Command transmitted by Mudlet.
                     cmd = self.cmd1_q.pop(0)
@@ -3219,10 +3723,11 @@ class S(Server):
                     # faster than the MUD.
                     cmd = self.cmd2_q.pop(0)
                     logger.debug("Prompt send %r",cmd)
+                    print("Prompt send",repr(cmd))
                     xmit = True
                 else:
                     # No command queued, so we check the stack.
-                    if self.process and seen:
+                    if seen:
                         logger.debug("Prompt Next %r",self.process)
                         await self.process.next()
                         seen = False
@@ -3234,6 +3739,8 @@ class S(Server):
                     continue
                 seen = True
 
+                if self.command is not None:
+                    await self.command.done()
                 if isinstance(cmd,str):
                     cmd = Command(self,command=cmd)
 
@@ -3254,29 +3761,38 @@ class S(Server):
                 self._prompt_evt = None
                 logger.debug("Prompt seen")
                 await self._process_prompt()
+                await self._wait_output()
 
             except Exception as exc:
                 await self.print(f"*** internal error: {exc!r} ***")
                 logger.exception("internal error: %r", exc)
-                self.cmd2_q = []
-                self.process = None
+                await self._reset_stack()
                 if self._prompt_evt:
+                    # should not happen but be safe
                     self._prompt_evt.set()
                     self._prompt_evt = None
 
+    async def _wait_output(self):
+        evt = trio.Event()
+        await self._text_w.send(evt)
+        await evt.wait()
 
     def match_exit(self, msg):
         """
         Match the "there is one exit" or "there are N exits" line which
         separates the room description from the things in the room.
 
-        TODO: if there's no GMCP this may signal that you have moved.
+        If there's no GMCP this signals that you have moved.
         """
         def matched(g=None):
             if self.command:
                 self.command.dir_seen(g)
 
         m = None
+        if self.command and self.command.current and not self.exit_match:
+            # Already saw an Exits line.
+            return False
+
         if self.exit_match is None:
             m = EX3.search(msg)
             if not m:
@@ -3312,10 +3828,6 @@ class S(Server):
         if self.command:
             self.command.add(msg)
 
-    def log_text_prompt(self):
-        if self.command:
-            self.command.prompt_seen()
-
     ### mud specific
 
     def is_prompt(self, msg):
@@ -3341,10 +3853,11 @@ class S(Server):
     def waiting_for_prompt(self):
         return self._prompt_evt is not None
 
-    def _trigger_prompt(self):
+    def _trigger_prompt(self, cause):
         self._prompt_state = None
         p = self._prompt_evt
         if p is not None:
+            print("PSET",cause)
             p.set()
 
     async def _trigger_prompt_later(self, timeout):
@@ -3354,6 +3867,7 @@ class S(Server):
         with trio.move_on_after(timeout):
             await p.wait()
             return  # not timed out if we get here
+        print("PSET L")
         p.set()
 
     def prompt(self, mode=None):
@@ -3373,18 +3887,18 @@ class S(Server):
             return
 
         if mode == self.MP_ALIAS:
-            self._trigger_prompt()
+            self._trigger_prompt("D")
             return
 
         if mode == self.MP_TEXT:
             if self.cmd1_q:
                 # The user typed a command while we were working.
-                self._trigger_prompt()
+                self._trigger_prompt("A")
             elif self._prompt_state is None:
                 self._prompt_state = True
                 self.main.start_soon(self._trigger_prompt_later, 0.5)
             elif self._prompt_state is False:
-                self._trigger_prompt()
+                self._trigger_prompt("B")
             return
 
         if mode == self.MP_TELNET:
@@ -3392,7 +3906,7 @@ class S(Server):
                 self._prompt_state = False
                 self.main.start_soon(self._trigger_prompt_later, 0.5)
             elif self._prompt_state is True:
-                self._trigger_prompt()
+                self._trigger_prompt("C")
             return
 
         if mode == self.MP_INFO:
@@ -3416,9 +3930,12 @@ class S(Server):
         # finish the current command
         s = self.command
         if s is None:
-            # no no command yet
+            # no command
             return
+        self.command = None
         await s.done()
+        self.process.append(s)
+        s.exits_seen = exits_seen
 
         # figure out whether we should run the "moved" code
         r = self.room
@@ -3431,32 +3948,86 @@ class S(Server):
             # TODO uniqueness test via room shortname / description
             return
 
-        moved = False
+        # at this point we have an old room.
+        # In case of GMCP we might have a new room to set the map to.
+        # (This is purely informational.)
+
         nr = None
+        moved = False
         if s.info:
             i_gmcp = s.info.get("id","")
-            i_short = s.info.get("short","")
 
-            # Changing info data generally indicate movement.
+            # Changing info indicates movement.
             nr = self.room_by_gmcp(i_gmcp)
             if nr is not None:
+                if nr is not r and nr.id_mudlet is not None and self.conf['show_intermediate']:
+                    await self.mud.centerview(nr.id_mudlet)
                 moved = r.id_gmcp != nr.id_gmcp
             elif i_gmcp or self.room.id_gmcp:
                 moved = True
             elif i_short and self.clean_shortname(r.name) != self.clean_shortname(i_short) and not (r.flag & self.db.Room.F_MOD_SHORTNAME):
                 await self.print(_("Shortname differs. #mm?"))
 
-        d = self.named_exit or short2loc(s.command)
-        try:
-            x = self.room.exit_at(d)
-        except KeyError:
-            x = None
+        return  ### !!!
+
+        # If we're in the middle of a known move then skip the rest because
+        # the processor will call it when it is done.
+        if self.this_exit is not None:
+            return
+
+        await self._end_command(s.command,nr,moved,exits_seen)
+
+
+    async def finish_move(self, d, moved):
+        """
+        Called when a SeqProcess ends
+        """
+        mv = self.process.last_move
+        nr = None
+        if self.this_exit:
+            nr = self.this_exit.dst
+            if mv is None and (nr is None or not (nr.flag & self.db.Room.F_NO_GMCP_ID)):
+                return
+        await self._end_command(d,nr,moved,None)
+
+
+    async def _end_command(self,d,nr,moved,exits_seen):
+        x = self.this_exit
+        if x is None:
+            d = short2loc(d)
+            try:
+                x = self.room.exit_at(d)
+            except KeyError:
+                x = None
+        else:
+            d = x.dir
+
+        move_cmd = self.process.last_move
+        info = move_cmd.info if move_cmd else None
+        r = self.room
+
+        moved = False
+        if info:
+            i_gmcp = info.get("id","")
+
+            # Changing info indicates movement.
+            nr = self.room_by_gmcp(i_gmcp)
+            if nr is not None:
+                moved = r.id_gmcp != nr.id_gmcp
+                if not moved and not x:
+                    nr = None
+            elif i_gmcp or self.room.id_gmcp:
+                moved = True
+            elif i_short and self.clean_shortname(r.name) != self.clean_shortname(i_short) and not (r.flag & self.db.Room.F_MOD_SHORTNAME):
+                await self.print(_("Shortname differs. #mm?"))
 
         if x and not exits_seen:
             if x.dst and x.dst.flag & self.db.Room.F_NO_EXIT:
                 exits_seen = True
+        elif exits_seen is None and move_cmd is not None:
+            exits_seen = move_cmd.exits_seen
 
-        if isinstance(s, LookProcessor):
+        if move_cmd and isinstance(move_cmd, LookProcessor):
             # This command does not generate movement. Thus if it did
             # anyway the move was probably timed, except when the exit
             # already exists. Life is complicated.
@@ -3474,9 +4045,9 @@ class S(Server):
 
         if nr or moved:
             # Consume the movement.
-            self.named_exit = None
+            self.this_exit = None
 
-            await self.went_to_dir(d, info=s.info, exits_text=s.exits_text)
+            await self.went_to_dir(d, info=info, exits_text=move_cmd.exits_text)
         self.db.commit()
 
     def room_by_gmcp(self, id_gmcp):
@@ -3586,12 +4157,14 @@ class S(Server):
         else:
             info = await self.mud.gmcp.MG.room.info
 
-        if self._prompt_evt is not None and self.command.info is None:
-            # waiting for prompt, during a command
-            self.command.info = info
-        else:
+        if self.command is None or self.command.info is not None:
+            self.command = c = IdleCommand(self)
+            self.process.append(c)
+
+        await self.command.set_info(info)
+
+        if self._prompt_evt is None:
             # not waiting, so process it from the main loop
-            self.info = info
             self.trigger_sender.set()
 
     async def event_gmcp_comm_channel(self, msg):
@@ -3613,6 +4186,9 @@ class S(Server):
 
     async def new_room(self, descr, id_gmcp=None, id_mudlet=None, offset_from=None,
             offset_dir=None, area=None):
+
+        if self.conf['debug_new_room']:
+            import pdb;pdb.set_trace()
 
         if id_mudlet:
             try:
@@ -3681,19 +4257,23 @@ class S(Server):
         Place the room if it isn't already.
         """
         x,y,z = None,None,None
-        if room.id_mudlet:
-            try:
-                x,y,z = await self.mud.getRoomCoordinates(room.id_mudlet)
-            except ValueError:
-                # Huh. Room deleted there. Get a new room then.
-                room.set_id_mudlet((await self.rpc(action="newroom"))[0])
+        if not room.id_mudlet:
+            return
+        try:
+            x,y,z = await self.mud.getRoomCoordinates(room.id_mudlet)
+        except ValueError:
+            # Huh. Room deleted there. Get a new room then.
+            room.set_id_mudlet((await self.rpc(action="newroom"))[0])
 
         if offset_from and (x is None or (x,y,z) == (0,0,0)):
             await self.place_room(offset_from,offset_dir,room)
 
         else:
-            # mudlet position is kindof authoritative
+            # mudlet positions are kindof authoritative
             room.pos_x, room.pos_y, room.pos_z = x,y,z
+            room.label_x,room.label_y = await self.mud.getRoomNameOffset(room.id_mudlet)
+            room.area_id = (await self.mud.getRoomArea(room.id_mudlet))[0]
+
 
     async def place_room(self, start,dir,room):
         """
@@ -3722,41 +4302,6 @@ class S(Server):
         """
         breakpoint()
         pass
-
-    async def new_info(self, info, moved=None):
-        db=self.db
-        rc = False
-        src = False
-        is_new_room = False
-
-        if info == self.room_info and moved is None:
-            await self.print("INFO same and not moved")
-            return
-
-        logger.debug("INFO:%r",info)
-        if self.conf['debug_new_room']:
-            import pdb;pdb.set_trace()
-
-        self.last_room_info = self.room_info
-        self.room_info = info
-
-        id_gmcp = info.get("id", None)
-        if id_gmcp and self.room and self.room.id_gmcp == id_gmcp:
-            return
-
-        # Case 1: we have a hash.
-        room = None
-
-        if id_gmcp:
-            try:
-                room = db.r_hash(id_gmcp)
-            except NoData:
-                pass
-            else:
-                await self.went_to_room(room)
-            if moved is None and self.command:
-                moved = self.command.command
-
 
     async def update_exit(self, room, d):
         try:
@@ -3817,6 +4362,9 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         name = name.rstrip(".")
         return name
 
+    async def timed_move(self, info=None, exits_text=None):
+        await self.went_to_dir(TIME_DIR, info=info, exits_text=exits_text)
+
     async def went_to_dir(self, d, info=None, exits_text=None, skip_if_noop=False):
         if not self.room:
             await self.print("No current room")
@@ -3869,7 +4417,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
                 id_mudlet = (await self.room.mud_exits).get(d, None) if self.room else None
 
             try:
-                rn = self.command.lines[0][-1]
+                rn = (getattr(info,"short",None) if info else None) or self.last_cmd or getattr(self.process,"name",None) or self.command.lines[0][-1]
             except (AttributeError,IndexError):
                 rn = "unknown"
             if room is None:
@@ -3883,8 +4431,12 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
 
         await self.went_to_room(room, d=d, is_new=is_new, info=info, exits_text=exits_text)
 
-    async def went_to_room(self, room, d=None, repair=False, is_new=False, info=None, exits_text=None):
+    async def went_to_room(self, room, d=None, exit=None, repair=False, is_new=False, info=None, exits_text=None):
         """You went to `room` using direction `d`."""
+        assert not d or not exit
+        if exit:
+            d = exit.dir
+
         db = self.db
 
         is_new = (await self.maybe_assign_mudlet(room)) or is_new
@@ -3934,11 +4486,11 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         if not self.last_room:
             return
 
-        p = self.command
+        p = self.top.last_move
         rn = ""
         if info:
             rn = info.get("short","")
-        if not rn and p.current > Command.P_BEFORE and p.lines[0]:
+        if not rn and p and p.current > Command.P_BEFORE and p.lines[0]:
             rn = p.lines[0][-1]
         if rn:
             rn = self.clean_shortname(rn)
@@ -3962,12 +4514,13 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
                 for tt in SPC.split(t):
                     room.has_thing(tt)
         else:
-            self.main.start_soon(self.send_commands, LookProcessor(self, "schau"))
+            self.main.start_soon(self.send_commands, "", LookProcessor(self, "schau"))
         room.visited()
         if last_room and last_room.id_mudlet:
             await self.update_room_color(last_room)
         if room.id_mudlet:
             await self.update_room_color(room)
+
         db.commit()
 
     async def maybe_set_name(self, room):
@@ -4035,7 +4588,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         get from MUD and set room to it
         """))
     async def alias_rl_b(self, cmd):
-        self.main.start_soon(self.send_commands,LookProcessor(self, "schau", force=True))
+        self.main.start_soon(self.send_commands,"", LookProcessor(self, "schau", force=True))
 
     @doc(_(
         """
@@ -4045,20 +4598,24 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
     async def alias_rs(self, cmd):
         db = self.db
         cmd = self.cmdfix("*", cmd)
-        sn = cmd[0] if cmd else self.room.last_shortname
-        if not sn:
-            await self.print("No shortname known")
+        if self.view_room and not cmd:
+            await self.print(_("Use an explicit text while viewing!"))
             return
-        if not self.room:
-            await self.print("No current room")
+        room = self.view_or_room
+        if not room:
+            await self.print(_("No current room"))
+            return
+        sn = cmd[0] if cmd else room.last_shortname
+        if not sn:
+            await self.print(_("No shortname known"))
             return
 
-        self.room.name = sn
-        await self.mud.setRoomName(self.room.id_mudlet, sn)
+        room.name = sn
+        await self.mud.setRoomName(room.id_mudlet, sn)
         if cmd:
-            self.room.flag |= db.Room.F_MOD_SHORTNAME
+            room.flag |= db.Room.F_MOD_SHORTNAME
         else:
-            self.room.flag &=~ db.Room.F_MOD_SHORTNAME
+            room.flag &=~ db.Room.F_MOD_SHORTNAME
         db.commit()
 
 
@@ -4116,7 +4673,6 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             #R=db.q(db.Room).filter(db.Room.id_old == 1).one()
             #R.id_mudlet = 142
             #db.commit()
-        #import pdb;pdb.set_trace()
         pass
 
     async def _gui_vitals_color(self, lp_ratio=None):
@@ -4315,10 +4871,10 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         if cmd:
             w = self.db.word(cmd[0], create=True)
             self.next_word = self.room.with_word(w, create=True)
-            self.main.start_soon(self.send_commands, WordProcessor(self, self.room, w, "unt "+cmd[0]))
+            self.main.start_soon(self.send_commands, "", WordProcessor(self, self.room, w, "unt "+cmd[0]))
         elif self.next_word:
             w = self.next_word.word
-            self.main.start_soon(self.send_commands, WordProcessor(self, self.room, w, "unt "+w.name if w.name else "schau"))
+            self.main.start_soon(self.send_commands, "", WordProcessor(self, self.room, w, "unt "+w.name if w.name else "schau"))
         else:
             await self.next_search()
 
@@ -4390,7 +4946,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             await self.print(_("No (more) words."))
         else:
             self.next_word = w
-            self.main.start_soon(self.send_commands, WordProcessor(self, self.room, w.word, "schau"))
+            self.main.start_soon(self.send_commands, "", WordProcessor(self, self.room, w.word, "schau"))
         self.db.commit()
 
 
@@ -4536,7 +5092,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         if f.enter:
             await self.print(_("Old content:\n{txt}"), txt=f.enter)
         await self.print(_("Set feature-enter text. End with '.'."))
-        async with self.input_grabber() as g:
+        async with self.input_grab_multi() as g:
             async for line in g:
                 if txt:
                     txt += "\n"
@@ -4559,7 +5115,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         if f.exit:
             await self.print(_("Old content:\n{txt}"), txt=f.exit)
         await self.print(_("Set feature-enter text. End with '.'."))
-        async with self.input_grabber() as g:
+        async with self.input_grab_multi() as g:
             async for line in g:
                 if txt:
                     txt += "\n"
@@ -4572,14 +5128,18 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
     @with_alias("xf+")
     @doc(_("""
     Set feature
-    Set the exit which you just used to have this feature.
-    Does not actually apply the feature.
+    Set an exit to have this feature.
+    Parameters: featurename [exit]
+    If used without an exit, it's applied to the exit you just came in from.
     """))
     async def alias_xf_p(self, cmd):
         db = self.db
-        cmd = self.cmdfix("w", cmd, min_words=1)
+        cmd = self.cmdfix("wx", cmd, min_words=1)
         f = db.feature(cmd[0])
-        x = self.last_room.exit_at(self.last_dir)
+        if len(cmd) > 1:
+            x = self.room.exit_at(cmd[1])
+        else:
+            x = self.last_room.exit_at(self.last_dir)
         x.feature = f
         db.commit()
         await self.print(_("Feature {f.name} set for {x.info_str}."), f=f, x=x)
@@ -4626,8 +5186,9 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
     
     # ### Quests ### #
 
-    async def _q_state(self, q):
-        await self.print(_("Quest: {q.id}: {q.name}"), q=q)
+    async def _q_state(self, q, print_q=True):
+        if print_q:
+            await self.print(_("Quest: {q.id}: {q.name}"), q=q)
         qs = q.current_step
         if qs is None:
             await self.print(_("Not started."))
@@ -4763,15 +5324,36 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
     Tell step A that it should now be numbered B,
     and move all affected steps around
     One number: move the last step there
+    Three: move A through B to C.
     """))
     async def alias_qo(self, cmd):
-        cmd = self.cmdfix("ii", cmd, min_words=1)
+        cmd = self.cmdfix("iii", cmd, min_words=1)
         if not self.quest:
             await self.print(_("No current quest."))
             return
         ns = cmd[-1]
-        qs = self.quest.step_at(cmd[0] if len(cmd) > 1 else self.quest.last_step_nr)
-        qs.set_step_nr(ns)
+        if len(cmd) == 3:
+            sa,sb,sc = cmd
+            if sa>=sb or sa<=sc<=sb:
+                await self.print(_("A and B must be a range and C can't be in that range."))
+                return
+            while sa <= sb:
+                qs = self.quest.step_at(sa)
+                qs.set_step_nr(sc)
+                if sa<=sc:
+                    # moving up. sa+1…sb moves down one step.
+                    sb -= 1
+                else:
+                    # moving down. sa+1…sb stays where it is.
+                    sa += 1
+                # the destination is not affected either way.
+                sc += 1
+            else:
+                while sa <= sb:
+                    qs = self.quest.step_at(sa)
+        else:
+            qs = self.quest.step_at(cmd[0] if len(cmd) > 1 else self.quest.last_step_nr)
+            qs.set_step_nr(ns)
         self.db.commit()
 
 
@@ -4791,8 +5373,9 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             self.quest = None
 
     @doc(_("""
-    Quest Next Step
+    Next Step
     Do the next thing in this quest
+    Argument: set to continue there.
     """))
     async def alias_qn(self, cmd):
         cmd = self.cmdfix("i", cmd)
@@ -4801,6 +5384,12 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             return
         if cmd:
             self.quest.step = cmd[0]
+            await self._q_state(q, print_q=False)
+            self.db.commit()
+            return
+        await self._q_next_step()
+
+    async def _q_next_step(self):
         s = self.quest.step
         qs = self.quest.current_step
         if qs is None:
@@ -4816,7 +5405,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         if qs.room != self.room:
             w = self.current_walker
             if w and w.dest == qs.room:
-                await self.print(_("Quest: Already walkting to room {room.idn_str}"), room=qs.room)
+                await self.print(_("Quest: Already walking to room {room.idn_str}"), room=qs.room)
                 await self.print(_("Walker: {w}"), w=w)
 
             elif self.path_gen and isinstance(self.path_gen.checker,RoomFinder) and self.path_gen.checker.room == qs.room:
@@ -4828,7 +5417,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
 
         c = qs.command
         if c[0] != '#':
-            await self._do_move(c)
+            await self._do_manual_command(c, send_echo=True)
         elif c == "#/ROOM":
             pass
         elif c == "#/DEAD":
@@ -4859,13 +5448,6 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             logfile.flush()
 
         await self.setup(db)
-
-        try:
-            info = await self.mud.gmcp.MG.room.info
-        except RuntimeError:
-            pass
-        else:
-            await self.new_info(info)
 
         #await self.mud.centerview()
 

@@ -579,6 +579,21 @@ def SQL(cfg):
         enter = Column(Text, nullable=False, default="")
         exit = Column(Text, nullable=False, default="")
 
+        @property
+        def enter_moves(self):
+            if self.enter:
+                return self.enter.split("\n")
+            else:
+                return []
+
+        @property
+        def exit_moves(self):
+            if self.exit:
+                return self.exit.split("\n")
+            else:
+                return []
+
+
     class Note(_AddOn, Base):
         __tablename__ = "notes"
         id = Column(Integer, nullable=True, primary_key=True)
