@@ -2,11 +2,14 @@ from mudpyc.util import attrdict, combine_dict
 from contextlib import contextmanager
 from weakref import ref
 from heapq import heappush,heappop
+import simplejson as json
 
 from sqlalchemy import ForeignKey, Column, Integer, MetaData, Table, String, Float, Text, create_engine, select, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, object_session, validates, backref
 from sqlalchemy.schema import Index
+
+from typing import Dict
 
 from .const import SignalThis, SkipRoute, SkipSignal
 from .const import ENV_OK,ENV_STD,ENV_SPECIAL,ENV_UNMAPPED
@@ -68,12 +71,28 @@ def SQL(cfg):
 
         rooms = relationship("Room", back_populates="area")
 
+    class Config(_AddOn, Base):
+        __tablename__ = "cfg"
+        id = Column(Integer, primary_key=True)
+        name = Column(String, unique=True)
+        _value = Column(Binary)
+
+        @property
+        def value(self):
+            return json.loads(self._value)
+        
+        @value.setter
+        def value(self, value):
+            self._value = json.dumps(value)
+
     class Exit(_AddOn, Base):
         __tablename__ = "exits"
         id = Column(Integer, primary_key=True)
+
         src_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
         dir = Column(String, nullable=False)
         dst_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE", ondelete="SET NULL"), nullable=True)
+
         det = Column(Integer, nullable=False, default=0) # ways with multiple destinations ## TODO
         cost = Column(Integer, nullable=False, default=1)
         steps = Column(String, nullable=True)
@@ -776,6 +795,28 @@ def SQL(cfg):
             raise KeyError(name)
         return f
 
+    class Cfg:
+        def __init__(self):
+            self._cache = {}
+        def __getitem__(self, name):
+            if name in self._cache:
+                return self._cache[name]
+            f = session.query(Config).filter(Config.name == name).one_or_none()
+            if f is None:
+                raise KeyError(name)
+            value = f.value
+            self._cache[name] = value
+            return value
+        
+        def __setitem__(self, name, value):
+            f = session.query(Config).filter(Config.name == name).one_or_none()
+            if f is None:
+                f = Config(name=name)
+                f.value = value
+                session.add(f)
+            session.commit()
+            self._cache[name] = value
+
     def setup(server):
         session._mud__main = ref(server)
 
@@ -789,6 +830,7 @@ def SQL(cfg):
             r_hash=r_hash, r_old=r_old, r_mudlet=r_mudlet, r_new=r_new,
             skiplist=get_skiplist, word=get_word, thing=get_thing,
             quest=get_quest, feature=get_feature,
+            cfg=Cfg(),
             commit=session.commit, rollback=session.rollback,
             add=session.add, delete=session.delete,
             WF_SCANNED=1, WF_SKIP=2, WF_IMPORTANT=3,
