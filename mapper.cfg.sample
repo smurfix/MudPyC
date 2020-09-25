@@ -1,4 +1,5 @@
-name: Morgengrauen
+name: yourmud
 sql:
-    url: 'mysql://name:password@database.example.com/muddb'
+    url: 'sqlite:////home/yourname/data/yourmud.db'
+    #url: 'mysql://name:password@database.example.com/muddb'
 
