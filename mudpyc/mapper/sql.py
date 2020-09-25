@@ -483,7 +483,12 @@ def SQL(cfg):
             await self.set_exit(d,None, skip_mud=skip_mud)
 
         @property
-        async def mud_exits(self):
+        async def mud_exits(self) -> Dict[str, int]:
+            """
+            Reads room exits from Mudlet.
+
+            Returns a direction > Mudlet-ID dict.
+            """
             m = self._m
             mud = m.mud
             res = {}
