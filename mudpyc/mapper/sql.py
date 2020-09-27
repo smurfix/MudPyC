@@ -100,8 +100,8 @@ def SQL(cfg):
         delay = Column(Integer, nullable=False, default=0)
         feature_id = Column(Integer, ForeignKey("feature.id", onupdate="CASCADE", ondelete="SET NULL"), nullable=True)
 
-        src = relationship("Room", back_populates="_exits", foreign_keys="Exit.src_id")
-        dst = relationship("Room", back_populates="_r_exits", foreign_keys="Exit.dst_id")
+        src = relationship("Room", back_populates="exits", foreign_keys="Exit.src_id")
+        dst = relationship("Room", back_populates="r_exits", foreign_keys="Exit.dst_id")
         feature = relationship("Feature", backref="exits")
 
         F_IN_MUDLET = (1<<0)
@@ -183,10 +183,10 @@ def SQL(cfg):
         F_MOD_SHORTNAME = (2<<1)
 
         area = relationship(Area, back_populates="rooms")
-        _exits = relationship(Exit,
+        exits = relationship(Exit,
             primaryjoin=id_old == Exit.src_id, foreign_keys=[Exit.src_id],
             cascade="delete", passive_deletes=True)
-        _r_exits = relationship(Exit,
+        r_exits = relationship(Exit,
             primaryjoin=id_old == Exit.dst_id, foreign_keys=[Exit.dst_id])
 
         long_descr = relationship("LongDescr", uselist=False, cascade="delete")
@@ -252,9 +252,9 @@ def SQL(cfg):
             so when we next look at them they need to be reconsidered
             """
             self.id_mudlet = id_mudlet
-            for x in self._exits:
+            for x in self.exits:
                 x.flag &=~ Exit.F_IN_MUDLET;
-            for x in self._r_exits:
+            for x in self.r_exits:
                 x.flag &=~ Exit.F_IN_MUDLET;
 
         def with_word(self, word, create=False):
@@ -273,10 +273,10 @@ def SQL(cfg):
 
         @property
         def exit_str(self):
-            if not self._exits:
+            if not self.exits:
                 return ":"
             ex = []
-            for x in self._exits:
+            for x in self.exits:
                 d = x.dir
                 if d.startswith("betrete haus von "):
                     d = "b-h-"+d[17:]
@@ -293,7 +293,7 @@ def SQL(cfg):
         @property
         def exits(self):
             res = {}
-            for x in self._exits:
+            for x in self.exits:
                 res[x.dir] = x.dst
             return res
 
@@ -307,7 +307,7 @@ def SQL(cfg):
             """
             A room's cost is defined as the min cost of all its exits
             """
-            return min(x.cost for x in self._exits)
+            return min(x.cost for x in self.exits)
 
         def set_cost(self, cost):
             """
@@ -316,7 +316,7 @@ def SQL(cfg):
             Not transmitted to the MUD
             """
             w = cost - self.cost
-            for x in self._exits:
+            for x in self.exits:
                 x.cost += w
 
         async def set_area(self, area, force=False):
@@ -344,7 +344,7 @@ def SQL(cfg):
             """
             res = 0
             m = self._m
-            for x in self._exits:
+            for x in self.exits:
                 if x.dst is None:
                     if x.dir in m.loc_names:
                         res = max(res,1)
@@ -390,7 +390,7 @@ def SQL(cfg):
             ID set goes to the same place, use that.
             """
             res = None
-            for x in self._exits:
+            for x in self.exits:
                 if x.dir == d:
                     res = x
                     break
@@ -398,7 +398,7 @@ def SQL(cfg):
                 raise KeyError()
             if not prefer_feature or not res.dst_id or res.feature_id:
                 return res
-            for x in self._exits:
+            for x in self.exits:
                 if x.dst_id == res.dst_id and x.feature_id:
                     return x
             return res
@@ -412,7 +412,7 @@ def SQL(cfg):
             res = None
             if isinstance(d,Room):
                 d = d.id_old
-            for x in self._exits:
+            for x in self.exits:
                 if x.dst_id == d:
                     if x.feature_id:
                         return x
@@ -432,10 +432,9 @@ def SQL(cfg):
             Returns a tuple: (Exit, changedFlag)
             """
             # TODO split this up
-            x = self.exits
             changed = False
             if v is True or v is False:
-                for x in self._exits:
+                for x in self.exits:
                     if x.dir == d:
                         if x.dst_id:
                             if v:
@@ -449,7 +448,7 @@ def SQL(cfg):
                     self._s.add(x)
                     changed = True
             else:
-                for x in self._exits:
+                for x in self.exits:
                     if x.dir == d:
                         if v:
                             if x.dst and not force:
@@ -474,7 +473,6 @@ def SQL(cfg):
                     x.flag |= Exit.F_IN_MUDLET
                 else:
                     x.flag &=~ Exit.F_IN_MUDLET
-            #self._exits = ":".join(f"{k}={v}" if v else f"{k}" for k,v in x.items())
             self._s.commit()
 
             return x,changed

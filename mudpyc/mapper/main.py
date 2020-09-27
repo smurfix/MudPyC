@@ -1844,7 +1844,7 @@ class S(Server):
             return txt
 
         if len(cmd) == 0:
-            for x in room._exits:
+            for x in room.exits:
                 txt = get_txt(x)
                 await self.print(txt)
         else:
@@ -2183,7 +2183,7 @@ class S(Server):
         if self.view_or_room == room:
             await self.mud.centerview(room.id_mudlet)
         await self.mud.deleteRoom(old_r)
-        for x in room._exits:
+        for x in room.exits:
             await room.set_mud_exit(x.dir, x.dst if x.dst_id and x.dst.id_mudlet else True)
         await self.mud.updateMap()
 
@@ -2227,7 +2227,7 @@ class S(Server):
                 s = s2
                 await self.print(_("… {room.id_mudlet}"), room=r)
                 await self.mud.updateMap()
-            for x in r._exits:
+            for x in r.exits:
                 await r.set_mud_exit(x.dir, x.dst if x.dst_id and x.dst.id_mudlet else True)
 
         await self.print("Done with map sync")
@@ -2481,7 +2481,7 @@ class S(Server):
                     return SkipRoute
                 if room in self.skiplist:
                     return None
-                for x in room._exits:
+                for x in room.exits:
                     if x.dst_id is None:
                         continue
                     if x.dst.id_mudlet is None:
@@ -2505,7 +2505,7 @@ class S(Server):
                     return SkipRoute
                 if room in self.skiplist:
                     return None
-                for x in room._exits:
+                for x in room.exits:
                     if x.dst_id is None:
                         return SkipSignal
                 return Continue
@@ -2527,7 +2527,7 @@ class S(Server):
                     return SkipRoute
                 if room in self.skiplist:
                     return None
-                for x in room._exits:
+                for x in room.exits:
                     if x.dst_id is None:
                         return SignalThis
                 return Continue
@@ -2593,7 +2593,7 @@ class S(Server):
                 mx = None
                 if room in self.skiplist:
                     return SkipRoute
-                for x in room._exits:
+                for x in room.exits:
                     if x.dst_id is not None:
                         continue
                     if mx is None:
@@ -3113,13 +3113,13 @@ class S(Server):
             await self.print(_("No current room known"))
             return
         exits = room.exits
-        rl = max(len(x) for x in exits.keys())
-        for d,dst in exits.items():
-            d += " "*(rl-len(d))
-            if dst is None:
+        rl = max(len(x.dir) for x in exits)
+        for x in exits:
+            d = x.dir+" "*(rl-len(x.dir))
+            if x.dst is None:
                 await self.print(_("{d} - unknown"), d=d)
             else:
-                await self.print(_("{d} = {dst.info_str}"), dst=dst, d=d)
+                await self.print(_("{d} = {dst.info_str}"), dst=x.dst, d=d)
 
 
     @doc(_(
@@ -3167,7 +3167,7 @@ class S(Server):
         if not room:
             await self.print(_("No current room known!"))
             return
-        for x in room._r_exits:
+        for x in room.r_exits:
             await self.print(x.src.info_str)
 
     @doc(_(
@@ -4059,9 +4059,10 @@ class S(Server):
             return None
 
     async def process_exits_text(self, room, txt):
-        xx = room.exits
         for x in self.exits_from_line(txt):
-            if x not in xx:
+            try:
+                room.exit_at(x)
+            except KeyError:
                 await room.set_exit(x)
                 await self.print(_("New exit: {exit}"), exit=x,room=room)
 
@@ -4325,13 +4326,15 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         if self.conf['add_reverse']:
             rev = loc2rev(d)
             if rev:
-                xr = room.exits.get(rev, NoData)
-                if xr is NoData:
+                try:
+                    xr = room.exit_at(rev, NoData)
+                except KeyError:
                     await self.print(_("This room doesn't have a back exit {dir}."), room=room,dir=rev)
-                elif xr is not None and xr != self.room:
-                    await self.print(_("Back exit {dir} already goes to {xr.idn_str}!"), xr=xr, dir=rev)
                 else:
-                    await room.set_exit(rev, self.room)
+                    if xr.dst is not None and xr.dst != self.room:
+                        await self.print(_("Back exit {dir} already goes to {room.idn_str}!"), room=xr.dst, dir=xr.dir)
+                    else:
+                        await room.set_exit(rev, self.room)
             else:
                 try:
                     self.room.exit_to(room)
