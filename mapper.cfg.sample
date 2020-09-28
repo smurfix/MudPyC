@@ -1,5 +1,5 @@
 name: yourmud
 sql:
-    url: 'sqlite:////home/yourname/data/yourmud.db'
+    url: 'sqlite:///./yourmud.db'
     #url: 'mysql://name:password@database.example.com/muddb'
 
