@@ -108,8 +108,9 @@ def SQL(cfg):
 
         @validates("dir")
         def dir_min_len(self, key, dir) -> str:
-            if dir is not None and len(dir) < 3:  # oben
-                raise ValueError(f'dir {dir!r} too short')
+            if not dir:
+                raise ValueError(f'dir {dir!r} empty')
+            # TODO we might want to protect against "n" if it should really be "north"
             return dir
 
         @property
