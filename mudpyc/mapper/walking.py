@@ -37,17 +37,24 @@ class PathChecker:
             await self.reporter(n,r,p,res)
         return res
 
-class RoomFinder(PathChecker):
+class CachedPathChecker(PathChecker):
+    """
+    Abstract base class for path checks which processes cache entries
+    """
+    pass
+
+
+class RoomFinder(CachedPathChecker):
     def __init__(self, room, **kw):
-        self.room = room
+        self.room = room.id_old
         super().__init__(**kw)
 
     async def check(self, room):
-        if self.room == room:
+        if self.room == room.id_old:
             # there can be only one
             return SignalDone
 
-class LabelChecker(PathChecker):
+class LabelChecker(CachedPathChecker):
     def __init__(self, label, **kw):
         self.label = label
         super().__init__(**kw)

@@ -4,7 +4,7 @@ from weakref import ref
 from heapq import heappush,heappop
 import simplejson as json
 
-from sqlalchemy import ForeignKey, Column, Integer, MetaData, Table, String, Float, Text, create_engine, select, func, Binary
+from sqlalchemy import ForeignKey, Column, Integer, MetaData, Table, String, Float, Text, create_engine, select, func, Binary, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, object_session, validates, backref
 from sqlalchemy.schema import Index
@@ -40,6 +40,122 @@ def SQL(cfg):
         "pk": "pk_%(table_name)s"
     }
     Base = declarative_base(metadata=MetaData(naming_convention=convention))
+
+    room_cache = {}
+    _cache_todo = set()  # rooms to be processed
+    _cache_evt = trio.Event()  # set when there are rooms to be processed
+    _cache_wait = trio.Event()  # set when the list is empty
+
+    class _RoomCommon:
+        """
+        Abstract base class for both rooms and room caches
+        """
+        id_old:int = None
+        id_mudlet:int = None
+        label:str = None
+
+        @property
+        async def reachable(self):
+            """
+            This iterator yields room cache entries (actually, paths to
+            them) reachable from this one. The room itself is included.
+
+            This returns cache entries. Used when you only require the
+            room IDs or the room's label.
+
+            You must send a `mudpyc.mapper.const._PathSignal` instance back
+            to the iterator, to tell it what to do next.
+            """
+            res = [(0,[self])]
+            seen = set()
+            c = None
+            while res:
+                d,h = heappop(res)
+                r = h[-1]
+                if r.id_old in seen:
+                    continue
+                seen.add(r.id_old)
+
+                for rr,cc in r.exit_costs:
+                    heappush(res,(d+cc, h+[rr]))
+
+                c = (yield h)
+                if c.done:
+                    return
+                if c.skip:
+                    continue
+
+        @property
+        def cache(self):
+            """
+            Cache entry for this room
+            """
+            ...
+
+        @property
+        def exit_costs(self):
+            """
+            (next_room,cost) iterator
+            """
+            ...
+
+    class CachedRoom(_RoomCommon):
+        id_old = None
+        id_mudlet = None
+        label = None
+
+        def __new__(cls, room):
+            if not room.id_mudlet:
+                return None
+            try:
+                res = room_cache[room.id_mudlet]
+            except KeyError:
+                res = object.__new__(cls)
+            else:
+                res._reset(room)
+            return res
+
+        def __init__(self, room):
+            if self.id_old is not None:
+                return
+            self.id_mudlet = room.id_mudlet
+            self.id_old = room.id_old
+            self.reset()
+            room_cache[self.id_old] = self
+
+        @property
+        def cache(self):
+            return self
+
+        def reset(self):
+            dr = r_mudlet(self.id_mudlet)
+            self._reset(dr)
+
+        def _reset(self, room):
+            self._exits = {}
+            self.label = room.label
+            for x in room.exits:
+                if x.dst is None or not x.dst.id_mudlet:
+                    continue
+                self._exits[x.dst.id_mudlet] = x.cost
+
+        @property
+        def exit_costs(self):
+            """
+            cache>cost iterator
+            """
+            for d,c in self._exits.items():
+                if d in room_cache:
+                    dc = room_cache[d]
+                else:
+                    try:
+                        r = r_old(d)
+                    except KeyError:
+                        continue
+                    dc = CachedRoom(r)
+                yield dc,c
+
+
     class _AddOn:
         @property
         def _s(self):
@@ -155,7 +271,7 @@ def SQL(cfg):
                 return None
             return x.feature
 
-    class Room(_AddOn, Base):
+    class Room(_RoomCommon, _AddOn, Base):
         __tablename__ = "rooms"
         id_old = Column(Integer, nullable=True, primary_key=True)
         id_mudlet = Column(Integer, nullable=True, unique=True)
@@ -204,6 +320,22 @@ def SQL(cfg):
             if id_gmcp is not None and len(id_gmcp) < 8:  # oben
                 raise ValueError(f'GMCP id {id_gmcp!r} too short')
             return id_gmcp
+
+        @property
+        def cache(self):
+            return room_cache[self.id_old]
+
+        @property
+        def exit_costs(self):
+            """
+            room>cost iterator
+
+            Same semantics as RoomCache.exit_costs
+            """
+            for x in self.exits:
+                if x.dst_id is None:
+                    continue
+                yield x.dst,x.cost
 
         @property
         def info_str(self):
@@ -291,13 +423,6 @@ def SQL(cfg):
                 ex.append(d)
             return ":"+":".join(ex)+":"
 
-        @property
-        def exits(self):
-            res = {}
-            for x in self.exits:
-                res[x.dir] = x.dst
-            return res
-
         def visited(self):
             lv = session.query(func.max(Room.last_visit)).scalar() or 0
             if self.last_visit != lv:
@@ -355,35 +480,6 @@ def SQL(cfg):
                     res = max(res,3)
             return res
 
-        @property
-        async def reachable(self):
-            """
-            This iterator yields rooms (actually, paths to rooms)
-            reachable from this one. The room itself is included.
-
-            TODO use a cache to speed up all of this.
-            """
-            res = [(0,[self])]
-            seen=set()
-            c=None
-            while res:
-                await trio.sleep(0)
-                d,h = heappop(res)
-                r = h[-1]
-                if r.id_old in seen:
-                    continue
-                c = (yield h)
-                seen.add(r.id_old)
-                if c.done:
-                    return
-                if c.skip:
-                    continue
-                for x in session.query(Exit).filter(Exit.src==r):
-                    await trio.sleep(0)
-                    if x.dst_id is None:
-                        continue
-                    heappush(res,(d+x.cost, h+[x.dst]))
-
         def exit_at(self,d, prefer_feature=False):
             """
             Return the exit(s) in a specific direction
@@ -433,6 +529,9 @@ def SQL(cfg):
             Returns a tuple: (Exit, changedFlag)
             """
             # TODO split this up
+            if not len(d):
+                return 
+
             changed = False
             if v is True or v is False:
                 for x in self.exits:
@@ -474,6 +573,10 @@ def SQL(cfg):
                     x.flag |= Exit.F_IN_MUDLET
                 else:
                     x.flag &=~ Exit.F_IN_MUDLET
+
+            if self.id_old not in _cache_todo:
+                _cache_todo.add(self.id_old)
+                _cache_evt.set()
             self._s.commit()
 
             return x,changed
@@ -550,6 +653,39 @@ def SQL(cfg):
             if isinstance(other,Room):
                 other = other.id_old
                 return self.id_old < other
+
+    async def cache_updater():
+        # standard decorator style
+        nonlocal _cache_evt
+
+        @event.listens_for(Room, 'load')
+        def receive_load(room, context):
+            "listen for the 'load' event"
+            if room.id_old not in room_cache:
+                _cache_todo.add(room.id_old)
+                _cache_wait.set()
+
+        evts = []
+        while True:
+            if not _cache_todo:
+                await _cache_evt.wait()
+                _cache_evt = trio.Event()
+                _cache_wait.set()
+
+            while _cache_todo:
+                await trio.sleep(0)
+                r = _cache_todo.pop()
+
+                room = r_old(r)
+                CachedRoom(room)
+
+    async def sync_updater():
+        nonlocal _cache_wait
+
+        if _cache_wait.is_set():
+            _cache_wait = trio.Event()
+        _cache_evt.set()
+        await _cache_wait.wait()
 
     class LongDescr(_AddOn, Base):
         __tablename__ = "longdescr"
@@ -854,7 +990,7 @@ def SQL(cfg):
     #conn = await engine.connect()
     session=Session()
     res = attrdict(db=session, q=session.query,
-            setup=setup,
+            setup=setup, cache_updater=cache_updater, sync_updater=sync_updater,
             Room=Room, Area=Area, Exit=Exit, Skiplist=Skiplist, Quest=Quest,
             Thing=Thing, Feature=Feature, LongDescr=LongDescr, Note=Note,
             r_hash=r_hash, r_old=r_old, r_mudlet=r_mudlet, r_new=r_new,

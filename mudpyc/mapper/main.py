@@ -21,7 +21,7 @@ from sqlalchemy.exc import IntegrityError
 from .sql import SQL, NoData
 from .const import SignalThis, SkipRoute, SkipSignal, Continue
 from .const import ENV_OK,ENV_STD,ENV_SPECIAL,ENV_UNMAPPED
-from .walking import PathGenerator, PathChecker, RoomFinder, LabelChecker, FulltextChecker, VisitChecker, ThingChecker, SkipFound
+from .walking import PathGenerator, PathChecker, CachedPathChecker, RoomFinder, LabelChecker, FulltextChecker, VisitChecker, ThingChecker, SkipFound
     
 from ..util import doc
 
@@ -160,7 +160,9 @@ def itl2loc(x):
 class MappedSkipMod:
     """
     A mix-in that doesn't walk through unmapped rooms
-    and which processes a skip list
+    and which processes a skip list.
+
+    This works both with rooms and room cache entries.
     """
     def __init__(self, skiplist=(), **kw):
         self.skiplist = skiplist
@@ -171,7 +173,7 @@ class MappedSkipMod:
             return SkipRoute
 
         res = await super().check(room)
-        if room in self.skiplist and not res.skip:
+        if room.id_old in self.skiplist and not res.skip:
             res = res(skip=True)
         return res
 
@@ -388,12 +390,36 @@ class FixProcess(Process):
         await self.server.print(_("*** Stopped ***"))
         await self.server.print(self.reason)
 
-class SeqProcess(Process):
+class _SeqProcess(Process):
+    next_seq = None
+
+    async def setup(self):
+        """
+        Set myself up.
+        """
+        s = self.server
+        print("SETUP",repr(self))
+        if isinstance(s.process, SeqProcess):
+            p = s.process
+            while p.next_seq is not None:
+                p = p.next_seq
+            p.next_seq = self
+            return
+        await super().setup()
+
+    async def finish(self):
+        """
+        Clean up after myself.
+        """
+        await super().finish()
+        if self.next_seq is not None:
+            await self.next_seq.setup()
+
+class SeqProcess(_SeqProcess):
     """
     Process that runs a sequence of commands
     """
     sleeping = False
-    next_seq = None
 
     def __init__(self, server, name, cmds, exit=None, room=None, send_echo=True, **kw):
         self.cmds = cmds
@@ -423,28 +449,6 @@ class SeqProcess(Process):
         for i,c in enumerate(self.cmds):
             r[cp%i] = ("*" if i == self.current else "") + repr(c)
         return r
-
-    async def setup(self):
-        """
-        Set myself up.
-        """
-        s = self.server
-        print("SETUP",repr(self))
-        if isinstance(s.process, SeqProcess):
-            p = s.process
-            while p.next_seq is not None:
-                p = p.next_seq
-            p.next_seq = self
-            return
-        await super().setup()
-
-    async def finish(self):
-        """
-        Clean up after myself.
-        """
-        await super().finish()
-        if self.next_seq is not None:
-            await self.next_seq.setup()
 
     async def _sleep(self, d, *, task_status=trio.TASK_STATUS_IGNORED):
         s = self.server
@@ -725,7 +729,7 @@ class IdleCommand(BaseCommand):
 
     async def done(self):
         if self.info or self.exits_text:
-            self.location_seen()
+            await self.location_seen()
         await super().done()
 
     async def location_seen(self):
@@ -753,7 +757,7 @@ class IdleCommand(BaseCommand):
                     r = db.r_hash(id_gmcp)
                 except NoData:
                     pass
-            if not r:
+            if self.server.room and not r:
                 try:
                     x = self.server.room.exit_at(TIME_DIR)
                 except KeyError:
@@ -811,7 +815,7 @@ class Command(BaseCommand):
         return res
 
 
-class LookProcessor(Command):
+class LookCommand(Command):
     def __init__(self, server, command, *, force=False):
         super().__init__(server, command)
         self.force = force
@@ -967,6 +971,7 @@ class S(Server):
         self._text_monitors = set()
 
         self._text_w,rd = trio.open_memory_channel(1000)
+        self.main.start_soon(self.db.cache_updater)
         self.main.start_soon(self._text_writer,rd)
         self.main.start_soon(self._send_loop)
         self.main.start_soon(self._monitor_selection)
@@ -2265,8 +2270,25 @@ class S(Server):
         Incrementally imports a Mudlet map by following exits that are only in Mudlet.
         Typical usage: select an initial room, then '#mdi ??'.
         """
-        cmd = self.cmdfix("r"*99, cmd, min_words=1)
-        await self.sync_map(*cmd)
+        db = self.db
+        if cmd.strip() == "??":
+            sel = await self.mud.getMapSelection()
+            if not sel or not sel[0] or not sel[0]["rooms"]:
+                await self.print(_("You need to select unmapped rooms."),id=r)
+                return
+            cmd = []
+            for r in sel[0]["rooms"]:
+                try:
+                    room = db.r_mudlet(r)
+                except NoData:
+                    nr = await self.new_room(id_mudlet=r)
+                    cmd.append(nr)
+            if not cmd:
+                await self.print(_("All selected rooms are known."))
+                return
+        else:
+            cmd = self.cmdfix("r"*99, cmd, min_words=1)
+        await self.sync_from_mudlet(*cmd)
 
     @with_alias("mdi!")
     @doc(_("""
@@ -2283,7 +2305,7 @@ class S(Server):
         Basic sync when some mudlet IDs got deleted due to out-of-sync-ness
         """
         cmd = self.cmdfix("r"*99, cmd, min_words=1)
-        await self.sync_map(*cmd, clear=True)
+        await self.sync_from_mudlet(*cmd, clear=True)
 
     @doc(_(
         """Current description state
@@ -2472,7 +2494,7 @@ class S(Server):
         No parameters. Use the skip list to ignore "not interesting" rooms.
         """))
     async def alias_mud(self, cmd):
-        class NotInMudlet(PathChecker):
+        class NotInMudlet(CachedPathChecker):
             @staticmethod
             async def check(room):
                 # exits that are in Mudlet.
@@ -2481,10 +2503,8 @@ class S(Server):
                     return SkipRoute
                 if room in self.skiplist:
                     return None
-                for x in room.exits:
-                    if x.dst_id is None:
-                        continue
-                    if x.dst.id_mudlet is None:
+                for x,c in room.exits:
+                    if x.id_mudlet is None:
                         return SkipSignal
                 return Continue
         await self.gen_rooms(NotInMudlet())
@@ -2516,6 +2536,7 @@ class S(Server):
         Exits with unknown destination
 
         Find routes to rooms with those exits.
+        Paths through those rooms are *not* skipped.
 
         No parameters. Use the skip list to ignore "not interesting" rooms.
         """))
@@ -3283,7 +3304,13 @@ class S(Server):
         p = PP(self, name, cmds, exit=exit, send_echo=send_echo)
         await self.run_process(p)
 
-    async def sync_map(self, *rooms, clear=False):
+    async def sync_from_mudlet(self, *rooms, clear=False):
+        """
+        Given these rooms, follow those of their exits that are only in
+        Mudlet. Create targets. Recurse.
+
+        If @clear is set, any old associations are deleted.
+        """
         db=self.db
         done = set()
         broken = set()
@@ -3296,6 +3323,7 @@ class S(Server):
         for k,v in area_names.items():
             area_rev[v] = k
         logger.debug("AREAS:%r",area_names)
+        await self.print(_("Start syncing. Please be patient."))
 
         if clear:
             r_old = {}
@@ -3323,6 +3351,9 @@ class S(Server):
             r = todo.pop()
             if r.id_old in done:
                 continue
+            done.add(r.id_old)
+            if not (len(done)%100):
+                await self.print(_("{done} rooms ..."), done=len(done))
 
             try:
                 y = await r.mud_exits
@@ -3332,7 +3363,8 @@ class S(Server):
                 explore.add(r.id_old)
                 continue
 
-            # Iterate exits but do the "standard" directions first
+            # Iterate exits but do the "standard" directions first,
+            # then the reversible nonstandard ways, then the others.
             def exits(y):
                 for d,mid in y.items():
                     if is_std_dir(d):
@@ -3340,8 +3372,8 @@ class S(Server):
                 for d,mid in y.items():
                     if not is_std_dir(d) and loc2rev(d) is not None:
                         yield d,mid
-                for d,mid in y.items() and loc2rev(d) is None:
-                    if not is_std_dir(d):
+                for d,mid in y.items():
+                    if not is_std_dir(d) and loc2rev(d) is None:
                         yield d,mid
 
             for d,mid in exits(y):
@@ -3369,12 +3401,14 @@ class S(Server):
                     nr = await self.new_room(name, id_gmcp=gmcp, id_mudlet=mid, offset_from=r, offset_dir=d)
 
                 if x is None:
-                    x,_ = await r.set_exit(d,nr,skip_mud=True)
+                    x,_xf = await r.set_exit(d,nr,skip_mud=True)
                 elif x.dst is None:
                     x.dst = nr
                 todo.append(nr)
+            db.commit()
+            await db.sync_updater()
 
-        db.commit()
+        await self.print(_("Finished, {done} rooms processed"), done=len(done))
 
     @asynccontextmanager
     async def input_grab_multi(self):
@@ -3995,11 +4029,12 @@ class S(Server):
         x = self.this_exit
         if x is None:
             d = short2loc(d)
-            try:
-                x = self.room.exit_at(d)
-            except KeyError:
-                x = None
-        else:
+            if self.room is not None:
+                try:
+                    x = self.room.exit_at(d)
+                except KeyError:
+                    x = None
+        if x is not None:
             d = x.dir
 
         move_cmd = self.process.last_move
@@ -4027,7 +4062,7 @@ class S(Server):
         elif exits_seen is None and move_cmd is not None:
             exits_seen = move_cmd.exits_seen
 
-        if move_cmd and isinstance(move_cmd, LookProcessor):
+        if move_cmd and isinstance(move_cmd, LookCommand):
             # This command does not generate movement. Thus if it did
             # anyway the move was probably timed, except when the exit
             # already exists. Life is complicated.
@@ -4185,8 +4220,8 @@ class S(Server):
                 txt = txt[len(prefix):-1]
             await self.print(prefix+txt.rstrip("\n")+"]")  # TODO color
 
-    async def new_room(self, descr, id_gmcp=None, id_mudlet=None, offset_from=None,
-            offset_dir=None, area=None):
+    async def new_room(self, descr="", *, id_gmcp=None, id_mudlet=None,
+            offset_from=None, offset_dir=None, area=None):
 
         if self.conf['debug_new_room']:
             import pdb;pdb.set_trace()
@@ -4195,7 +4230,11 @@ class S(Server):
             try:
                 room = self.db.r_mudlet(id_mudlet)
             except NoData:
-                pass
+                if not descr:
+                    descr = (await self.mud.getRoomName(id_mudlet))[0]
+                if area is None:
+                    area = (await self.mud.getRoomArea(id_mudlet))[0]
+                    area = self._area_id2area[area]
             else:
                 if offset_from and offset_dir:
                     self.logger.error(_("Not in mudlet? but we know mudlet# {id_mudlet} at {offset_room.id_str}/{offset_dir}").format(offset_room=offset_room, offset_dir=offset_dir, id_mudlet=id_mudlet))
@@ -4517,7 +4556,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
                 for tt in SPC.split(t):
                     room.has_thing(tt)
         else:
-            self.main.start_soon(self.send_commands, "", LookProcessor(self, "schau"))
+            await self.send_commands("", LookCommand(self, "schau"))
         room.visited()
         if last_room and last_room.id_mudlet:
             await self.update_room_color(last_room)
@@ -4591,7 +4630,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         get from MUD and set room to it
         """))
     async def alias_rl_b(self, cmd):
-        self.main.start_soon(self.send_commands,"", LookProcessor(self, "schau", force=True))
+        self.main.start_soon(self.send_commands,"", LookCommand(self, "schau", force=True))
 
     @doc(_(
         """
