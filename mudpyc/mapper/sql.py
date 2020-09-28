@@ -50,15 +50,15 @@ def SQL(cfg):
 
     assoc_skip_room = Table('assoc_skip_room', Base.metadata,
         Column('skip_id', Integer, ForeignKey('skip.id')),
-        Column('room_id', Integer, ForeignKey('rooms.id_old'), index=True),
-        Index("assoc_skip_idx","skip_id","room_id",unique=True),
+        Column('room_id', Integer, ForeignKey('rooms.id_old')),#, index=True),
+        #Index("assoc_skip_idx","skip_id","room_id",unique=True),
         
     )
 
     assoc_seen_room = Table('seen_in', Base.metadata,
         Column('seen_id', Integer, ForeignKey('seen.id')),
-        Column('room_id', Integer, ForeignKey('rooms.id_old'), index=True),
-        Index("assoc_seen_idx","seen_id","room_id",unique=True),
+        Column('room_id', Integer, ForeignKey('rooms.id_old')),#, index=True),
+        #Index("assoc_seen_idx","seen_id","room_id",unique=True),
     )
 
     class Area(_AddOn, Base):
@@ -159,7 +159,7 @@ def SQL(cfg):
         id_old = Column(Integer, nullable=True, primary_key=True)
         id_mudlet = Column(Integer, nullable=True, unique=True)
         id_gmcp = Column(String, nullable=True, unique=True)
-        name = Column(String, nullable=True, index=True)
+        name = Column(String, nullable=True) ## index=True
         label = Column(String, nullable=True)
         # long_descr = Column(Text)
         pos_x = Column(Integer, nullable=False, default=0)
