@@ -13,6 +13,7 @@ from typing import Dict
 
 from .const import SignalThis, SkipRoute, SkipSignal
 from .const import ENV_OK,ENV_STD,ENV_SPECIAL,ENV_UNMAPPED
+from ..driver import LocalDir
 
 import trio
 
@@ -472,7 +473,7 @@ def SQL(cfg):
             m = self._m
             for x in self.exits:
                 if x.dst is None:
-                    if x.dir in m.loc_names:
+                    if m.dr.is_std_dir(x.dir):
                         res = max(res,1)
                     else:
                         res = max(res,2)
@@ -606,25 +607,25 @@ def SQL(cfg):
                 y = y[0]
             else:
                 y = {}
-            return combine_dict(m.itl2loc(x),y)
+            return combine_dict(m.dr.intl2loc(x),y)
 
-        async def set_mud_exit(self,d,v=True):
+        async def set_mud_exit(self,d:LocalDir,v=True):
             m = self._m
             mud = self._m.mud
             if not self.id_mudlet:
                 raise RuntimeError("no id_mudlet "+self.idnn_str)
 
             changed = False
-            d = m.loc2itl(d)
+            d = m.dr.loc2intl(d)
             if v and v is not True and v is not False and v.id_mudlet:  # set
-                if d in m.itl_names:
+                if m.dr.is_mudlet_dir(d):
                     await mud.setExit(self.id_mudlet,v.id_mudlet,d)
                 else:
                     await mud.addSpecialExit(self.id_mudlet,v.id_mudlet,d)
                 changed = True
             else:
                 if not v:  # delete
-                    if d in m.itl_names:
+                    if m.dr.is_mudlet_dir(d):
                         await mud.setExit(self.id_mudlet, -1, d)
                     else:
                         await mud.removeSpecialExit(self.id_mudlet,d)
@@ -633,7 +634,7 @@ def SQL(cfg):
                     x = (await mud.getRoomExits(self.id_mudlet))
                     x = x[0] if len(x) else []
                     if d not in x:
-                        if d in m.itl_names:
+                        if m.dr.is_mudlet_dir(d):
                             await mud.setExitStub(self.id_mudlet, d, True)
                         else: # special exit
                             # a special exit without a destination doesn't work

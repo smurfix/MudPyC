@@ -14,6 +14,7 @@ from weakref import ref
 from inspect import iscoroutine
 from datetime import datetime
 import re
+from importlib import import_module
 
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -83,79 +84,6 @@ CFG_HELP=attrdict(
         pos_y_delta=_("Y offset, new rooms"),
         pos_small_delta=_("Diagonal offset, new rooms"),
         )
-
-_itl2loc = {
-        "up":"oben", "down":"unten", "in":"rein", "out":"raus",
-        "north":"norden", "south":"sueden", "east":"osten", "west":"westen",
-        "northwest":"nordwesten", "southwest":"suedwesten",
-        "northeast":"nordosten", "southeast":"suedosten",
-        }
-_loc2itl = {}
-_short2loc = {
-        "n":"norden", "s":"sueden",
-        "o":"osten","w":"westen",
-        "so":"suedosten","sw":"suedwesten",
-        "no":"nordosten","nw":"nordwesten",
-        "ob":"oben","u":"unten",
-        }
-_std_dirs = set()
-for a in "nord","sued","":
-    for b in "ost","west","":
-        for c in "ob","unt","":
-            _std_dirs.add(a+b+c+"en")
-_std_dirs.remove("en")  # :-)
-
-for k,v in _itl2loc.items():
-    _loc2itl[v]=k
-for k,v in _short2loc.items():
-    _loc2itl[k] = _loc2itl[v]
-def short2loc(x):
-    return _short2loc.get(x,x)
-def loc2itl(x):
-    x = short2loc(x)
-    return _loc2itl.get(x,x)
-def loc2rev(x):
-    r=(("nord","sued"),("ost","west"),("oben","unten"))
-    y=x
-    for a,b in r:
-        if a in y:
-            y = y.replace(a,b)
-        else:
-            y = y.replace(b,a)
-    if x==y or y not in _std_dirs:
-        return None
-    return y
-def is_std_dir(x):
-    return x in _std_dirs
-
-def dir_off(d, use_z=True, d_x=5, d_y=5, d_small=2):
-    """Calculate an (un)likely offset for placing a new room."""
-    x,y,z = 0,0,0
-    d = short2loc(d)
-    if "ost" in d: x += d_x
-    if "west" in d: x -= d_x
-    if "nord" in d: y += d_y
-    if "sued" in d: y -= d_y
-    if d.endswith("unten"): z -= 1
-    if d.endswith("oben"): z += 1
-    if d == "raus":
-        x -= d_small
-        y -= d_small
-    # anything not moving out is regarded as moving in
-    if (x,y,z) == (0,0,0):
-        x += d_small
-        y += d_small
-    if not use_z:
-        x -= d_small*z
-        y += d_small*z
-        z = 0
-    return x,y,z
-
-def itl2loc(x):
-    if isinstance(x,dict):
-        return { itl2loc(k):v for k,v in x.items() }
-    else:
-        return _itl2loc.get(x,x)
 
 class MappedSkipMod:
     """
@@ -891,11 +819,6 @@ class NoteProcessor(Command):
 
 class S(Server):
 
-    loc2itl=staticmethod(loc2itl)
-    itl2loc=staticmethod(itl2loc)
-    itl_names=set(_itl2loc.keys())
-    loc_names=set(_loc2itl.keys())
-
     _input_grab = None
 
     blocked_commands = set(("lang","kurz","ultrakurz"))
@@ -924,6 +847,11 @@ class S(Server):
             32:"raus",
             }
         }
+
+    def __init__(self, cfg):
+        super().__init__(cfg)
+        self.dr = import_module(cfg['driver']).Driver(cfg)
+
     async def setup(self, db):
         self.db = db
         db.setup(self)
@@ -1233,7 +1161,7 @@ class S(Server):
         """
         cmdfix add-on that interprets exits, by canonicalizing them.
         """
-        return short2loc(v)
+        return self.dr.short2loc(v)
 
     @doc(_(
         """
@@ -3367,13 +3295,13 @@ class S(Server):
             # then the reversible nonstandard ways, then the others.
             def exits(y):
                 for d,mid in y.items():
-                    if is_std_dir(d):
+                    if self.dr.is_std_dir(d):
                         yield d,mid
                 for d,mid in y.items():
-                    if not is_std_dir(d) and loc2rev(d) is not None:
+                    if not self.dr.is_std_dir(d) and self.dr.loc2rev(d) is not None:
                         yield d,mid
                 for d,mid in y.items():
-                    if not is_std_dir(d) and loc2rev(d) is None:
+                    if not self.dr.is_std_dir(d) and self.dr.loc2rev(d) is None:
                         yield d,mid
 
             for d,mid in exits(y):
@@ -3473,7 +3401,7 @@ class S(Server):
         """
         self.this_exit = None
 
-        ms = short2loc(msg)
+        ms = self.dr.short2loc(msg)
         if self.room is None:
             await self.send_commands(msg, msg)
         else:
@@ -4028,7 +3956,7 @@ class S(Server):
     async def _end_command(self,d,nr,moved,exits_seen):
         x = self.this_exit
         if x is None:
-            d = short2loc(d)
+            d = self.dr.short2loc(d)
             if self.room is not None:
                 try:
                     x = self.room.exit_at(d)
@@ -4073,7 +4001,7 @@ class S(Server):
             if x is not None:
                 # There is an exit thus we seem to have used it
                 moved = True
-            elif is_std_dir(d):
+            elif self.dr.is_std_dir(d):
                 # Standard directions generally indicate movement.
                 # Exit may be 'created' by opening a door or similar.
                 moved = True
@@ -4314,17 +4242,34 @@ class S(Server):
             room.label_x,room.label_y = await self.mud.getRoomNameOffset(room.id_mudlet)
             room.area_id = (await self.mud.getRoomArea(room.id_mudlet))[0]
 
+    def dir_off(self, d, use_z=True, d_x=5, d_y=5, d_small=2):
+        """Calculate an (un)likely offset for placing a new room."""
+        d = self.dr.short2loc(d)
+        dx,dy,dz,ds,dt = self.dr.offset_delta(d)
+
+        d_x=self.conf["pos_x_delta"]
+        d_y=self.conf["pos_y_delta"]
+        # d_z is always 1
+        d_small=self.conf["pos_small_delta"]
+
+        dx = dx * self.conf["pos_x_delta"] + ds * d_small + dt * d_small
+        dy = dy * self.conf["pos_y_delta"] + ds * d_small - dt * d_small
+        if dz and not self.conf['dir_use_z']:
+            dx -= d_small*dz
+            dy += d_small*dz*2
+            dz = 0
+        return dx,dy,dz
+
 
     async def place_room(self, start,dir,room):
         """
-        Went from start via dir to room. Move room.
+        If you went from start via dir to room, move room to be in the
+        correct direction.
         """
         # x,y,z = start.pos_x,start.pos_y,start.pos_z
         x,y,z = await self.mud.getRoomCoordinates(start.id_mudlet)
-        dx,dy,dz = dir_off(dir, self.conf['dir_use_z'],
-                d_x=self.conf["pos_x_delta"], d_y=self.conf["pos_y_delta"],
-                d_small=self.conf["pos_small_delta"])
-        x += dx; y += dy; z += dz
+        dx,dy,dz = self.dir_off(dir)
+        x,y,z = x+dx, y+dy, z+dz
         room.pos_x, room.pos_y, room.pos_z = x,y,z
         await self.mud.setRoomCoordinates(room.id_mudlet, x,y,z)
 
@@ -4349,7 +4294,7 @@ class S(Server):
         except KeyError:
             x = None
         else:
-            if is_std_dir(d):
+            if self.dr.is_std_dir(d):
                 x = None
 
         if x is None:
@@ -4363,7 +4308,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         #src |= _src
 
         if self.conf['add_reverse']:
-            rev = loc2rev(d)
+            rev = self.dr.loc2rev(d)
             if rev:
                 try:
                     xr = room.exit_at(rev, NoData)
@@ -5198,7 +5143,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         db = self.db
         cmd = self.cmdfix("w", cmd, min_words=1)
         f = db.feature(cmd[0])
-        d = loc2rev(self.last_dir)
+        d = self.dr.loc2rev(self.last_dir)
         if d == self.last_dir:  # could not reverse
             x = self.room.exit_to(self.last_room)
         else:
@@ -5426,7 +5371,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             return
         if cmd:
             self.quest.step = cmd[0]
-            await self._q_state(q, print_q=False)
+            await self._q_state(self.quest, print_q=False)
             self.db.commit()
             return
         await self._q_next_step()

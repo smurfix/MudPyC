@@ -1,4 +1,4 @@
-name: yourmud
+driver: mudlet.driver.en.midnight_sun
 sql:
     url: 'sqlite:///./yourmud.db'
     #url: 'mysql://name:password@database.example.com/muddb'
