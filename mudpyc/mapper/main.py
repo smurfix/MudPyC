@@ -1063,7 +1063,12 @@ class S(Server):
             self._area_name2area[area.name.lower()] = area
             self._area_id2area[area.id] = area
             seen.add(area.id)
-        for k,v in (await self.mud.getAreaTableSwap())[0].items():
+        ts = (await self.mud.getAreaTableSwap())[0]
+        if isinstance(ts,dict):
+            ts = ts.items()
+        else:
+            ts = ((i+1,x) for i,x in enumerate(ts))
+        for k,v in ts:
             k = int(k)
             if k in self._area_id2area:
                 seen.remove(k)
@@ -1079,6 +1084,9 @@ class S(Server):
             v = self._area_id2area[k].name
             self.logger.info(_("SYNC: add area {v} to Mudlet").format(v=v))
             kk = (await self.mud.addAreaName(v))[0]
+            if kk is None:
+                # ugh it's actually present but hasn't been returned
+                kk = (await self.mud.getRoomAreaName(v))[0]
             if kk != k:
                 # Ugh now we have to renumber it
                 self.logger.warning(_("SYNC: renumber area {v}: {k} > {kk}").format(kk=kk, k=k, v=v))
