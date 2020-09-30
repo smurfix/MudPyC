@@ -3511,8 +3511,9 @@ class S(Server):
         self.main.start_soon(self.mud.send,"\n",False)
         return True
 
-    async def called_text(self, msg):
+    async def called_text(self, msg, colors=None):
         """Incoming text from the MUD"""
+        # TODO: store and interpret colors
         if await self.check_more(msg):
             return
         if self.logfile:
