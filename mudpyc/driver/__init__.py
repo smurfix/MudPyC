@@ -53,7 +53,6 @@ class Driver:
 		"""
 		return self._short2loc.get(d,d)
 
-	@staticmethod
 	def intl2loc(self, d: IntlDir) -> LocalDir:
 		"""
 		Translate an international direction, as understood by Mudlet, to
@@ -65,7 +64,6 @@ class Driver:
 		"""
 		return self._intl2loc.get(d,d)
 
-	@staticmethod
 	def loc2intl(self, d: LocalDir) -> IntlDir:
 		"""
 		Translate a direction as understood by the MUD to the name required
