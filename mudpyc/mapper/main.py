@@ -58,12 +58,6 @@ DEFAULT_CFG=attrdict(
             ),
         )
 
-EX1 = re.compile(r"^Es gibt \S+ sichtbare Ausgaenge:(.*)$")
-EX2 = re.compile(r"^Es gibt einen sichtbaren Ausgang:(.*)$")
-EX3 = re.compile(r"^Es gibt keinen sichtbaren Ausgang.\s*")
-EX4 = re.compile(r"^Es gibt keine sichtbaren Ausgaenge.\s*")
-EX5 = re.compile(r"^Du kannst keine Ausgaenge erkennen.\s*")
-EX9 = re.compile(r"\.\s*$")
 SPC = re.compile(r"\s{3,}")
 WORD = re.compile(r"(\w+)")
 DASH = re.compile(r"- +")
@@ -596,19 +590,16 @@ class BaseCommand:
         attrs = self._repr()
         return "C‹%s›" % (" ".join("%s=%s" % (k,v) for k,v in self._repr().items()),)
 
-    def dir_seen(self, exits_line):
+    def dir_seen(self, exit_matcher):
         """
         Directions.
         """
         if self.current == self.P_BEFORE:
             self.current = self.P_AFTER
-            if exits_line:
-                self.exits_text = exits_line
-        elif exits_line and not self.lines[1]:
-            self.exits_text += " " + exits_line
-
-        if self.exits_text and exits_line is None:
-            self.set_exits()
+            self.exits = exit_matcher
+            exit_matcher.set_finish_cb(self.set_exits)
+        # otherwise we have an "Outside you see:" situation
+        # those exits must be ignored
 
     def add(self, msg):
         self.lines[self.current].append(msg)
@@ -633,7 +624,7 @@ class BaseCommand:
         self.info = info
         return True
 
-    async def set_exits(self):
+    def set_exits(self):
         pass
 
 
@@ -861,7 +852,7 @@ class S(Server):
 
         self.logger = logging.getLogger(self.cfg['name'])
         self.trigger_sender = trio.Event()
-        self.exit_match = None
+        self.exit_matcher = None
         self.start_rooms = deque()
         self.room = None
         self.view_room = None
@@ -1019,7 +1010,7 @@ class S(Server):
             if isinstance(line,trio.Event):
                 line.set()
             else:
-                await self.mud.print(line)
+                await self.mud.print(line, noreply=True)
 
     async def print(self, msg, **kw):
         if kw:
@@ -2673,7 +2664,7 @@ class S(Server):
     async def alias_gp(self, cmd):
         w = self.current_walker
         if not w:
-            await w.resume(cmd[0] if cmd else 1)
+            await self.print(_("No walker is active"))
         elif w.stopped:
             await w.resume()
         else:
@@ -3507,7 +3498,7 @@ class S(Server):
     async def check_more(self, msg):
         if not msg.startswith("--mehr--("):
             return False
-        self.main.start_soon(self.mud.send,"\n",False)
+        await self.mud.send("\n",False, noreply=True)
         return True
 
     async def called_text(self, msg, colors=None):
@@ -3528,7 +3519,11 @@ class S(Server):
         logger.debug("IN  : %s", msg)
         if self.filter_text(msg) is False:
             return
-        self.log_text(msg)
+
+        if not self.filter_exit(msg):
+            if self.command:
+                self.command.add(msg)
+
         await self._to_text_watchers(msg)
         await self._text_w.send(msg)
 
@@ -3607,7 +3602,7 @@ class S(Server):
             await self.print(_("Current Move: {x!r}"), x=self.this_exit)
         else:
             x = self.current_exit
-            await self.print(_("Last Move: {x!r}"), x=x)
+            await self.print(_("Last Move: {x.id_str}"), x=x)
 
         x = self.process
         n = 0
@@ -3724,7 +3719,7 @@ class S(Server):
                 if self.logfile:
                     print(">>>",cmd.command, file=self.logfile)
                 if xmit:
-                    await self.mud.send(cmd.command, cmd.send_echo)
+                    await self.mud.send(cmd.command, cmd.send_echo, noreply=True)
                 else:
                     cmd.send_seen = True
                 await self._prompt_evt.wait()
@@ -3747,56 +3742,19 @@ class S(Server):
         await self._text_w.send(evt)
         await evt.wait()
 
-    def match_exit(self, msg):
-        """
-        Match the "there is one exit" or "there are N exits" line which
-        separates the room description from the things in the room.
-
-        If there's no GMCP this signals that you have moved.
-        """
-        def matched(g=None):
-            if self.command:
-                self.command.dir_seen(g)
-
-        m = None
-        if self.command and self.command.current and not self.exit_match:
-            # Already saw an Exits line.
-            return False
-
-        if self.exit_match is None:
-            m = EX3.search(msg)
-            if not m:
-                m = EX4.search(msg)
-            if not m:
-                m = EX5.search(msg)
-            if m:
-                self.exit_match = False
-                matched()
+    def filter_exit(self, msg):
+        m = self.exit_matcher
+        if m is not None:
+            if m.match_line(msg):
                 return True
-
-            m = EX1.search(msg)
-            if not m:
-                m = EX2.search(msg)
+        else:
+            m = self.dr.match_exits(msg)
             if m:
-                matched(m.group(1))
-                self.exit_match = True
-
-        if self.exit_match is True:
-            if not m:
-                matched(msg)
-            if EX9.search(msg):
-                self.exit_match = False
+                self.exit_matcher = m
+                if self.command:
+                    self.command.dir_seen(m)
                 return True
-
-        return self.exit_match
-
-
-    def log_text(self, msg):
-        if self.match_exit(msg):
-            return
-
-        if self.command:
-            self.command.add(msg)
+        return False
 
     ### mud specific
 
@@ -3891,10 +3849,13 @@ class S(Server):
         A prompt has been seen. Finish the current command,
         which may include creating a new room / moving the avatar.
         """
-        if self.exit_match:
-            await self.print(_("WARNING: Exit matching failed halfway!"))
-        exits_seen = self.exit_match is False
-        self.exit_match = None
+        exits_seen = False
+        m = self.exit_matcher
+        if m is not None:
+            if not self.exit_matcher.prompt():
+                await self.print(_("WARNING: Exit matching failed halfway!"))
+            exits_seen = True
+        self.exit_matcher = None
         await self._to_text_watchers(None)
 
         # finish the current command
@@ -4052,8 +4013,9 @@ class S(Server):
         logger.debug("%r", msg)
 
     async def initGMCP(self):
-        await self.mud.sendGMCP("""Core.Supports.Debug 20""")
-        await self.mud.sendGMCP("""Core.Supports.Set [ "MG.char 1", "MG.room 1", "comm.channel 1" ] """)
+        for s,d in self.dr.gmcp_setup_data():
+            await self.mud.sendGMCP(s+" "+json.dumps(d), noreply=True)
+
     async def event_sysProtocolEnabled(self, msg):
         if msg[1] == "GMCP":
             await self.initGMCP()

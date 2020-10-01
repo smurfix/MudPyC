@@ -34,3 +34,12 @@ class Driver(_Driver):
                 self._loc2rev[x] = y
                 self._loc2rev[y] = x
 
+    def gmcp_setup_data(self):
+        """
+        Iterates whatever GMCP settings the current MUD should use.
+
+        Usage: call sendGMCP on whatever you get.
+        """
+        yield "Core.Supports.Debug", 20
+        yield "Core.Supports.Set", [ "MG.char 1", "MG.room 1", "comm.channel 1" ]
+
