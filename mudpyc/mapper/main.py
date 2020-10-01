@@ -484,8 +484,13 @@ class WalkProcess(Process):
         if not n:
             return
         while n:
-            r = next(self.rooms)
+            n -= 1
+            try:
+                r = next(self.rooms)
+            except StopIteration:
+                return False
         self.current_room = s.db.r_old(r)
+        return True
 
 
     async def gen_step(self, stopped=False):
