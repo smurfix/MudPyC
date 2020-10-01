@@ -1019,7 +1019,15 @@ class S(Server):
 
     async def print(self, msg, **kw):
         if kw:
-            msg = msg.format(**kw)
+            try:
+                msg = msg.format(**kw)
+            except Exception as exc:
+                try:
+                    msg = f"{msg}: {exc!r}, {kw!r}"
+                    logger.exception("Format %r with %r", msg,kw)
+                except Exception:
+                    msg = f"{msg}: {exc!r} [data not printable]"
+                    logger.exception("Format %r", msg)
         await self._text_w.send(msg)
 
     @property
