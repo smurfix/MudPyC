@@ -676,7 +676,7 @@ def SQL(cfg):
         def receive_load(room, context):
             "listen for the 'load' event"
             if room.id_old not in room_cache:
-                _cache_todo.add(room.id_old)
+                update_cache(room)
 
         evts = []
         while True:
