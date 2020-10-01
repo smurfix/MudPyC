@@ -65,15 +65,15 @@ class LabelChecker(CachedPathChecker):
 
 class FulltextChecker(PathChecker):
     def __init__(self, txt, **kw):
-        self.txt = txt
+        self.txt = txt.lower()
         super().__init__(**kw)
 
     async def check(self, room):
         n = room.long_descr
-        if n and self.txt in n.lower():
+        if n and self.txt in n.descr.lower():
             return SkipSignal
         n = room.note
-        if n and self.txt in n.lower():
+        if n and self.txt in n.note.lower():
             return SkipSignal
 
 class VisitChecker(PathChecker):
@@ -87,7 +87,7 @@ class VisitChecker(PathChecker):
 
 class ThingChecker(PathChecker):
     def __init__(self, thing, **kw):
-        self.thing = last_visit
+        self.thing = thing
         super().__init__(**kw)
 
     async def check(self, room):

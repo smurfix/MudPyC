@@ -828,22 +828,6 @@ class S(Server):
     _prompt_evt = None
     _prompt_state = None
 
-    keydir = {
-        0: {
-            21:"suedwesten",
-            22:"sueden",
-            23:"suedosten",
-            26:"osten",
-            29:"nordosten",
-            28:"norden",
-            27:"nordwesten",
-            24:"westen",
-            31:"oben",
-            30:"unten",
-            32:"raus",
-            }
-        }
-
     def __init__(self, cfg):
         super().__init__(cfg)
         self.dr = import_module(cfg['driver']).Driver(cfg)
@@ -950,6 +934,15 @@ class S(Server):
                         pass
                     else:
                         await self.went_to_room(room)
+
+        self.keymap = km = self.dr.keymap
+        for k in db.q(db.Keymap).all():
+            if k.mod in km:
+                kk = km[k.mod]
+            else:
+                km[k.mod] = kk = dict()
+            kk[k.val] = k
+        db.commit()
 
     async def _monitor_selection(self):
         db = self.db
@@ -1131,6 +1124,7 @@ class S(Server):
         self.alias.at("ds").helptext = _("Command processor debugging")
         self.alias.at("f").helptext = _("Find things, rooms")
         self.alias.at("g").helptext = _("Walking, paths")
+        self.alias.at("k").helptext = _("Shortcut keys")
         self.alias.at("mc").helptext = _("Map Colors")
         self.alias.at("md").helptext = _("Mudlet functions")
         self.alias.at("m").helptext = _("Mapping")
@@ -3457,10 +3451,12 @@ class S(Server):
 
     async def _fnkey(self, key, mod):
         try:
-            s = self.keydir[mod][key]
+            s = self.keymap[mod][key]
         except KeyError:
             await self.print(f"No shortcut {mod}/{key} found.")
         else:
+            if isinstance(s,self.db.Keymap):
+                s = s.text
             if isinstance(s,str):
                 await self._do_manual_command(s, send_echo=True)
                 return
@@ -3564,6 +3560,72 @@ class S(Server):
         finally:
             self._text_monitors.discard(w)
             await w.close()
+
+    @doc(_("""
+        List keymap shortcuts
+    """))
+    async def alias_kl(self, cmd):
+        cmd = self.cmdfix("ii", cmd)
+        if len(cmd) == 0:
+            await self.print(_("Known modifiers: ")+" ".join(str(x) for x in self.keymap.keys()))
+        elif len(cmd) == 1:
+            try:
+                km = self.keymap[cmd[0]]
+            except KeyError:
+                await self.print(_("No such modifier defined."))
+            else:
+                await self.print(_("Known keycodes: ")+" ".join(str(x) for x in km.keys()))
+        else:
+            try:
+                k = self.keymap[cmd[0]][cmd[1]]
+            except KeyError:
+                await self.print(_("No such key defined."))
+            else:
+                if isinstance(k,self.db.Keymap):
+                    await self.print(_("Send {key!r} (stored)"), key=k.text)
+                else:
+                    await self.print(_("Send {key!r} (default)"), key=k)
+
+    @doc(_("""
+        Dump keymap
+        Parameter: modifier
+    """))
+    async def alias_kll(self, cmd):
+        cmd = self.cmdfix("i", cmd, min_words=1)
+        try:
+            km = self.keymap[cmd[0]]
+        except KeyError:
+            await self.print(_("No such modifier defined."))
+        else:
+            if km:
+                for c,k in km.items():
+                    if isinstance(k,self.db.Keymap):
+                        k = k.text
+                    await self.print(_("{code}: Send {key!r}"), code=c, key=k)
+            else:
+                await self.print(_("empty."))
+
+    @doc(_("""
+        Add a keymap shortcut
+    """))
+    @with_alias("k+")
+    async def alias_k_p(self, cmd):
+        db = self.db
+        cmd = self.cmdfix("ii*", cmd, min_words=3)
+        try:
+            km = self.keymap[cmd[0]]
+        except KeyError:
+            self.keymap[cmd[0]] = km = dict()
+        try:
+            k = km[cmd[1]]
+            if isinstance(k,str):
+                raise KeyError("default")
+        except KeyError:
+            km[cmd[1]] = k = db.Keymap(mod=cmd[0], val=cmd[1])
+            db.add(k)
+        k.text = cmd[2]
+        db.commit()
+
 
     async def alias_dss(self, cmd):
         """

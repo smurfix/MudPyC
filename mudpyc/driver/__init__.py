@@ -130,6 +130,23 @@ class Driver:
     _std_dirs: Set[Union[LocalDir,ShortDir]] = None
     _intl_dirs: Set[IntlDir] = None
 
+    keymap = {
+        0: {
+            21:"southwest",
+            22:"south",
+            23:"southeast",
+            26:"east",
+            29:"northeast",
+            28:"north",
+            27:"northwest",
+            24:"west",
+            31:"up",     # minus
+            30:"down",   # plus
+            32:"leave",  # asterisk
+            34:"enter",  # slash
+            }
+        }
+    
     def is_mudlet_dir(self, d: IntlDir) -> bool:
         """
         Return a flag whether this is a standard Mudlet direction.

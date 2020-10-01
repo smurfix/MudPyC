@@ -209,6 +209,14 @@ def SQL(cfg):
         def value(self, value):
             self._value = json.dumps(value)
 
+    class Keymap(_AddOn, Base):
+        __tablename__ = "keys"
+        id = Column(Integer, primary_key=True)
+        mod = Column(Integer)
+        val = Column(Integer)
+        text = Column(String(255))
+        Index("keys_idx","mod","val",unique=True)
+
     class Exit(_AddOn, Base):
         __tablename__ = "exits"
         id = Column(Integer, primary_key=True)
@@ -997,6 +1005,7 @@ def SQL(cfg):
             setup=setup, cache_updater=cache_updater,
             Room=Room, Area=Area, Exit=Exit, Skiplist=Skiplist, Quest=Quest,
             Thing=Thing, Feature=Feature, LongDescr=LongDescr, Note=Note,
+            Keymap=Keymap,
             r_hash=r_hash, r_old=r_old, r_mudlet=r_mudlet, r_new=r_new,
             skiplist=get_skiplist, word=get_word, thing=get_thing,
             quest=get_quest, feature=get_feature,
