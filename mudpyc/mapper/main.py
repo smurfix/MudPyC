@@ -22,7 +22,7 @@ from sqlalchemy.exc import IntegrityError
 from .sql import SQL, NoData
 from .const import SignalThis, SkipRoute, SkipSignal, Continue
 from .const import ENV_OK,ENV_STD,ENV_SPECIAL,ENV_UNMAPPED
-from .walking import PathGenerator, PathChecker, CachedPathChecker, RoomFinder, LabelChecker, FulltextChecker, VisitChecker, ThingChecker, SkipFound
+from .walking import PathGenerator, PathChecker, CachedPathChecker, RoomFinder, LabelChecker, FulltextChecker, VisitChecker, ThingChecker, SkipFound, Continue
     
 from ..util import doc
 
@@ -2042,11 +2042,8 @@ class S(Server):
         except KeyError:
             await self.print(_("{self.last_room.idn_str} doesn't have an exit to {self.room.idn_str}?"), self=self)
             return
-        if x.steps:
-            await self.print(_("This exit already has steps:"))
-            await self.alias_xs(self,x.dir)
-            return
-        x.steps = x.dir
+        if not x.steps:
+            x.steps = x.dir
         x.dir = cmd
         await self.print(_("Exit renamed from {src} to {dst}"),src=x.steps,dst=cmd)
         self.db.commit()
@@ -2464,7 +2461,7 @@ class S(Server):
                 if room.id_mudlet is None:
                     return SkipRoute
                 if room in self.skiplist:
-                    return None
+                    return Continue
                 for x in room.exits:
                     if x.dst_id is None:
                         return SkipSignal
@@ -2487,7 +2484,7 @@ class S(Server):
                 if room.id_mudlet is None:
                     return SkipRoute
                 if room in self.skiplist:
-                    return None
+                    return Continue
                 for x in room.exits:
                     if x.dst_id is None:
                         return SignalThis
@@ -2656,7 +2653,7 @@ class S(Server):
         cmd = self.cmdfix("i", cmd)
         w = self.current_walker
         if w:
-            await w.resume(cmd[0] if cmd else 1)
+            w.resume(cmd[0] if cmd else 1)
         else:
             await self.print(_("No walker is active."))
 
@@ -3017,7 +3014,7 @@ class S(Server):
             return
         txt = cmd[0].lower()
 
-        checker = MappedFulltextSkipChecker(last_visit=lim, skiplist=self.skiplist)
+        checker = MappedFulltextSkipChecker(txt=txt, skiplist=self.skiplist)
         await self.gen_rooms(checker)
 
     @doc(_(
@@ -3033,8 +3030,8 @@ class S(Server):
             return
         txt = cmd[0].lower()
 
-        checker = MappedThingSkipChecker(thung=txt, skiplist=self.skiplist)
-        await self.gen_rooms(check)
+        checker = MappedThingSkipChecker(thing=txt, skiplist=self.skiplist)
+        await self.gen_rooms(checker)
 
     async def clear_gen(self):
         """Cancel path generation"""
@@ -3612,10 +3609,10 @@ class S(Server):
             await self.print(_("Mapper: {x!r}"), x=x)
 
         if self.this_exit:
-            await self.print(_("Current Move: {x!r}"), x=self.this_exit)
+            await self.print(_("Current Move: {x.dir} from {x.src.idn_str}"), x=self.this_exit)
         else:
             x = self.current_exit
-            await self.print(_("Last Move: {x.id_str}"), x=x)
+            await self.print(_("Last Move: {x.dir} from {x.src.idn_str}"), x=x)
 
         x = self.process
         n = 0
