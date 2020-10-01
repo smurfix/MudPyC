@@ -3342,7 +3342,6 @@ class S(Server):
                     x.dst = nr
                 todo.append(nr)
             db.commit()
-            await db.sync_updater()
 
         await self.print(_("Finished, {done} rooms processed"), done=len(done))
 

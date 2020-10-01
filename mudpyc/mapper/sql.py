@@ -16,6 +16,7 @@ from .const import ENV_OK,ENV_STD,ENV_SPECIAL,ENV_UNMAPPED
 from ..driver import LocalDir
 
 import trio
+from contextvars import ContextVar
 
 class NoData(RuntimeError):
     def __str__(self):
@@ -26,6 +27,8 @@ class NoData(RuntimeError):
                 pass
         return "‹NoData›"
     pass
+
+in_updater: ContextVar[bool] = ContextVar('in_updater', default=False)
 
 @contextmanager
 def SQL(cfg):
@@ -45,7 +48,6 @@ def SQL(cfg):
     room_cache = {}
     _cache_todo = set()  # rooms to be processed
     _cache_evt = trio.Event()  # set when there are rooms to be processed
-    _cache_wait = trio.Event()  # set when the list is empty
 
     class _RoomCommon:
         """
@@ -575,9 +577,7 @@ def SQL(cfg):
                 else:
                     x.flag &=~ Exit.F_IN_MUDLET
 
-            if self.id_old not in _cache_todo:
-                _cache_todo.add(self.id_old)
-                _cache_evt.set()
+            update_cache(self)
             self._s.commit()
 
             return x,changed
@@ -655,23 +655,29 @@ def SQL(cfg):
                 other = other.id_old
                 return self.id_old < other
 
+    def update_cache(room):
+        if in_updater.get():
+            return
+        if room.id_old not in _cache_todo:
+            _cache_todo.add(room.id_old)
+            _cache_evt.set()
+
     async def cache_updater():
         # standard decorator style
         nonlocal _cache_evt
+        in_updater.set(True)
 
         @event.listens_for(Room, 'load')
         def receive_load(room, context):
             "listen for the 'load' event"
             if room.id_old not in room_cache:
                 _cache_todo.add(room.id_old)
-                _cache_wait.set()
 
         evts = []
         while True:
             if not _cache_todo:
                 await _cache_evt.wait()
                 _cache_evt = trio.Event()
-                _cache_wait.set()
 
             while _cache_todo:
                 await trio.sleep(0)
@@ -679,14 +685,6 @@ def SQL(cfg):
 
                 room = r_old(r)
                 CachedRoom(room)
-
-    async def sync_updater():
-        nonlocal _cache_wait
-
-        if _cache_wait.is_set():
-            _cache_wait = trio.Event()
-        _cache_evt.set()
-        await _cache_wait.wait()
 
     class LongDescr(_AddOn, Base):
         __tablename__ = "longdescr"
@@ -991,7 +989,7 @@ def SQL(cfg):
     #conn = await engine.connect()
     session=Session()
     res = attrdict(db=session, q=session.query,
-            setup=setup, cache_updater=cache_updater, sync_updater=sync_updater,
+            setup=setup, cache_updater=cache_updater,
             Room=Room, Area=Area, Exit=Exit, Skiplist=Skiplist, Quest=Quest,
             Thing=Thing, Feature=Feature, LongDescr=LongDescr, Note=Note,
             r_hash=r_hash, r_old=r_old, r_mudlet=r_mudlet, r_new=r_new,
