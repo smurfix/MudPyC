@@ -32,6 +32,11 @@ in_updater: ContextVar[bool] = ContextVar('in_updater', default=False)
 
 @contextmanager
 def SQL(cfg):
+    sqlite = cfg.sql.url.startswith("sqlite:")
+    _idx={}
+    if not sqlite:
+        _idx['index'] = True
+
     engine = create_engine(
             cfg.sql.url,
             #strategy=TRIO_STRATEGY
@@ -169,15 +174,15 @@ def SQL(cfg):
 
     assoc_skip_room = Table('assoc_skip_room', Base.metadata,
         Column('skip_id', Integer, ForeignKey('skip.id')),
-        Column('room_id', Integer, ForeignKey('rooms.id_old')),#, index=True),
-        #Index("assoc_skip_idx","skip_id","room_id",unique=True),
+        Column('room_id', Integer, ForeignKey('rooms.id_old'), **_idx),
+        *(() if sqlite else (Index("assoc_skip_idx","skip_id","room_id",unique=True),)),
         
     )
 
     assoc_seen_room = Table('seen_in', Base.metadata,
         Column('seen_id', Integer, ForeignKey('seen.id')),
-        Column('room_id', Integer, ForeignKey('rooms.id_old')),#, index=True),
-        #Index("assoc_seen_idx","seen_id","room_id",unique=True),
+        Column('room_id', Integer, ForeignKey('rooms.id_old'), **_idx),
+        *(() if sqlite else (Index("assoc_seen_idx","seen_id","room_id",unique=True),)),
     )
 
     class Area(_AddOn, Base):
@@ -185,7 +190,7 @@ def SQL(cfg):
 
         __tablename__ = "area"
         id = Column(Integer, primary_key=True)
-        name = Column(String)
+        name = Column(String(100))
         flag = Column(Integer, nullable=False, default=0)
 
         rooms = relationship("Room", back_populates="area")
@@ -193,7 +198,7 @@ def SQL(cfg):
     class Config(_AddOn, Base):
         __tablename__ = "cfg"
         id = Column(Integer, primary_key=True)
-        name = Column(String, unique=True)
+        name = Column(String(20), unique=True)
         _value = Column(Binary)
 
         @property
@@ -208,13 +213,13 @@ def SQL(cfg):
         __tablename__ = "exits"
         id = Column(Integer, primary_key=True)
 
-        src_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
-        dir = Column(String, nullable=False)
-        dst_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE", ondelete="SET NULL"), nullable=True)
+        src_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE", ondelete="CASCADE"), nullable=False, **_idx)
+        dir = Column(String(50), nullable=False)
+        dst_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE", ondelete="SET NULL"), nullable=True, **_idx)
 
         det = Column(Integer, nullable=False, default=0) # ways with multiple destinations ## TODO
         cost = Column(Integer, nullable=False, default=1)
-        steps = Column(String, nullable=True)
+        steps = Column(String(255), nullable=True)
         flag = Column(Integer, nullable=False, default=0)
         delay = Column(Integer, nullable=False, default=0)
         feature_id = Column(Integer, ForeignKey("feature.id", onupdate="CASCADE", ondelete="SET NULL"), nullable=True)
@@ -278,15 +283,15 @@ def SQL(cfg):
         __tablename__ = "rooms"
         id_old = Column(Integer, nullable=True, primary_key=True)
         id_mudlet = Column(Integer, nullable=True, unique=True)
-        id_gmcp = Column(String, nullable=True, unique=True)
-        name = Column(String, nullable=True) ## index=True
-        label = Column(String, nullable=True)
+        id_gmcp = Column(String(100), nullable=True, unique=True)
+        name = Column(String(255), nullable=True) ## **_idx
+        label = Column(String(50), nullable=True)
         # long_descr = Column(Text)
         pos_x = Column(Integer, nullable=False, default=0)
         pos_y = Column(Integer, nullable=False, default=0)
         pos_z = Column(Integer, nullable=False, default=0)
         last_visit = Column(Integer, nullable=True, unique=True)
-        area_id = Column(Integer, ForeignKey("area.id", onupdate="CASCADE",ondelete="RESTRICT"), nullable=True)
+        area_id = Column(Integer, ForeignKey("area.id", onupdate="CASCADE",ondelete="RESTRICT"), nullable=True, **_idx)
         label_x = Column(Float, nullable=False, default=0)
         label_y = Column(Float, nullable=False, default=0)
         flag = Column(Integer, nullable=False, default=0)
@@ -689,7 +694,7 @@ def SQL(cfg):
     class LongDescr(_AddOn, Base):
         __tablename__ = "longdescr"
         id = Column(Integer, nullable=True, primary_key=True)
-        room_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE",ondelete="RESTRICT"), nullable=False)
+        room_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE",ondelete="RESTRICT"), nullable=False, **_idx)
         descr = Column(Text, nullable=False)
 
 #        room = relationship("Room", uselist=False,
@@ -698,7 +703,7 @@ def SQL(cfg):
     class Thing(_AddOn, Base):
         __tablename__ = "seen"
         id = Column(Integer, nullable=True, primary_key=True)
-        name = Column(String, nullable=False)
+        name = Column(String(100), nullable=False)
 
         rooms = relationship("Room", secondary=assoc_seen_room, backref="things")
 
@@ -707,7 +712,7 @@ def SQL(cfg):
 
         __tablename__ = "feature"
         id = Column(Integer, nullable=True, primary_key=True)
-        name = Column(String, nullable=False)
+        name = Column(String(50), nullable=False)
         flag = Column(Integer, nullable=False, default=0)
 
         enter = Column(Text, nullable=False, default="")
@@ -731,7 +736,7 @@ def SQL(cfg):
     class Note(_AddOn, Base):
         __tablename__ = "notes"
         id = Column(Integer, nullable=True, primary_key=True)
-        room_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE",ondelete="RESTRICT"), nullable=False)
+        room_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE",ondelete="RESTRICT"), nullable=False, **_idx)
         note = Column(Text, nullable=False)
 
 #        room = relationship("Room", uselist=False,
@@ -740,13 +745,13 @@ def SQL(cfg):
     class Skiplist(_AddOn, Base):
         __tablename__ = "skip"
         id = Column(Integer, nullable=True, primary_key=True)
-        name = Column(String, nullable=False)
+        name = Column(String(50), nullable=False)
         rooms = relationship("Room", secondary=assoc_skip_room, backref="skiplists")
 
     class Word(_AddOn, Base):
         __tablename__ = "words"
         id = Column(Integer, nullable=True, primary_key=True)
-        name = Column(String, nullable=False, unique=True)
+        name = Column(String(50), nullable=False, unique=True)
         flag = Column(Integer, nullable=False, default=0)
         # 0 std, 2 skip
 
@@ -781,7 +786,7 @@ def SQL(cfg):
     class WordAlias(_AddOn, Base):
         __tablename__ = "wordalias"
         id = Column(Integer, nullable=True, primary_key=True)
-        name = Column(String, nullable=False)
+        name = Column(String(50), nullable=False)
         word_id = Column(Integer, ForeignKey("words.id", onupdate="CASCADE",ondelete="CASCADE"), nullable=False)
 
         word = relationship("Word", backref=backref("aliases", cascade="all, delete-orphan"))
@@ -790,8 +795,8 @@ def SQL(cfg):
         __tablename__ = "wordroom"
         id = Column(Integer, nullable=True, primary_key=True)
 
-        word_id = Column(Integer, ForeignKey("words.id", onupdate="CASCADE",ondelete="CASCADE"), nullable=False)
-        room_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE",ondelete="CASCADE"), nullable=False)
+        word_id = Column(Integer, ForeignKey("words.id", onupdate="CASCADE",ondelete="CASCADE"), nullable=False, **_idx)
+        room_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE",ondelete="CASCADE"), nullable=False, **_idx)
 
         flag = Column(Integer, nullable=False, default=0)
         # 0 notscanned, 1 scanned, 2 skipped, 3 marked important?
@@ -810,7 +815,7 @@ def SQL(cfg):
     class Quest(_AddOn, Base):
         __tablename__ = "quest"
         id = Column(Integer, nullable=True, primary_key=True)
-        name = Column(String, nullable=False)
+        name = Column(String(50), nullable=False)
         flag = Column(Integer, nullable=False, default=0)
         step = Column(Integer, nullable=True)
 
@@ -844,14 +849,14 @@ def SQL(cfg):
         __tablename__ = "queststep"
         id = Column(Integer, nullable=True, primary_key=True)
 
-        quest_id = Column(Integer, ForeignKey("quest.id", onupdate="CASCADE",ondelete="CASCADE"), nullable=False)
-        room_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE",ondelete="CASCADE"), nullable=False)
+        quest_id = Column(Integer, ForeignKey("quest.id", onupdate="CASCADE",ondelete="CASCADE"), nullable=False, **_idx)
+        room_id = Column(Integer, ForeignKey("rooms.id_old", onupdate="CASCADE",ondelete="CASCADE"), nullable=False, **_idx)
         step = Column(Integer, nullable=False)
         # WARNING quest_id+step should be unique but cannot be because
         # renumbering then won't work because mysql doesn't support
         # deferring unique key checks until commit, and sqlalchemy doesn't
         # support order_by when updating
-        command = Column(String, nullable=False)
+        command = Column(String(255), nullable=False)
 
         flag = Column(Integer, nullable=False, default=0)
         # 1 command, 2 stop execution
