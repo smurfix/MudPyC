@@ -599,7 +599,7 @@ def SQL(cfg):
                 raise NoData
             x = await mud.getRoomExits(self.id_mudlet)
             if x:
-                x = x[0]
+                x = { m.dr.intl2loc(d):r for d,r in x[0].items() }
             else:
                 x = {}
             y = await mud.getSpecialExitsSwap(self.id_mudlet)
@@ -607,7 +607,7 @@ def SQL(cfg):
                 y = y[0]
             else:
                 y = {}
-            return combine_dict(m.dr.intl2loc(x),y)
+            return combine_dict(x,y)
 
         async def set_mud_exit(self,d:LocalDir,v=True):
             m = self._m
