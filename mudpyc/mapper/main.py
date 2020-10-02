@@ -2426,8 +2426,8 @@ class S(Server):
                     return SkipRoute
                 if room in self.skiplist:
                     return None
-                for x,c in room.exits:
-                    if x.id_mudlet is None:
+                for x in room.exits:
+                    if x.dst_id is not None and x.dst.id_mudlet is None:
                         return SkipSignal
                 return Continue
         await self.gen_rooms(NotInMudlet())
@@ -3670,7 +3670,8 @@ class S(Server):
             await self.print(_("Current Move: {x.dir} from {x.src.idn_str}"), x=self.this_exit)
         else:
             x = self.current_exit
-            await self.print(_("Last Move: {x.dir} from {x.src.idn_str}"), x=x)
+            if x:
+                await self.print(_("Last Move: {x.dir} from {x.src.idn_str}"), x=x)
 
         x = self.process
         n = 0
