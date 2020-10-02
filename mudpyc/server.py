@@ -24,6 +24,8 @@ import json
 import logging
 logger = logging.getLogger(__name__)
 
+ALL_EVT="*"
+
 class PostEvent(BaseException):
     """
     Raised by an action handler if the message shall be added to the event queue instead.
@@ -238,7 +240,8 @@ class Server:
                 if qdel:
                     qq -= qdel
             await _disp(self._handlers.get(event, ()))
-            await _disp(self._handlers.get("any", ()))
+            if (event != ALL_EVT):
+                await _disp(self._handlers.get(ALL_EVT, ()))
             return
         logger.warning("Unhandled message: %r", msg)
 
@@ -324,7 +327,7 @@ class Server:
             # Mudlet may time out after 4 or 5 seconds
 
     @asynccontextmanager
-    async def event_monitor(self, event="any"):
+    async def event_monitor(self, event=ALL_EVT):
         """
         Listen to some event from Mudlet.
         """

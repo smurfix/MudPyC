@@ -4088,8 +4088,14 @@ class S(Server):
                 await self.print(_("New exit: {exit}"), exit=x,room=room)
 
 
-    async def handle_event(self, msg):
-        name = msg[0].replace(".","_")
+    async def handle_event(self, msg, evt=None):
+        if msg:
+            evt = msg[0]
+        name = evt.replace(".","_")
+        hdl = getattr(self.dr, "event_"+name, None)
+        if hdl is not None:
+            await hdl(msg)
+            return
         hdl = getattr(self, "event_"+name, None)
         if hdl is not None:
             await hdl(msg)
@@ -5498,9 +5504,10 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         #await self.mud.centerview()
 
         try:
-            async with self.event_monitor("*") as h:
+            async with self.event_monitor() as h:
+                evt.set()
                 async for msg in h:
-                    await self.handle_event(msg['args'])
+                    await self.handle_event(msg.get('args',()),msg.get("event",None))
         except Exception as exc:
             logger.exception("END")
             raise
