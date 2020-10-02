@@ -216,9 +216,12 @@ class Server:
             ev.set()
         else:
             await self._dispatch(msg)
-        logger.debug("IN done %r",msg)
+        logger.debug("IN done")
         
     async def _dispatch(self, msg):
+        """
+        Process all messages that are not replies
+        """
         action = msg.get("action",None)
         if action:
             try:

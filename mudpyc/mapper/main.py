@@ -924,6 +924,7 @@ class S(Server):
                 km[k.mod] = kk = dict()
             kk[k.val] = k
         db.commit()
+        print("Connected.")
 
     async def _monitor_selection(self):
         db = self.db
@@ -3467,7 +3468,7 @@ class S(Server):
         Called by Mudlet when the MUD sends a Telnet GA
         signalling readiness for the next line
         """
-        logger.debug("NEXT")
+        logger.debug("Queue GA")
         raise PostEvent("prompt")
 
     async def event_prompt(self,msg):
@@ -3487,6 +3488,7 @@ class S(Server):
         """
         if isinstance(cmd,str):
             cmd = cls(self, command=cmd)
+        logger.debug("Put SendCmd2 %r",cmd)
         self.cmd2_q.append(cmd)
         self.trigger_sender.set()
         return cmd
@@ -3760,7 +3762,7 @@ class S(Server):
                     # There should be only one, but sometimes the user is
                     # faster than the MUD.
                     cmd = self.cmd2_q.pop(0)
-                    logger.debug("Prompt send %r",cmd)
+                    logger.debug("Get SendCmd2 %r",cmd)
                     xmit = True
                 else:
                     # No command queued, so we check the stack.
@@ -4276,6 +4278,7 @@ class S(Server):
         # x,y,z = start.pos_x,start.pos_y,start.pos_z
         x,y,z = await self.mud.getRoomCoordinates(start.id_mudlet)
         dx,dy,dz = self.dir_off(dir)
+        logger.debug("Offset for %s is %r from %s",dir,(dx,dy,dz),start.idn_str)
         x,y,z = x+dx, y+dy, z+dz
         room.pos_x, room.pos_y, room.pos_z = x,y,z
         await self.mud.setRoomCoordinates(room.id_mudlet, x,y,z)
