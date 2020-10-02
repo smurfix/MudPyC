@@ -4660,7 +4660,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             #db.commit()
         pass
 
-    async def _gui_vitals_color(self, lp_ratio=None):
+    async def _gui_vitals_color(self, lp_ratio=None, **kw):
         if lp_ratio is None:
             try:
                 lp_ratio = self.me.vitals.hp/self.me.maxvitals.max_hp
@@ -4668,7 +4668,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
                 lp_ratio = 0.9
         if lp_ratio > 1:
             lp_ratio = 1
-        await self.mmud.GUI.lp_anzeige.setColor(255 * (1 - lp_ratio), 255 * lp_ratio, 50)
+        await self.mmud.GUI.lp_anzeige.setColor(255 * (1 - lp_ratio), 255 * lp_ratio, 50, **kw)
 
     async def _gui_vitals_blink_hp(self, task_status=trio.TASK_STATUS_IGNORED):
         with trio.CancelScope() as cs:
@@ -4690,23 +4690,23 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         try:
             w = self.me.maxvitals
         except AttributeError:
-            await self.mmud.GUI.lp_anzeige.setValue(1,1, f"<b> {v.hp}/?</b> ")
-            await self.mmud.GUI.kp_anzeige.setValue(1,1, f"<b> {v.sp}/?</b> ")
-            await self.mmud.GUI.gift.echo("")
+            await self.mmud.GUI.lp_anzeige.setValue(1,1, f"<b> {v.hp}/?</b> ", noreply=True)
+            await self.mmud.GUI.kp_anzeige.setValue(1,1, f"<b> {v.sp}/?</b> ", noreply=True)
+            await self.mmud.GUI.gift.echo("", noreply=True)
         else:
-            await self.mmud.GUI.lp_anzeige.setValue(v.hp,w.max_hp, f"<b> {v.hp}/{w.max_hp}</b> ")
-            await self.mmud.GUI.kp_anzeige.setValue(v.sp,w.max_sp, f"<b> {v.sp}/{w.max_sp}</b> ")
+            await self.mmud.GUI.lp_anzeige.setValue(v.hp,w.max_hp, f"<b> {v.hp}/{w.max_hp}</b> ", noreply=True)
+            await self.mmud.GUI.kp_anzeige.setValue(v.sp,w.max_sp, f"<b> {v.sp}/{w.max_sp}</b> ", noreply=True)
             if v.poison:
                 r,g,b = 255,255-160*v.poison/w.max_poison,0
                 line = f"G I F T  {v.poison}/{w.max_poison}"
             else:
                 r,g,b = 30,30,30
                 line = ""
-            await self.mmud.GUI.gift.echo(line, "white")
-            await self.mmud.GUI.gift.setColor(r, g, b)
+            await self.mmud.GUI.gift.echo(line, "white", noreply=True)
+            await self.mmud.GUI.gift.setColor(r, g, b, noreply=True)
 
             if not self.me.blink_hp:
-                await self._gui_vitals_color(v.hp / w.max_hp)
+                await self._gui_vitals_color(v.hp / w.max_hp, noreply=True)
 
         if "last_hp" in self.me and self.me.last_hp > v.hp:
             await self.main.start(self._gui_vitals_blink_hp)
