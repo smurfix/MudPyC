@@ -333,6 +333,10 @@ class Driver:
     def server(self):
         return self._server()
 
+    async def gmcp_initial(self, gmcp):
+        # extract "standard" GMCP data
+        raise RuntimeError("TODO")
+
     async def event_gmcp_comm_channel(self, msg):
         s = self.server
         msg = AD(msg[2])  

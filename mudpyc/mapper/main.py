@@ -914,25 +914,7 @@ class S(Server):
         elif not await self.mud.GUI.angezeigt:
             await self.mud.initGUI(self.cfg["name"])
 
-        val = await self.mud.gmcp.MG
-        if val:
-            for x in "base info vitals maxvitals attributes".split():
-                try: self.me[x] = AD(val['char'][x])
-                except AttributeError: pass
-            await self.gui_show_player()
-
-            try:
-                id_gmcp = val["room"]["info"]["id"]
-            except KeyError:
-                pass
-            else:
-                if id_gmcp:
-                    try:
-                        room = db.r_hash(id_gmcp)
-                    except NoData:
-                        pass
-                    else:
-                        await self.went_to_room(room)
+        await self.dr.gmcp_initial(await self.mud.gmcp)
 
         self.keymap = km = self.dr.keymap
         for k in db.q(db.Keymap).all():

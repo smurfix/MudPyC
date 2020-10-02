@@ -47,3 +47,26 @@ class Driver(_Driver):
         yield "Core.Supports.Debug", 20
         yield "Core.Supports.Set", [ "MG.char 1", "MG.room 1", "comm.channel 1" ]
 
+    async def gmcp_initial(self, gmcp):
+        s = self.server
+        val = gmcp.get("MG", None)
+        if not val:
+            return False
+        for x in "base info vitals maxvitals attributes".split():
+            try: s.me[x] = AD(val['char'][x])
+            except KeyError: pass
+        await s.gui_show_player()
+
+        try:
+            id_gmcp = val["room"]["info"]["id"]
+        except KeyError:
+            pass
+        else:
+            if id_gmcp:
+                try:
+                    room = s.db.r_hash(id_gmcp)
+                except NoData:
+                    pass
+                else:
+                    await s.went_to_room(room)
+        return True
