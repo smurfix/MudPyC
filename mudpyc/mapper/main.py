@@ -3387,7 +3387,9 @@ class S(Server):
             return None
         if msg.startswith("lua "):
             return None
-        self.cmd3_q.append(msg)
+        logger.debug("Put SendCmd3 %r",msg)
+        self.cmd3_q.append((msg,False))
+        self.trigger_sender.set()
 
     async def _do_manual_command(self, msg, send_echo=None):
         """
@@ -3448,7 +3450,8 @@ class S(Server):
             if isinstance(s,self.db.Keymap):
                 s = s.text
             if isinstance(s,str):
-                self.cmd3_q.append(s)
+                logger.debug("Put SendCmd3 %r",s)
+                self.cmd3_q.append((s,True))
                 self.trigger_sender.set()
                 return
             if isinstance(s,Command):
@@ -3766,9 +3769,9 @@ class S(Server):
                         await self.process.next()
                         seen = False
                     elif self.cmd3_q:
-                        cmd = self.cmd3_q.pop(0)
-                        logger.debug("Input send %r",cmd)
-                        await self._do_manual_command(cmd, send_echo=True)
+                        cmd,echo = self.cmd3_q.pop(0)
+                        logger.debug("Get SendCmd3 %r",cmd)
+                        await self._do_manual_command(cmd, send_echo=echo)
                     else:
                         logger.debug("Prompt Wait %r",self.process)
                         await self.trigger_sender.wait()
