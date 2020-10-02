@@ -225,6 +225,9 @@ class Process:
         The default does nothing, i.e. it finishes this command and gets
         back to the next one on the list.
         """
+        if self.server.process is not self:
+            return
+
         np = self.upstack
         await self.finish()
         if np is not None and self.server.process is np:
@@ -261,16 +264,12 @@ class TopProcess(Process):
         if s.top is not None:
             raise RuntimeError("dup Top Process")
         s.top = self
-
         s.process = self
 
     async def finish(self):
         """
         Clean up after myself.
         """
-        s = self.server
-        if s.process is not self:
-            raise RuntimeError("Process hook mismatch")
         await super().finish()
         s.top = None
 
@@ -339,6 +338,7 @@ class SeqProcess(_SeqProcess):
     Process that runs a sequence of commands
     """
     sleeping = False
+    finished = False
 
     def __init__(self, server, name, cmds, exit=None, room=None, send_echo=True, **kw):
         self.cmds = cmds
@@ -429,7 +429,9 @@ class SeqProcess(_SeqProcess):
             return
 
         # Done.
-        await self.finish_move()
+        if not self.finished:
+            self.finished = True
+            await self.finish_move()
         await super().queue_next()
 
     async def finish_move(self, moved=False):
@@ -857,8 +859,9 @@ class S(Server):
         self.last_commands = deque()
         self.last_cmd = None  # (compound) command sent
         self.idle_info = None
-        self.cmd1_q = []
-        self.cmd2_q = []
+        self.cmd1_q = []  # already-sent user input
+        self.cmd2_q = []  # queued by commands
+        self.cmd3_q = []  # user input
         self.dring_move = False
 
         self.next_word = None  # word to search for
@@ -3390,7 +3393,7 @@ class S(Server):
             return None
         if msg.startswith("lua "):
             return None
-        return await self._do_manual_command(msg)
+        self.cmd3_q.append(msg)
 
     async def _do_manual_command(self, msg, send_echo=None):
         """
@@ -3443,9 +3446,6 @@ class S(Server):
             await self.print(_("* Note:\n{room.note.note}"), room=room)
 
     async def called_fnkey(self, key, mod):
-        self.main.start_soon(self._fnkey, key,mod)
-
-    async def _fnkey(self, key, mod):
         try:
             s = self.keymap[mod][key]
         except KeyError:
@@ -3454,7 +3454,8 @@ class S(Server):
             if isinstance(s,self.db.Keymap):
                 s = s.text
             if isinstance(s,str):
-                await self._do_manual_command(s, send_echo=True)
+                self.cmd3_q.append(s)
+                self.trigger_sender.set()
                 return
             if isinstance(s,Command):
                 s = (s,)
@@ -3665,6 +3666,8 @@ class S(Server):
             await self.print(_("Mudlet: {x!r}"), x=x)
         for x in self.cmd2_q:
             await self.print(_("Mapper: {x!r}"), x=x)
+        for x in self.cmd3_q:
+            await self.print(_("Input: {x!r}"), x=x)
 
         if self.this_exit:
             await self.print(_("Current Move: {x.dir} from {x.src.idn_str}"), x=self.this_exit)
@@ -3697,6 +3700,7 @@ class S(Server):
         self.command = None
         # self.cmd1_q = []  # already sent, so no
         self.cmd2_q = []
+        self.cmd3_q = []
         while self.process is not self.top:
             p = self.process
             try:
@@ -3763,6 +3767,10 @@ class S(Server):
                         logger.debug("Prompt Next %r",self.process)
                         await self.process.next()
                         seen = False
+                    elif self.cmd3_q:
+                        cmd = self.cmd3_q.pop(0)
+                        logger.debug("Input send %r",cmd)
+                        await self._do_manual_command(cmd, send_echo=True)
                     else:
                         logger.debug("Prompt Wait %r",self.process)
                         await self.trigger_sender.wait()
