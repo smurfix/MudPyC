@@ -5,6 +5,9 @@ import weakref
 
 from typing import NewType, Optional, Dict, Set, Tuple, Final, Union, List
 
+import logging
+logger = logging.getLogger(__name__)
+
 from mudpyc.util import AD
 
 LocalDir = NewType("LocalDir", str)

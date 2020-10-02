@@ -1,6 +1,9 @@
 from . import Driver as _Driver
 from mudpyc.util import AD
 
+import logging
+logger = logging.getLogger(__name__)
+
 class Driver(_Driver):
     """
     """
