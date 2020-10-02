@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from mudpyc import Server, Alias, with_alias, run_in_task
+from mudpyc import Server, Alias, with_alias, run_in_task, PostEvent
 import trio
 from mudpyc.util import ValueEvent, attrdict, combine_dict
 from functools import partial
@@ -3484,6 +3484,9 @@ class S(Server):
         signalling readiness for the next line
         """
         logger.debug("NEXT")
+        raise PostEvent("prompt")
+
+    async def event_prompt(self,msg):
         self.prompt(self.MP_TELNET)
 
     @doc(_(

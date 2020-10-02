@@ -24,6 +24,15 @@ import json
 import logging
 logger = logging.getLogger(__name__)
 
+class PostEvent(BaseException):
+    """
+    Raised by an action handler if the message shall be added to the event queue instead.
+    This is used to serialize processing.
+    """
+    def __init__(self, event=None):
+        self.event = event
+
+
 DEFAULTS = attrdict(
         server=attrdict(
             host="127.0.0.1", port=23817,
@@ -210,8 +219,12 @@ class Server:
     async def _dispatch(self, msg):
         action = msg.get("action",None)
         if action:
-            await getattr(self, "_action_"+action, self._action_unknown)(msg)
-            return
+            try:
+                await getattr(self, "_action_"+action, self._action_unknown)(msg)
+            except PostEvent as exc:
+                msg['event'] = exc.event or action
+            else:
+                return
         event = msg.get("event",None)
         if event:
             async def _disp(qq):
