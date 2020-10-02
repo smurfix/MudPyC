@@ -150,7 +150,6 @@ class Process:
         Set myself up.
         """
         s = self.server
-        print("SETUP",repr(self))
         self.upstack = s.process
         s.process = self
         self.upstack.append(self)
@@ -166,7 +165,6 @@ class Process:
         if s.process is not self:
             raise RuntimeError("Process hook mismatch")
         s.process = self.upstack
-        print("FINISH",repr(self))
 
     def _repr(self):
         res = {}
@@ -320,7 +318,6 @@ class _SeqProcess(Process):
         Set myself up.
         """
         s = self.server
-        print("SETUP",repr(self))
         if isinstance(s.process, SeqProcess):
             p = s.process
             while p.next_seq is not None:
@@ -613,7 +610,6 @@ class BaseCommand:
         # prompt seen: finished
         s = self.server
         self._done.set()
-        print("DONE",repr(self))
         if s.command is self:
             s.command = None
 
@@ -762,7 +758,7 @@ class LookCommand(Command):
             await s.print(_("Long descr updated."))
         elif old != nld:
             await s.print(_("Long descr differs."))
-            print(f"""\
+            logger.debug(f"""\
 *** 
 *** Descr: {room.idnn_str}
 *** old:
@@ -3760,7 +3756,6 @@ class S(Server):
                     # faster than the MUD.
                     cmd = self.cmd2_q.pop(0)
                     logger.debug("Prompt send %r",cmd)
-                    print("Prompt send",repr(cmd))
                     xmit = True
                 else:
                     # No command queued, so we check the stack.
@@ -3857,7 +3852,6 @@ class S(Server):
         self._prompt_state = None
         p = self._prompt_evt
         if p is not None:
-            print("PSET",cause)
             p.set()
 
     async def _trigger_prompt_later(self, timeout):
@@ -3867,7 +3861,6 @@ class S(Server):
         with trio.move_on_after(timeout):
             await p.wait()
             return  # not timed out if we get here
-        print("PSET L")
         p.set()
 
     def prompt(self, mode=None):
