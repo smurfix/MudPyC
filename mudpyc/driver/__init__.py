@@ -333,6 +333,23 @@ class Driver:
     def server(self):
         return self._server()
 
+    async def event_gmcp_comm_channel(self, msg):
+        s = self.server
+        msg = AD(msg[2])  
+        logger.debug("CHAN %r",msg)
+        chan = msg.chan
+        player = msg.player
+        prefix = f"[{msg.chan}:{msg.player}] "
+        txt = msg.msg.rstrip("\n")
+        if txt.startswith(prefix):
+            txt = txt.replace(prefix,"").replace("\n"," ").replace("  "," ").strip()
+            await s.print(prefix+txt.rstrip("\n"))  # TODO color
+        else:
+            prefix = f"[{msg.chan}:{msg.player} "
+            if txt.startswith(prefix) and txt.endswith("]"):
+                txt = txt[len(prefix):-1]
+            await s.print(prefix+txt.rstrip("\n")+"]")  # TODO color
+
     def clean_shortname(self, name):
         """
         Clean up the MUD's shortnames.

@@ -4194,23 +4194,6 @@ class S(Server):
             # not waiting, so process it from the main loop
             self.trigger_sender.set()
 
-    async def event_gmcp_comm_channel(self, msg):
-        # don't do a thing
-        msg = AD(msg[2])
-        logger.debug("CHAN %r",msg)
-        chan = msg.chan
-        player = msg.player
-        prefix = f"[{msg.chan}:{msg.player}] "
-        txt = msg.msg.rstrip("\n")
-        if txt.startswith(prefix):
-            txt = txt.replace(prefix,"").replace("\n"," ").replace("  "," ").strip()
-            await self.print(prefix+txt.rstrip("\n"))  # TODO color
-        else:
-            prefix = f"[{msg.chan}:{msg.player} "
-            if txt.startswith(prefix) and txt.endswith("]"):
-                txt = txt[len(prefix):-1]
-            await self.print(prefix+txt.rstrip("\n")+"]")  # TODO color
-
     async def new_room(self, descr="", *, id_gmcp=None, id_mudlet=None,
             offset_from=None, offset_dir=None, area=None):
 
