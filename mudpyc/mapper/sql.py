@@ -696,8 +696,12 @@ def SQL(cfg):
                 await trio.sleep(0)
                 r = _cache_todo.pop()
 
-                room = r_old(r)
-                CachedRoom(room)
+                try:
+                    room = r_old(r)
+                except NoData:
+                    pass # deleted
+                else:
+                    CachedRoom(room)
 
     class LongDescr(_AddOn, Base):
         __tablename__ = "longdescr"
