@@ -830,7 +830,7 @@ class S(Server):
 
     def __init__(self, cfg):
         super().__init__(cfg)
-        self.dr = import_module(cfg['driver']).Driver(cfg)
+        self.dr = import_module(cfg['driver']).Driver(self, cfg)
 
     async def setup(self, db):
         self.db = db

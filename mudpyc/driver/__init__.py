@@ -1,6 +1,7 @@
 # generic driver
 
 import re
+import weakref
 
 from typing import NewType, Optional, Dict, Set, Tuple, Final, Union, List
 
@@ -315,9 +316,44 @@ class Driver:
         """
         return self.ExitMatcher.first_line(msg, colors)
 
-    def __init__(self, cfg:dict):
+    def __init__(self, server, cfg:dict):
+        self._server = weakref.ref(server)
         self.init_std_dirs()
         self.init_short2loc()
         self.init_intl()
         self.init_reversal()
     
+    def clean_shortname(self, name):
+        """
+        Clean up the MUD's shortnames.
+        """
+        name = name.strip()
+        name = name.rstrip(".")
+        if name:
+            if name[0] in "'\"" and name[0] == name[-1]:
+                name = name[1:-1]
+            name = name.strip()
+        if not name:
+            return self.NAMELESS
+        return name
+            
+
+    @property
+    def server(self):
+        return self._server()
+
+    def clean_shortname(self, name):
+        """
+        Clean up the MUD's shortnames.
+        """
+        name = name.strip()
+        name = name.rstrip(".")
+        if name:
+            if name[0] in "'\"" and name[0] == name[-1]:
+                name = name[1:-1]
+            name = name.strip()
+        if not name:
+            return self.NAMELESS
+        return name
+            
+
