@@ -70,3 +70,46 @@ class Driver(_Driver):
                 else:
                     await s.went_to_room(room)
         return True
+
+    async def event_gmcp_MG_char_attributes(self, msg):
+        s = self.server
+        logger.debug("AttrMG %s: %r",msg[1],msg[2])
+        s.me.attributes = AD(msg[2])   
+        await s.gui_show_player()
+
+    async def event_gmcp_MG_char_base(self, msg):
+        s = self.server
+        logger.debug("BaseMG %s: %r",msg[1],msg[2])
+        s.me.base = AD(msg[2])
+        await s.gui_show_player()
+
+    async def event_gmcp_MG_char_info(self, msg):
+        s = self.server
+        logger.debug("InfoMG %s: %r",msg[1],msg[2])
+        s.me.info = AD(msg[2])
+        await s.gui_show_player()
+
+    async def event_gmcp_MG_char_vitals(self, msg):
+        s = self.server
+        logger.debug("VitalsMG %s: %r",msg[1],msg[2])
+        s.me.vitals = AD(msg[2])
+        await s.gui_show_vitals()
+
+    async def event_gmcp_MG_char_maxvitals(self, msg):
+        s = self.server
+        logger.debug("MaxVitalsMG %s: %r",msg[1],msg[2])
+        s.me.maxvitals = AD(msg[2])
+        await s.gui_show_vitals()
+
+    async def event_gmcp_MG_room_info(self, msg):   
+        s = self.server
+        if len(msg) > 2:
+            info = AD(msg[2])
+        else:
+            info = await s.mud.gmcp.MG.room.info
+
+        c = s.current_command(no_info=True)
+        await c.set_info(info)
+        s.maybe_trigger_sender()
+       
+

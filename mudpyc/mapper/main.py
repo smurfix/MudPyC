@@ -4096,32 +4096,6 @@ class S(Server):
         if msg[1] == "GMCP":
             await self.initGMCP()
 
-    async def event_gmcp_MG_char_attributes(self, msg):
-        logger.debug("AttrMG %s: %r",msg[1],msg[2])
-        self.me.attributes = AD(msg[2])
-        await self.gui_show_player()
-
-    async def event_gmcp_MG_char_base(self, msg):
-        logger.debug("BaseMG %s: %r",msg[1],msg[2])
-        self.me.base = AD(msg[2])
-        await self.gui_show_player()
-
-    async def event_gmcp_MG_char_info(self, msg):
-        logger.debug("InfoMG %s: %r",msg[1],msg[2])
-        self.me.info = AD(msg[2])
-        await self.gui_show_player()
-
-    async def event_gmcp_MG_char_vitals(self, msg):
-        logger.debug("VitalsMG %s: %r",msg[1],msg[2])
-        self.me.vitals = AD(msg[2])
-        await self.gui_show_vitals()
-
-    async def event_gmcp_MG_char_maxvitals(self, msg):
-        logger.debug("MaxVitalsMG %s: %r",msg[1],msg[2])
-        self.me.maxvitals = AD(msg[2])
-        await self.gui_show_vitals()
-
-
     async def event_sysWindowResizeEvent(self, msg):
         pass
 
@@ -4161,18 +4135,18 @@ class S(Server):
         self.cmd1_q.append(msg[1])
         self.trigger_sender.set()
 
-    async def event_gmcp_MG_room_info(self, msg):
-        if len(msg) > 2:
-            info = AD(msg[2])
-        else:
-            info = await self.mud.gmcp.MG.room.info
+    def current_command(self, no_info=False):
+        c = self.command
+        if c is not None:
+            if not no_info or not c.info:
+                return c
+        print("*** IDLE ***")
+        import pdb;pdb.set_trace()
+        c = IdleCommand(self)
+        self.process.append(c)
+        return c
 
-        if self.command is None or self.command.info is not None:
-            self.command = c = IdleCommand(self)
-            self.process.append(c)
-
-        await self.command.set_info(info)
-
+    def maybe_trigger_sender(self):
         if self._prompt_evt is None:
             # not waiting, so process it from the main loop
             self.trigger_sender.set()
