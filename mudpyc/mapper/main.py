@@ -829,8 +829,9 @@ class S(Server):
         super().__init__(cfg)
         self.dr = import_module(cfg['driver']).Driver(self, cfg)
 
-    async def setup(self, db):
+    async def setup(self, evt, db):
         self.db = db
+        await evt.wait()
         db.setup(self)
 
         self.send_command_lock = trio.Lock()
@@ -5468,12 +5469,13 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         if logfile is not None:
             logfile.flush()
 
-        await self.setup(db)
+        evt = trio.Event()
+        self.main.start_soon(self.setup, evt, db)
 
         #await self.mud.centerview()
 
         try:
-            async with self.event_monitor() as h:
+            async with self.event_monitor("*") as h:
                 evt.set()
                 async for msg in h:
                     await self.handle_event(msg.get('args',()),msg.get("event",None))
