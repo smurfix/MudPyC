@@ -2289,7 +2289,7 @@ class S(Server):
         if cmd and cmd[0]:
             r = cmd[0]
         else:
-            r = await self.new_room("unknown", offset_from=self.last_room, offset_dir=self.last_dir)
+            r = await self.new_room(self.dr.NAMELESS, offset_from=self.last_room, offset_dir=self.last_dir)
         await self.last_room.set_exit(self.last_dir,r, force=True)
         self.db.commit()
         lr = self.room if self.is_new_room else None
@@ -2310,7 +2310,7 @@ class S(Server):
         if cmd:
             r = cmd[0]
             if not r:
-                r = await self.new_room("unknown", offset_from=self.last_room, offset_dir=self.last_dir)
+                r = await self.new_room(self.dr.NAMELESS, offset_from=self.last_room, offset_dir=self.last_dir)
                 self.db.commit()
             await self.went_to_room(r, repair=True)
         else:
@@ -2351,7 +2351,7 @@ class S(Server):
                 return
             await self.print(_("You went {d} from {last.idn_str}."), last=self.last_room,d=self.last_dir,room=self.room)
             return
-        r = cmd[0] or await self.new_room("unknown")
+        r = cmd[0] or await self.new_room(self.dr.NAMELESS)
         self.last_room = r
         if not cmd[0]:
             await self.print(_("{last.idn_str} created."), last=self.last_room,d=self.last_dir,room=self.room)
@@ -3335,9 +3335,10 @@ class S(Server):
                         continue
                 except NoData:
                     name = await self.mud.getRoomName(mid)
-                    name = name[0] if name and name[0] else None
+                    name = self.dr.clean_shortname(name[0]) if name and name[0] else None
                     gmcp = await self.mud.getRoomHashByID(mid)
                     gmcp = gmcp[0] if gmcp and gmcp[0] else None
+
                     nr = await self.new_room(name, id_gmcp=gmcp, id_mudlet=mid, offset_from=r, offset_dir=d)
 
                 if x is None:
@@ -3982,7 +3983,7 @@ class S(Server):
                 moved = r.id_gmcp != nr.id_gmcp
             elif i_gmcp or self.room.id_gmcp:
                 moved = True
-            elif i_short and self.clean_shortname(r.name) != self.clean_shortname(i_short) and not (r.flag & self.db.Room.F_MOD_SHORTNAME):
+            elif i_short and self.dr.clean_shortname(r.name) != self.dr.clean_shortname(i_short) and not (r.flag & self.db.Room.F_MOD_SHORTNAME):
                 await self.print(_("Shortname differs. #mm?"))
 
         return  ### !!!
@@ -4036,7 +4037,7 @@ class S(Server):
                     nr = None
             elif i_gmcp or self.room.id_gmcp:
                 moved = True
-            elif i_short and self.clean_shortname(r.name) != self.clean_shortname(i_short) and not (r.flag & self.db.Room.F_MOD_SHORTNAME):
+            elif i_short and self.dr.clean_shortname(r.name) != self.dr.clean_shortname(i_short) and not (r.flag & self.db.Room.F_MOD_SHORTNAME):
                 await self.print(_("Shortname differs. #mm?"))
 
         if x and not exits_seen:
@@ -4389,20 +4390,6 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
                 # else:
                 #     some exit to where we came from exists, so we don't complain
 
-    def clean_shortname(self, name):
-        """
-        Clean up the MUD's shortnames.
-        """
-        name = name.strip()
-        name = name.rstrip(".")
-        if name:
-            if name[0] in "'\"" and name[0] == name[-1]:
-                name = name[1:-1]
-            name = name.strip()
-        if not name:
-            return "<namenloser Raum>"
-        return name
-
     def clean_thing(self, name):
         """
         Clean up the MUD's thing names.
@@ -4468,7 +4455,9 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             try:
                 rn = (getattr(info,"short",None) if info else None) or self.last_cmd or getattr(self.process,"name",None) or self.command.lines[0][-1]
             except (AttributeError,IndexError):
-                rn = "unknown"
+                rn = self.dr.NAMELESS
+            else:
+                rn = self.dr.clean_shortname(rn)
             if room is None:
                 room = await self.new_room(rn, offset_from=self.room, offset_dir=d, id_mudlet=id_mudlet, id_gmcp=id_gmcp)
                 is_new = True
@@ -4542,7 +4531,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         if not rn and p and p.current > Command.P_BEFORE and p.lines[0]:
             rn = p.lines[0][-1]
         if rn:
-            rn = self.clean_shortname(rn)
+            rn = self.dr.clean_shortname(rn)
         if rn:
             room.last_shortname = rn
             if not room.name:
@@ -4550,7 +4539,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
                 db.commit()
             elif room.name == rn:
                 pass
-            elif self.clean_shortname(room.name) == rn:
+            elif self.dr.clean_shortname(room.name) == rn:
                 room.name = rn
                 db.commit()
             else:

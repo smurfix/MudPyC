@@ -22,6 +22,8 @@ class Driver(_Driver):
     lang = "de"
     ExitMatcher = ExitMatcher
 
+    NAMELESS = "<namenloser Raum>"
+
     _dir_local = tuple("norden sueden osten westen nordosten nordwesten suedosten suedwesten oben unten rein raus".split())
     _dir_short = tuple("n s o w no nw so sw ob u re r".split())
 

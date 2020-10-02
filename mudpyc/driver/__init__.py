@@ -30,6 +30,7 @@ class ExitMatcher:
     M_JOIN_SEP = ", "
     M_JOIN_LAST = " and "
     M_END = re.compile(r"\.\s*$")
+    NAMELESS = "<nameless room>"
 
     finish_cb = None
     def set_finish_cb(self, cb):
@@ -328,21 +329,6 @@ class Driver:
         self.init_intl()
         self.init_reversal()
     
-    def clean_shortname(self, name):
-        """
-        Clean up the MUD's shortnames.
-        """
-        name = name.strip()
-        name = name.rstrip(".")
-        if name:
-            if name[0] in "'\"" and name[0] == name[-1]:
-                name = name[1:-1]
-            name = name.strip()
-        if not name:
-            return self.NAMELESS
-        return name
-            
-
     @property
     def server(self):
         return self._server()
@@ -360,5 +346,4 @@ class Driver:
         if not name:
             return self.NAMELESS
         return name
-            
 
