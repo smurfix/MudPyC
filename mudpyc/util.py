@@ -92,6 +92,10 @@ class attrdict(dict):
         except KeyError:
             raise AttributeError(a) from None
 
+def AD(x):
+    return combine_dict(x, cls=attrdict, force=True)
+
+
 class OSLineReader:
     def __init__(self, fd, max_line_length=16384):
         self.fd = fd

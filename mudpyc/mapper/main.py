@@ -24,13 +24,10 @@ from .const import SignalThis, SkipRoute, SkipSignal, Continue
 from .const import ENV_OK,ENV_STD,ENV_SPECIAL,ENV_UNMAPPED
 from .walking import PathGenerator, PathChecker, CachedPathChecker, RoomFinder, LabelChecker, FulltextChecker, VisitChecker, ThingChecker, SkipFound, Continue
     
-from ..util import doc
+from ..util import doc, AD
 
 import logging
 logger = logging.getLogger(__name__)
-
-def AD(x):
-    return combine_dict(x, cls=attrdict, force=True)
 
 DEFAULT_CFG=attrdict(
         logfile=None,
