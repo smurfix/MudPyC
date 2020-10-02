@@ -42,6 +42,7 @@ DEFAULT_CFG=attrdict(
             use_mud_area = False,
             force_area = False,
             mudlet_gmcp = True,
+            mudlet_delete = True,
             add_reverse = True,
             show_intermediate = True,
             dir_use_z = True,
@@ -68,6 +69,7 @@ CFG_HELP=attrdict(
         use_mud_area=_("Use the MUD's area name"),
         force_area=_("Modify existing rooms' area when visiting them"),
         mudlet_gmcp=_("Use GMCP IDs stored in Mudlet's map"),
+        mudlet_delete=_("forget rooms if they're deleted in Mudlet"),
         add_reverse=_("Link back when creating an exit"),
         show_intermediate=_("show movement during command sequences"),
         dir_use_z=_("Allow new rooms in Z direction"),
@@ -975,8 +977,12 @@ class S(Server):
                         await self.print(_("Moved: {room.idn_str}"),room=room)
                         chg = True
                 else:  # deleted
-                    await self.print(_("Unmapped: -{room.id_old}: {room.idn_str}"),room=room)
-                    room.id_mudlet = None
+                    if self.conf['mudlet_delete']:
+                        await self._delete_room(room)
+                        await self.print(_("Deleted: {room.idn_str}"),room=room)
+                    else:
+                        await self.print(_("Unmapped: -{room.id_old}: {room.idn_str}"),room=room)
+                        room.id_mudlet = None
                     chg = True
             if chg:
                 db.commit()
@@ -1190,6 +1196,13 @@ class S(Server):
                 if isinstance(vt,bool):
                     v=_("ON") if v else _("off")
                 await self.print(f"{str(v):>5} = {CFG_HELP[k]}")
+
+    @doc(_(
+        """
+        Remove rooms from the database if they're deleted in Mudlet?
+        """))
+    async def alias_cfx(self, cmd):
+        await self._conf_flip("mudlet_delete")
 
     @doc(_(
         """
