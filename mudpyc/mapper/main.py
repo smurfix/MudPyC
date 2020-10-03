@@ -1007,6 +1007,10 @@ class S(Server):
                 await self.mud.print(line, noreply=True)
 
     async def print(self, msg, **kw):
+        msg = self._format(msg, kw)
+        await self._text_w.send(msg)
+
+    def _format(self, msg, kw):
         if kw:
             try:
                 msg = msg.format(**kw)
@@ -1017,7 +1021,7 @@ class S(Server):
                 except Exception:
                     msg = f"{msg}: {exc!r} [data not printable]"
                     logger.exception("Format %r", msg)
-        await self._text_w.send(msg)
+        return msg
 
     @property
     def view_or_room(self):
@@ -3642,6 +3646,15 @@ class S(Server):
         When used with a number, dump its n'th command
         """
         cmd = self.cmdfix("iiiiiiiii", cmd)
+        await self._state_dumper(self.print, cmd)
+
+    async def _log_state(self):
+        async def _logger(msg, **kw):
+            msg = self._format(msg, kw)
+            logger.debug(msg)
+        await self._state_dumper(_logger)
+
+    async def _state_dumper(self, printer, cmd=()):
         if len(cmd):
             x = self.process
             n = 1
@@ -3652,47 +3665,47 @@ class S(Server):
             while cmd:
                 x = x.commands[cmd[0]-1]
                 cmd = cmd[1:]
-            await self.print(_("Target: {cmd!r}"), cmd=x)
+            await printer(_("Target: {cmd!r}"), cmd=x)
             if hasattr(x,"cmds"):
                 for i,command in enumerate(x.cmds):
-                    await self.print(_("Step {n}: {cmd}"), n=i+1, cmd=command)
+                    await printer(_("Step {n}: {cmd}"), n=i+1, cmd=command)
             if hasattr(x,"commands"):
                 for i,command in enumerate(x.commands):
-                    await self.print(_("Sub {n}: {cmd!r}"), n=i+1, cmd=command)
+                    await printer(_("Sub {n}: {cmd!r}"), n=i+1, cmd=command)
             return
 
         if not self.command:
-            await self.print(_("No command"))
+            await printer(_("No command"))
         else:
-            await self.print(_("Command: {s.command}"), s=self)
+            await printer(_("Command: {s.command}"), s=self)
         if not self._prompt_evt:
-            await self.print(_("Not waiting for prompt"))
+            await printer(_("Not waiting for prompt"))
         elif self._prompt_evt.is_set():
-            await self.print(_("Prompt trigger set"))
+            await printer(_("Prompt trigger set"))
         else:
-            await self.print(_("Waiting for prompt (state={ps})"), ps=self._prompt_state)
+            await printer(_("Waiting for prompt (state={ps})"), ps=self._prompt_state)
         if not self.trigger_sender.is_set():
-            await self.print(_("waiting for continuation"))
+            await printer(_("waiting for continuation"))
 
         for x in self.cmd1_q:
-            await self.print(_("Mudlet: {x!r}"), x=x)
+            await printer(_("Mudlet: {x!r}"), x=x)
         for x in self.cmd2_q:
-            await self.print(_("Mapper: {x!r}"), x=x)
+            await printer(_("Mapper: {x!r}"), x=x)
         for x in self.cmd3_q:
-            await self.print(_("Input: {x!r}"), x=x)
+            await printer(_("Input: {x!r}"), x=x)
 
         if self.this_exit:
-            await self.print(_("Current Move: {x.dir} from {x.src.idn_str}"), x=self.this_exit)
+            await printer(_("Current Move: {x.dir} from {x.src.idn_str}"), x=self.this_exit)
         else:
             x = self.current_exit
             if x:
-                await self.print(_("Last Move: {x.dir} from {x.src.idn_str}"), x=x)
+                await printer(_("Last Move: {x.dir} from {x.src.idn_str}"), x=x)
 
         x = self.process
         n = 0
         while x:
             n += 1
-            await self.print(_("Stack {n}: {x!r}"), n=n, x=x)
+            await printer(_("Stack {n}: {x!r}"), n=n, x=x)
             x = x.upstack
 
     @with_alias("##")
