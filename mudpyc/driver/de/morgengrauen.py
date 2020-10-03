@@ -1,5 +1,6 @@
 from . import Driver as _Driver
 from mudpyc.util import AD
+from mudpyc.mapper.sql import NoData
 
 import logging
 logger = logging.getLogger(__name__)
@@ -66,9 +67,8 @@ class Driver(_Driver):
                 try:
                     room = s.db.r_hash(id_gmcp)
                 except NoData:
-                    pass
-                else:
-                    await s.went_to_room(room)
+                    room = await s.new_room(descr=val["room"]["info"]["short"], id_gmcp=id_gmcp)
+                await s.went_to_room(room)
         return True
 
     async def event_gmcp_MG_char_attributes(self, msg):
