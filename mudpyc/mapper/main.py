@@ -1292,7 +1292,7 @@ class S(Server):
                 await self.print(f"{count} {label}")
         else:
             n = 0
-            for r in db.q(db.Room).filter(db.Room.label == cmd[0]).all():
+            for r in db.q(db.Room).filter(db.Room.label == cmd[0]).order_by(db.Room.name).all():
                 n += 1
                 await self.print(r.idnn_str)
             if n == 0:
