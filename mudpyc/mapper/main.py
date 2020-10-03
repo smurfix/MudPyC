@@ -27,7 +27,7 @@ from .walking import PathGenerator, PathChecker, CachedPathChecker, RoomFinder, 
 from ..util import doc, AD
 
 import logging
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("S")
 
 DEFAULT_CFG=attrdict(
         logfile=None,
@@ -117,6 +117,7 @@ class Process:
     """
     Abstract class to assemble some job to be done
     """
+    _n_proc = 0
     upstack = None
 
     def __init__(self, server, *, stopped=False):
@@ -124,6 +125,9 @@ class Process:
         self.stopped = stopped
         self.commands = deque()
         self.n_moves = 0
+
+        Process._n_proc += 1
+        self._n = Process._n_proc
 
     def append(self, cmd):
         """
@@ -148,6 +152,7 @@ class Process:
         """
         Set myself up.
         """
+        logger.debug("Setup %r", self)
         s = self.server
         self.upstack = s.process
         s.process = self
@@ -160,6 +165,7 @@ class Process:
 
         Does NOT continue the sender loop.
         """
+        logger.debug("Finish %r", self)
         s = self.server
         if s.process is not self:
             raise RuntimeError("Process hook mismatch")
@@ -174,6 +180,7 @@ class Process:
             res["_t"] = n[:-7]
         else:
             res["_t"] = n
+        res["_n"] = self._n
         if self.stopped:
             res["stop"]="y"
         if self.commands:
@@ -214,8 +221,11 @@ class Process:
         This obeys the stop flag.
         """
         if self.stopped:
+            logger.debug("Next / ignore, stopped %r", self)
             return
+        logger.debug("Next %r", self)
         await self.queue_next()
+        logger.debug("NextDone %r", self)
 
     async def queue_next(self):
         """
@@ -4146,8 +4156,7 @@ class S(Server):
         if c is not None:
             if not no_info or not c.info:
                 return c
-        print("*** IDLE ***")
-        import pdb;pdb.set_trace()
+        logger.debug("*** IDLE ***")
         c = IdleCommand(self)
         self.process.append(c)
         return c
@@ -5501,7 +5510,13 @@ async def main(config,log,debug,migrate):
         config = open("mapper.cfg","r")
     cfg = yaml.safe_load(config)
     cfg = combine_dict(cfg, DEFAULT_CFG, cls=attrdict)
-    logging.basicConfig(level=logging.DEBUG if debug else getattr(logging,cfg.log['level'].upper()))
+
+    if 'logging' in cfg:
+        from logging.config import dictConfig
+        dictConfig(cfg['logging'])
+    else:
+        logging.basicConfig(level=logging.DEBUG if debug else getattr(logging,cfg.log['level'].upper()))
+
 
     if not log and cfg.logfile is not None:
         log = open(cfg.logfile, "a")
