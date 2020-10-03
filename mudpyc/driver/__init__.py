@@ -30,7 +30,6 @@ class ExitMatcher:
     M_JOIN_SEP = ", "
     M_JOIN_LAST = " and "
     M_END = re.compile(r"\.\s*$")
-    NAMELESS = "<nameless room>"
 
     finish_cb = None
     def set_finish_cb(self, cb):
@@ -111,6 +110,10 @@ class Driver:
     name = "Generic driver"
 
     lang:str = None # should be overridden
+
+    NAMELESS = "<nameless room>"
+    LOOK = "look"
+    EXAMINE = "examine"
 
     ExitMatcher = ExitMatcher
 

@@ -4508,7 +4508,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
                 for tt in SPC.split(t):
                     room.has_thing(tt)
         else:
-            await self.send_commands("", LookCommand(self, "schau"))
+            await self.send_commands("", LookCommand(self, self.dr.LOOK))
         room.visited()
         if last_room and last_room.id_mudlet:
             await self.update_room_color(last_room)
@@ -4582,7 +4582,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         get from MUD and set room to it
         """))
     async def alias_rl_b(self, cmd):
-        self.main.start_soon(self.send_commands,"", LookCommand(self, "schau", force=True))
+        self.main.start_soon(self.send_commands,"", LookCommand(self, self.dr.LOOK, force=True))
 
     @doc(_(
         """
@@ -4865,10 +4865,10 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         if cmd:
             w = self.db.word(cmd[0], create=True)
             self.next_word = self.room.with_word(w, create=True)
-            self.main.start_soon(self.send_commands, "", WordProcessor(self, self.room, w, "unt "+cmd[0]))
+            await self.send_commands("", WordProcessor(self, self.room, w, "%s %s" % (self.dr.EXAMINE,cmd[0])))
         elif self.next_word:
             w = self.next_word.word
-            self.main.start_soon(self.send_commands, "", WordProcessor(self, self.room, w, "unt "+w.name if w.name else "schau"))
+            await self.send_commands("", WordProcessor(self, self.room, w, ("%s %s" % (self.dr.EXAMINE,w.name)) if w.name else self.dr.LOOK))
         else:
             await self.next_search()
 
@@ -4940,7 +4940,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             await self.print(_("No (more) words."))
         else:
             self.next_word = w
-            self.main.start_soon(self.send_commands, "", WordProcessor(self, self.room, w.word, "schau"))
+            self.main.start_soon(self.send_commands, "", WordProcessor(self, self.room, w.word, self.dr.LOOK))
         self.db.commit()
 
 
