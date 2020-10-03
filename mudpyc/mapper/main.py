@@ -404,7 +404,7 @@ class SeqProcess(_SeqProcess):
                 break
 
             if isinstance(d,str):
-                logger.debug("sender sends %r",d)
+                logger.debug("seq has %r",d)
                 if not d:
                     continue
                 if d[0] != '#':
@@ -834,6 +834,7 @@ class S(Server):
     # Prompt handling
     _prompt_evt = None
     _prompt_state = None
+    _send_recheck = None
 
     def __init__(self, cfg):
         super().__init__(cfg)
@@ -3230,7 +3231,7 @@ class S(Server):
             db.commit()
         return area
 
-    async def send_commands(self, name, *cmds, err_str="", move=False, exit=None, send_echo=True):
+    async def send_commands(self, name, *cmds, err_str="", move=False, exit=None, send_echo=True, now=False):
         """
         Send this list of commands to the MUD.
         The list may include special processing or delays.
@@ -3241,6 +3242,8 @@ class S(Server):
             PP = SeqProcess
         p = PP(self, name, cmds, exit=exit, send_echo=send_echo)
         await self.run_process(p)
+        if now:
+            self._send_recheck = True
 
     async def sync_from_mudlet(self, *rooms, clear=False):
         """
@@ -3402,7 +3405,6 @@ class S(Server):
             return None
         if msg.startswith("lua "):
             return None
-        logger.debug("Put SendCmd3 %r",msg)
         self.cmd3_q.append((msg,False))
         self.trigger_sender.set()
 
@@ -3465,7 +3467,6 @@ class S(Server):
             if isinstance(s,self.db.Keymap):
                 s = s.text
             if isinstance(s,str):
-                logger.debug("Put SendCmd3 %r",s)
                 self.cmd3_q.append((s,True))
                 self.trigger_sender.set()
                 return
@@ -3502,7 +3503,6 @@ class S(Server):
         """
         if isinstance(cmd,str):
             cmd = cls(self, command=cmd)
-        logger.debug("Put SendCmd2 %r",cmd)
         self.cmd2_q.append(cmd)
         self.trigger_sender.set()
         return cmd
@@ -3674,6 +3674,7 @@ class S(Server):
                     await printer(_("Sub {n}: {cmd!r}"), n=i+1, cmd=command)
             return
 
+        await printer(_("Send Recheck {recheck!r}"), recheck=self._send_recheck)
         if not self.command:
             await printer(_("No command"))
         else:
@@ -3772,7 +3773,7 @@ class S(Server):
         """
         Main send-some-commands loop.
         """
-        seen = True
+        self._send_recheck = True
         while True:
             try:
                 if self.cmd1_q:
@@ -3785,25 +3786,22 @@ class S(Server):
                     # There should be only one, but sometimes the user is
                     # faster than the MUD.
                     cmd = self.cmd2_q.pop(0)
-                    logger.debug("Get SendCmd2 %r",cmd)
                     xmit = True
                 else:
-                    # No command queued, so we check the stack.
-                    if seen:
-                        logger.debug("Prompt Next %r",self.process)
+                    # No command queued, so we ask the stack.
+                    if self._send_recheck:
+                        self._send_recheck = False
                         await self.process.next()
-                        seen = False
                     elif self.cmd3_q:
                         cmd,echo = self.cmd3_q.pop(0)
-                        logger.debug("Get SendCmd3 %r",cmd)
                         await self._do_manual_command(cmd, send_echo=echo)
+                        self._send_recheck = True
                     else:
-                        logger.debug("Prompt Wait %r",self.process)
                         await self.trigger_sender.wait()
                         self.trigger_sender = trio.Event()
-                        seen = True
+                        self._send_recheck = True
                     continue
-                seen = True
+                self._send_recheck = True
 
                 if self.command is not None:
                     await self.command.done()
@@ -3825,7 +3823,6 @@ class S(Server):
                     cmd.send_seen = True
                 await self._prompt_evt.wait()
                 self._prompt_evt = None
-                logger.debug("Prompt seen")
                 await self._process_prompt()
                 await self._wait_output()
 
@@ -4521,7 +4518,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
                 for tt in SPC.split(t):
                     room.has_thing(tt)
         else:
-            await self.send_commands("", LookCommand(self, self.dr.LOOK))
+            await self.send_commands("", LookCommand(self, self.dr.LOOK), now=True)
         room.visited()
         if last_room and last_room.id_mudlet:
             await self.update_room_color(last_room)
