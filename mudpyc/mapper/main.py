@@ -2069,8 +2069,8 @@ class S(Server):
             return
         if not x.steps:
             x.steps = x.dir
+        await self.print(_("Exit renamed from {src} to {dst}"),src=x.dir,dst=cmd)
         x.dir = cmd
-        await self.print(_("Exit renamed from {src} to {dst}"),src=x.steps,dst=cmd)
         self.db.commit()
 
     @doc(_(
