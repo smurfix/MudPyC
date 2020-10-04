@@ -1346,9 +1346,11 @@ class S(Server):
             await self.print(_("No flag set."))
             return
         if room.flag & db.Room.F_NO_EXIT:
-            flags.append(_("Descr doesn't have exits"))
+            flags.append(_("Description doesn't have exits"))
         if room.flag & db.Room.F_NO_GMCP_ID:
             flags.append(_("ignore this GMCP ID"))
+        if room.flag & db.Room.F_NO_AUTO_EXIT:
+            flags.append(_("Don't auto-set exits"))
         await self.print(_("Flags: {flags}"), flags=" ".join(flags))
 
     @doc(_(
@@ -1370,6 +1372,27 @@ class S(Server):
         else:
             room.flag |= F
             await self.print(_("Room special: has no Exits line."))
+        db.commit()
+
+    @doc(_(
+        """Flag: no-exits
+        Exits are special, don't auto-set them.
+        """))
+    async def alias_rfx(self, cmd):
+        db = self.db
+        F = db.Room.F_NO_AUTO_EXIT
+        cmd = self.cmdfix("r", cmd)
+        if cmd:
+            room = cmd[0]
+        else:
+            room = self.view_or_room
+        flags = []
+        if room.flag & F:
+            room.flag &=~ F
+            await self.print(_("Room normal: exits work normally."))
+        else:
+            room.flag |= F
+            await self.print(_("Room special: unset exits are special."))
         db.commit()
 
     @doc(_(
@@ -4327,6 +4350,8 @@ class S(Server):
                 x = None
 
         if x is None:
+            if self.room.flag & self.db.Room.F_NO_AUTO_EXIT:
+                return # don't touch
             x,_src = await self.room.set_exit(d, room, force=False)
         else:
             _src = False
@@ -4346,7 +4371,7 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
                 else:
                     if xr.dst is not None and xr.dst != self.room:
                         await self.print(_("Back exit {dir} already goes to {room.idn_str}!"), room=xr.dst, dir=xr.dir)
-                    else:
+                    elif not (room.flag & self.db.Room.F_NO_AUTO_EXIT):
                         await room.set_exit(rev, self.room)
             else:
                 try:
@@ -4430,7 +4455,8 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
             else:
                 room.id_mudlet = id_mudlet
                 room.area = None
-            await self.room.set_exit(d, room)
+            if not (self.room.flag & self.db.Room.F_NO_AUTO_EXIT):
+                await self.room.set_exit(d, room)
             db.commit()
 
         await self.went_to_room(room, d=d, is_new=is_new, info=info, exits_text=exits_text)

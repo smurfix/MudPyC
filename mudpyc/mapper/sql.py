@@ -313,7 +313,8 @@ def SQL(cfg):
 
         F_NO_EXIT = (1<<0)
         F_NO_GMCP_ID = (1<<1)
-        F_MOD_SHORTNAME = (2<<1)
+        F_MOD_SHORTNAME = (1<<2)
+        F_NO_AUTO_EXIT = (1<<3)
 
         area = relationship(Area, back_populates="rooms")
         exits = relationship(Exit,
