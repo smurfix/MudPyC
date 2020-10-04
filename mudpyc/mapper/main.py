@@ -1007,8 +1007,8 @@ class S(Server):
             else:
                 await self.mud.print(line, noreply=True)
 
-    async def print(self, msg, **kw):
-        msg = self._format(msg, kw)
+    async def print(self, _msg, **kw):
+        msg = self._format(_msg, kw)
         await self._text_w.send(msg)
 
     def _format(self, msg, kw):
