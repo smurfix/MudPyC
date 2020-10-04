@@ -2169,7 +2169,8 @@ class S(Server):
 
         await self.print("Sync rooms")
         await self.sync_areas()
-        for r in db.q(db.Room).filter(db.Room.id_mudlet != None).order_by(db.Room.id_mudlet).all():
+        async def upd(r):
+            nonlocal s
             s2 = r.id_mudlet // 200
             if s != s2:
                 s = s2
@@ -2185,6 +2186,12 @@ class S(Server):
             if r.area_id:
                 await self.mud.setRoomArea(r.id_mudlet, r.area_id)
             db.commit()
+
+        for r in db.q(db.Room).filter(db.Room.id_mudlet != None).order_by(db.Room.id_mudlet).all():
+            await upd(r)
+        for r in db.q(db.Room).filter(db.Room.id_mudlet == None, (db.Room.pos_x != 0) | (db.Room.pos_y != 0)).order_by(db.Room.id_mudlet).all():
+            r.set_id_mudlet((await self.rpc(action="newroom"))[0])
+            await upd(r)
 
         await self.print("Sync exits")
         s=0
