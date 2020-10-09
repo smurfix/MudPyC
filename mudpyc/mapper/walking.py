@@ -112,6 +112,7 @@ class PathGenerator:
     _scope: trio.CancelScope = None
 
     def __init__(self, server, start_room, checker:PathChecker, n_results = 3):
+        assert start_room is not None
         self.s = server
         self.checker = checker
         self.start_room = start_room

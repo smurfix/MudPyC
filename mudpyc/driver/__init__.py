@@ -37,6 +37,12 @@ class ExitMatcher:
         if self.last:
             cb()
 
+    @property
+    @staticmethod
+    def init_mud():
+        if False:
+            yield ""
+
     @classmethod
     def first_line(cls, msg, colors=None):
         """
@@ -157,6 +163,48 @@ class Driver:
             }
         }
     
+    # WARNING you need to write your Lua setup code in such a way that it
+    # can easily be re-executed without clearing or changing the current
+    # state.
+    lua_setup = ["""\
+function initGUI()
+    print("Note: you don't have any MUD specific Mudlet code")
+end
+"""]
+
+    async def show_room_label(self, room):
+        """
+        Update the current room's label in the GUI
+        """
+        pass
+
+    async def show_room_note(self, room=None):
+        """
+        Update the current room's notes in the GUI
+        """
+        pass
+
+    async def show_room_data(self, room=None):
+        """
+        Update the current room's data in the GUI.
+
+        This should call `show_room_note` and `show_room_label` with the
+        new room.
+        """
+        pass
+
+    async def show_player(self):
+        """
+        Display the player's name and other attrs that don't change often
+        """
+        pass
+
+    async def show_vitals(self):
+        """
+        Display the player's vitals (health etc)
+        """
+        pass
+
     def is_mudlet_dir(self, d: IntlDir) -> bool:
         """
         Return a flag whether this is a standard Mudlet direction.
