@@ -40,6 +40,7 @@ DEFAULT_CFG=attrdict(
             force_area = False,
             mudlet_gmcp = True,
             mudlet_delete = True,
+            mudlet_explode = True,
             add_reverse = True,
             show_intermediate = True,
             dir_use_z = True,
@@ -67,6 +68,7 @@ CFG_HELP=attrdict(
         force_area=_("Modify existing rooms' area when visiting them"),
         mudlet_gmcp=_("Use GMCP IDs stored in Mudlet's map"),
         mudlet_delete=_("forget rooms if they're deleted in Mudlet"),
+        mudlet_explode=_("Spread Mudlet rooms when they're first seen"),
         add_reverse=_("Link back when creating an exit"),
         show_intermediate=_("show movement during command sequences"),
         dir_use_z=_("Allow new rooms in Z direction"),
@@ -1211,6 +1213,13 @@ class S(Server):
         """))
     async def alias_cfx(self, cmd):
         await self._conf_flip("mudlet_delete")
+
+    @doc(_(
+        """
+        Remove rooms from the database if they're deleted in Mudlet?
+        """))
+    async def alias_cfp(self, cmd):
+        await self._conf_flip("mudlet_explode")
 
     @doc(_(
         """
@@ -3292,6 +3301,9 @@ class S(Server):
         Given these rooms, follow those of their exits that are only in
         Mudlet. Create targets. Recurse.
 
+        Mudlet coordinates are expanded by pos_x/y_delta if "mudlet_explode"
+        is set.
+
         If @clear is set, any old associations are deleted.
         """
         db=self.db
@@ -3382,7 +3394,7 @@ class S(Server):
                     gmcp = await self.mud.getRoomHashByID(mid)
                     gmcp = gmcp[0] if gmcp and gmcp[0] else None
 
-                    nr = await self.new_room(name, id_gmcp=gmcp, id_mudlet=mid, offset_from=r, offset_dir=d)
+                    nr = await self.new_room(name, id_gmcp=gmcp, id_mudlet=mid, offset_from=r, offset_dir=d, explode=self.conf['mudlet_explode'])
 
                 if x is None:
                     x,_xf = await r.set_exit(d,nr,skip_mud=True)
@@ -4219,7 +4231,7 @@ class S(Server):
             self.trigger_sender.set()
 
     async def new_room(self, descr="", *, id_gmcp=None, id_mudlet=None,
-            offset_from=None, offset_dir=None, area=None):
+            offset_from=None, offset_dir=None, area=None, explode=False):
 
         if self.conf['debug_new_room']:
             import pdb;pdb.set_trace()
@@ -4267,7 +4279,7 @@ class S(Server):
         self.db.commit()
 
         is_new = await self.maybe_assign_mudlet(room, id_mudlet)
-        await self.maybe_place_room(room, offset_from,offset_dir, is_new=is_new)
+        await self.maybe_place_room(room, offset_from,offset_dir, is_new=is_new, explode=explode)
 
         if (area is None or area.flag & self.db.Area.F_IGNORE) and offset_from is not None:
             area = offset_from.area
@@ -4290,7 +4302,7 @@ class S(Server):
             room.set_id_mudlet((await self.rpc(action="newroom"))[0])
             return True
 
-    async def maybe_place_room(self, room, offset_from,offset_dir, is_new=False):
+    async def maybe_place_room(self, room, offset_from,offset_dir, is_new=False, explode=False):
         """
         Place the room if it isn't already.
         """
@@ -4308,6 +4320,11 @@ class S(Server):
 
         else:
             # mudlet positions are kindof authoritative
+            if explode:
+                x *= selfconf['pos_x_delta']
+                y *= selfconf['pos_y_delta']
+                await self.mud.setRoomCoordinates(room.id_mudlet, x,y,z)
+
             room.pos_x, room.pos_y, room.pos_z = x,y,z
             room.label_x,room.label_y = await self.mud.getRoomNameOffset(room.id_mudlet)
             room.area_id = (await self.mud.getRoomArea(room.id_mudlet))[0]
