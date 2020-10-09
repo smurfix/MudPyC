@@ -8,18 +8,24 @@ explore-a-MUD-and-play features.
 Setup
 =====
 
-You need Mudlet, ideally an account on a MUD you're already somewhat
-familiar with, and some patience to teach your fingers a bunch of new
-macros. Even more ideally you should use Smurf's version of Mudlet because
-it can display the MUD's room labels.
+You need Mudlet, ideally an account on a supported MUD you're already
+somewhat familiar with, and some patience to teach your fingers a bunch of
+new macros. Even more ideally you should use Smurf's version of Mudlet
+because it can display the MUD's room labels.
 
 You also need a database. Databases are nice because they don't need to be
 saved, quite unlike the map you create in Mudlet. Create one. This example
 uses sqlite, so simply copy ``mapper.cfg.sample`` to ``mapper.cfg`` and
 adapt it.
 
-Next start ``./run -c mapper.cfg --migrate`` which will create the data
-structures. Start Mudlet, create a new profile for your MUD account, log
+You find supported MUDs by checking the contents of ``mudpyc/driver/XX``
+where ``XX`` is the language code (currently either "de" for German or "en"
+for English"). Adapting things to a different MUD isn't that difficult;
+please submit your code to the project so that other players may benefit
+from it, and so we can try to keep things working when code is refactored.
+
+Next start ``./run -c mapper.cfg --migrate`` which will create the database
+tables. Start Mudlet, create a new profile for your MUD account, log
 in, and go to an area which you know and which has reasonable cardinal
 directions (i.e. ``north`` then ``south`` returns you to the room you
 started at).

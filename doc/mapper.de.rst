@@ -8,9 +8,9 @@ Funktionen, um ein MUD auszukundschaften.
 Einrichtung
 ===========
 
-Du brauchst "Mudlet", einen Character in einem MUD das du schon ein
-bisschen kennst, und ein wenig Geduld um deinen Fingern ein paar neue
-Makros beizubringen.
+Du brauchst "Mudlet", einen Character in einem von MudPyC unterstützten MUD
+das du schon ein bisschen kennst, und ein wenig Geduld um deinen Fingern
+ein paar neue Makros beizubringen.
 
 Im Idealfall solltest du die Mudlet-Version von Smurf verwenden, weil du
 damit die Raumbezeichnungen anzeigen lassen kannst.
@@ -19,6 +19,12 @@ Du brauchst außerdem eine Datenbank. Datenbanken sind nett, weil man sie
 nicht sichern muss, ganz im Gegensatz zur Mudlet-Karte. Somit legen wir
 eine an. Dieses Beispiel verwendet sqlite: kopiere einfach
 ``mapper.cfg.sample`` nach ``mapper.cfg``.
+
+Die unterstützten MUDs findest du im Verzeichnis ``mudpyc/driver/XX``.
+``XX`` ist "de" oder "en" je nach MUD-Sprache. MudPyC auf ein weiteres
+MUD anzupassen ist nicht allzu schwer; bitte schick uns den Code, damit
+andere Spieler auch was davon haben und wir ihn am Laufen halten können,
+wenn wir was umstrukturieren müssen.
 
 Als Nächtes starte ``./run -c mapper.cfg --migrate``, das legt die
 Datenbank an. Dann starte Mudlet, lege für deinen Character ein neues
