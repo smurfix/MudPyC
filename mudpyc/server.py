@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 from functools import partial
 from inspect import iscoroutine
 import shlex
+import yaml
 
 from .util import attrdict, combine_dict, OSLineReader, ValueEvent
 from .alias import Alias
@@ -39,10 +40,13 @@ DEFAULTS = attrdict(
         server=attrdict(
             host="127.0.0.1", port=23817,
             ca_certs=None, certfile=None, keyfile=None, use_reloader=False,
-        )
+        ),
+        config=os.curdir,  # profile specific configuration
     )
-if "XDG_RUNTIME_DIR" in os.environ:
-    DEFAULTS["server"]["fifo"] = os.path.join(os.environ["XDG_RUNTIME_DIR"], "mudlet_fifo")
+try:
+    DEFAULTS["server"]["fifo"] = os.environ["XDG_RUNTIME_DIR"]
+except KeyError:
+    pass
 
 def run_in_task(x):
     x.run_in_task = True
@@ -80,7 +84,7 @@ class _CallMudlet:
 
     async def _get(self):
         if self.meth:
-            raise RuntimeError("Only for non-method calls")
+            raise RuntimeError("Only for direct calls")
         res = await self.server.rpc(action="get", name=self.name)
         if not res:
             return None  # nil, Lua can't store that in a table
@@ -88,14 +92,18 @@ class _CallMudlet:
 
     async def _set(self, value):
         if self.meth:
-            raise RuntimeError("Only for non-method calls")
+            raise RuntimeError("Only for direct calls")
         return await self.server.rpc(action="set", name=self.name, value=value)
 
     @property
-    async def _nil(self):
+    async def _type(self):
         if self.meth:
-            raise RuntimeError("Only for non-method calls")
-        return not await self.server.rpc(action="exists", name=self.name)
+            raise RuntimeError("Only for direct calls")
+        return await self.server.rpc(action="type", name=self.name)
+
+    @property
+    async def _nil(self):
+        return "nil" == await self._type
 
     async def _del(self):
         if self.meth:
@@ -103,81 +111,71 @@ class _CallMudlet:
         await self.server.rpc(action="delete", name=self.name)
 
 class Server:
+    """
+    One instance corresponds to a specific Mudlet profile.
+    """
     _seq = 1
 
-    def __init__(self, cfg):
-        self.app = Quart(cfg['name'],
-                # no, we do not want any of those default folders and whatnot
-                static_folder=None,template_folder=None,root_path="/nonexistent",
-                )
-        self.cfg = cfg = combine_dict(cfg, DEFAULTS)
+    def __init__(self, name, cfg):
+        self.name = name
+        self.__logger = logging.getLogger(__name__+"."+name)
+
+        d = cfg.get('configdir', None)
+        if d is not None:
+            cf = os.path.join(d,name+".cfg")
+            with open(cf,"r") as f:
+                cfg = combine_dict(yaml.safe_load(f), cfg, cls=attrdict)
+        self.cfg = cfg
+
         self._handlers = {}
         self._calls = {}
-        
-        if 'fifo' in cfg["server"]:
+        self._is_running = trio.Event()
+
+        self.fifo = None
+        try:
+            fifo = cfg["server"]['fifo']
+        except KeyError:
+            pass
+        else:
+            fifo = os.path.join(fifo, self.name+".fifo")
             try:
-                os.unlink(cfg["server"]['fifo'])
+                os.unlink(fifo)
             except EnvironmentError as err:
                 if err.errno != errno.ENOENT:
                     raise
             try:
-                os.mkfifo(cfg["server"]['fifo'], 0o600)
+                os.mkfifo(fifo, 0o600)
             except EnvironmentError as err:
-                logger.info("No FIFO. Using HTTP. (%r)", err)
-                del cfg["server"]['fifo']
+                self.__logger.info("No FIFO. Using HTTP. (%r)", err)
+            else:
+                self.fifo = fifo
 
+        self._to_send = []
+        self._to_send_wait = trio.Event()
+        self._replies = {}
+        self._is_connected = trio.Event()
 
-        @self.app.route("/test", methods=['GET'])
-        async def _get_test():
-            msg = json.dumps(dict(hello="This is a test."))
-            return Response(msg, content_type="application/json")
+    @property
+    async def is_running(self):
+        await self._is_running.wait()
 
-        @self.app.route("/test", methods=['POST'])
-        async def _echo_data():
-            msg = await request.get_data()
-            return Response(msg, content_type="application/x-fubar")
+    async def process_request(self, msg):
+        for m in msg:
+            await self._msg_in(m)
 
-        # GET only fetches. PUT only sends. POST does both.
-
-        @self.app.route("/json", methods=['GET'])
-        async def _get_data():
-            return await self._post_reply()
-
-        @self.app.route("/json", methods=['PUT'])
-        async def _put_data():
-            msg = await request.get_data()
-            logger.debug("PUT %r",msg)
-            if msg:
-                msg = json.loads(msg)
-                for m in msg:
-                    logger.debug("PUT P %r",m)
-                    await self._msg_in(m)
-            logger.debug("PUT PE")
-            msg = json.dumps([])
-            return Response(msg, content_type="application/json")
-
-        @self.app.route("/json", methods=['POST'])
-        async def _post_data():
-            msg = await request.get_data()
-            if msg:
-                msg = json.loads(msg)
-                await self._msg_in(msg)
-            return await self._post_reply()
-
-    async def _post_reply(self):
+    async def make_reply(self):
         while not self._to_send:
             await self._to_send_wait.wait()
             self._to_send_wait = trio.Event()
         msg, self._to_send = self._to_send, []
-        msg = json.dumps(msg)
-        return Response(msg, content_type="application/json")
+        return json.dumps(msg)
 
     async def _reader(self, task_status=trio.TASK_STATUS_IGNORED):
-        if 'fifo' not in self.cfg['server']:
+        if self.fifo is None:
             task_status.started(None)
             return
 
-        fx = os.open(self.cfg['server']['fifo'], os.O_RDONLY|os.O_NDELAY)
+        fx = os.open(self.fifo, os.O_RDONLY|os.O_NDELAY)
         f = OSLineReader(fx)
         task_status.started(fx)
         try:
@@ -189,7 +187,7 @@ class Server:
                 try:
                     await self._msg_in(msg)
                 except Exception as exc:
-                    logger.exception("CRASH")
+                    self.__logger.exception("CRASH")
         except EnvironmentError as err:
             if err.errno == errno.EBADF:
                 return  # closed from outside
@@ -197,17 +195,17 @@ class Server:
 
     async def _msg_in(self, msg):
         if msg.get("result",()) and msg["result"][0] != "Pong":
-            logger.debug("IN %r",msg)
+            self.__logger.debug("IN %r",msg)
         seq = msg.get("seq",None)
         if seq is not None:
             try:
                 ev = self._replies[seq]
             except KeyError:
-                logger.warning("Unknown Reply %r",msg)
+                self.__logger.warning("Unknown Reply %r",msg)
                 return
             else:
                 if not isinstance(ev, trio.Event):
-                    logger.warning("Dup Reply %r",msg)
+                    self.__logger.warning("Dup Reply %r",msg)
                     return
             try:
                 self._replies[seq] = outcome.Value(msg["result"])
@@ -216,7 +214,7 @@ class Server:
             ev.set()
         else:
             await self._dispatch(msg)
-        logger.debug("IN done")
+        self.__logger.debug("IN done")
         
     async def _dispatch(self, msg):
         """
@@ -246,13 +244,13 @@ class Server:
             if (event != ALL_EVT):
                 await _disp(self._handlers.get(ALL_EVT, ()))
             return
-        logger.warning("Unhandled message: %r", msg)
+        self.__logger.warning("Unhandled message: %r", msg)
 
     async def _action_poll(self, msg):
         pass
 
     async def _action_unknown(self, msg):
-        logger.warning("Unknown: %r", msg)
+        self.__logger.warning("Unknown: %r", msg)
         pass
 
     async def _action_call(self, msg):
@@ -272,9 +270,9 @@ class Server:
         def done_err(err):
             done({"error":str(err)})
             if seq is None:
-                logger.exception("Ignored error: %r", msg, exc_info=err)
+                self.__logger.exception("Ignored error: %r", msg, exc_info=err)
             else:
-                logger.warning("Error (sent to Lua): %r", msg, exc_info=err)
+                self.__logger.warning("Error (sent to Lua): %r", msg, exc_info=err)
 
         async def capture(fn, data):
             try:
@@ -301,9 +299,12 @@ class Server:
 
 
     async def _action_init(self, msg):
+        profile = msg.get("profile", None)
+        home = msg.get("home", None)
+
         res = dict(action="init")
-        if 'fifo' in self.cfg['server']:
-            res['fifo'] = self.cfg['server']['fifo']
+        if self.fifo is not None:
+            res['fifo'] = self.fifo
         self._send(res)
 
     async def _action_up(self, msg):
@@ -318,14 +319,14 @@ class Server:
                     res = await self.rpc(action="ping")
             except trio.TooSlowError:
                 if "pdb" in sys.modules:
-                    logger.error("PING ?!?")
+                    self.__logger.error("PING ?!?")
                 else:
                     raise
             if res[0] != "Pong":
                 raise ValueError(res)
             t2 = trio.current_time()
             if t2-t1 > 0.1:
-                logger.info("LAG %f",t2-t1)
+                self.__logger.info("LAG %f",t2-t1)
             await trio.sleep(3)
             # Mudlet may time out after 4 or 5 seconds
 
@@ -365,38 +366,33 @@ class Server:
         finally:
             del self._mgr
 
+    async def run(self):
+        """
+        Run this instance.
+
+        This default implementation simply opens+holds the context.
+        You may or may not want to do something else instead.
+        """
+        self.__logger.debug("Starting %s", self.name)
+        async with self:
+            while True:
+                await trio.sleep(99999)
+
     @asynccontextmanager
     async def _run(self) -> None:
         """
-        Run this application.
-
-        This is a simple Hypercorn runner.
-        You should probably use something more elaborate in a production setting.
+        Context manager for this instance.
         """
-        self._to_send = []
-        self._to_send_wait = trio.Event()
-        self._replies = {}
-        self._is_connected = trio.Event()
 
-        config = HyperConfig()
-        cfg = self.cfg['server']
-        config.access_log_format = "%(h)s %(r)s %(s)s %(b)s %(D)s"
-        config.access_logger = create_serving_logger()  # type: ignore
-        config.bind = [f"{cfg['host']}:{cfg['port']}"]
-        config.ca_certs = cfg['ca_certs']
-        config.certfile = cfg['certfile']
-#       if debug is not None:
-#           config.debug = debug
-        config.error_logger = config.access_logger  # type: ignore
-        config.keyfile = cfg['keyfile']
-        config.use_reloader = cfg['use_reloader']
+        # TODO nothing sets this ... yet
+        self._close = trio.Event()
 
-        scheme = "http" if config.ssl_enabled is None else "https"
         async with trio.open_nursery() as n:
             # fx is the FIFO, opened in read-write mode
             fx = await n.start(self._reader)
-            n.start_soon(hyper_serve, self.app, config)
             self.main = n
+            self._is_running.set()
+
             try:
                 await self._is_connected.wait()
                 if self._handlers:
@@ -405,6 +401,7 @@ class Server:
                             await nn.start_soon(partial(self.rpc,action="handle", event=event))
                 self.do_register_aliases()
                 yield self
+
             finally:
                 if fx is not None:
                     os.close(fx)
@@ -418,7 +415,7 @@ class Server:
 
     def _send(self, data):
         # if data.get("action","") != "ping":
-        logger.debug("OUT %r",data)
+        self.__logger.debug("OUT %r",data)
         json.dumps(data)  # functional no-op but catches errors early
         self._to_send.append(data)
         self._to_send_wait.set()
@@ -439,6 +436,9 @@ class Server:
 
     async def event(self, name, *args):
         await self.rpc(action="event", name=name, args=args)
+
+    async def lua_eval(self, msg, name="unknown"):
+        await self.rpc(action="eval",  code=msg, name=name)
 
     @property
     def mud(self):
@@ -492,7 +492,7 @@ class Server:
         try:
             await ali(cmd)
         except Exception as err:
-            logger.warning("Error in alias %r", ocmd, exc_info=err)
+            self.__logger.warning("Error in alias %r", ocmd, exc_info=err)
             await self.mud.print(_("Error: {err!r}").format(err=err))
             await self.post_error()
 
@@ -541,4 +541,110 @@ class Server:
         if len(res) < min_words:
             raise ValueError(_("Too few parameters"))
         return res
+
+
+class WebServer:
+
+    def __init__(self, cfg, factory=Server):
+        self.app = Quart(cfg['name'],
+                # no, we do not want any of those default folders and whatnot
+                static_folder=None,template_folder=None,root_path="/nonexistent",
+                )
+        self.cfg = cfg = combine_dict(cfg, DEFAULTS)
+        self._server = {}
+        self.factory = factory
+        
+
+        @self.app.route("/test", methods=['GET'])
+        async def _get_test():
+            msg = json.dumps(dict(hello="This is a test."))
+            return Response(msg, content_type="application/json")
+
+        @self.app.route("/test", methods=['POST'])
+        async def _echo_data():
+            msg = await request.get_data()
+            return Response(msg, content_type="application/x-fubar")
+
+
+        # GET only sends. PUT only receives. POST does both.
+
+        @self.app.route("/json", methods=['GET'])
+        async def _get_data():
+            s = await self.server
+            msg = await s.make_reply()
+            return Response(msg, content_type="application/json")
+
+        @self.app.route("/json", methods=['PUT'])
+        async def _put_data():
+            s = await self.server
+            msg = await request.get_data()
+            if msg:
+                msg = json.loads(msg)
+                await s.process_request(msg)
+            msg = json.dumps([])
+            return Response(msg, content_type="application/json")
+
+        @self.app.route("/json", methods=['POST'])
+        async def _post_data():
+            s = await self.server
+            msg = await request.get_data()
+            if msg:
+                msg = json.loads(msg)
+                await s.process_request(msg)
+            msg = await s.make_reply()
+            return Response(msg, content_type="application/json")
+
+    def _make_server(self, name):
+        return self.factory(name, self.cfg)
+
+    @property
+    async def server(self):
+        sn = request.headers["Mudlet-Instance"]
+        try:
+            return self._server[sn]
+        except KeyError:
+            self._server[sn] = s = self._make_server(sn)
+            self._srv_w.send_nowait(s)
+        await s.is_running
+        return s
+
+
+    async def run_one(self, s):
+        try:
+            self._server[s.name] = s
+            await s.run()
+        except Exception as exc:
+            logger.exception("Oops: %s died: %r", s.name, exc)
+        finally:
+            del self._server[s.name]
+
+
+    async def run(self) -> None:
+        """
+        Run this application.
+
+        This is a simple Hypercorn runner.
+        You should probably use something more elaborate in a production setting.
+        """
+        config = HyperConfig()
+        cfg = self.cfg['server']
+        config.access_log_format = "%(h)s %(r)s %(s)s %(b)s %(D)s"
+        config.access_logger = create_serving_logger()  # type: ignore
+        config.bind = [f"{cfg['host']}:{cfg['port']}"]
+        config.ca_certs = cfg['ca_certs']
+        config.certfile = cfg['certfile']
+#       if debug is not None:
+#           config.debug = debug
+        config.error_logger = config.access_logger  # type: ignore
+        config.keyfile = cfg['keyfile']
+        config.use_reloader = cfg['use_reloader']
+
+        scheme = "http" if config.ssl_enabled is None else "https"
+        self._srv_w,rdr = trio.open_memory_channel(1)
+
+        async with trio.open_nursery() as n:
+            n.start_soon(hyper_serve, self.app, config)
+            async for s in rdr:
+                n.start_soon(self.run_one, s)
+            pass # end nursery
 

@@ -3,6 +3,7 @@ __pycache__/
 /python.mpackage
 /mapper.cfg
 /.eggs/
+/.cfg/
 /dist/
 /mudpyc.egg-info/
 *~

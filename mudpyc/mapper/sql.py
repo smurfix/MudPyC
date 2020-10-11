@@ -32,13 +32,14 @@ in_updater: ContextVar[bool] = ContextVar('in_updater', default=False)
 
 @contextmanager
 def SQL(cfg):
-    sqlite = cfg.sql.url.startswith("sqlite:")
+    url = cfg['sql']['url']
+    sqlite = url.startswith("sqlite:")
     _idx={}
     if not sqlite:
         _idx['index'] = True
 
     engine = create_engine(
-            cfg.sql.url,
+            url,
             #strategy=TRIO_STRATEGY
     )
     convention = {

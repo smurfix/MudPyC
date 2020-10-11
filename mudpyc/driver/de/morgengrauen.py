@@ -162,7 +162,7 @@ end
         await s.mmud.GUI.raumnotizen.echo(note)
 
     async def show_vitals(self):
-        s = s.server
+        s = self.server
         try:
             v = s.me.vitals
         except AttributeError:
@@ -206,10 +206,8 @@ end
                     self._std_dirs.add(a+b+c+"en")
         self._std_dirs.remove("en")  # :-)
 
-    @property
-    @classmethod
-    def init_mud(cls):
-        yield from super().init_mud
+    def init_mud(self):
+        yield from super().init_mud()
         yield "kurz"
         yield "report senden"
 

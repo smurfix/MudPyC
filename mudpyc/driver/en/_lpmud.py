@@ -10,10 +10,8 @@ class Driver(_Driver):
     """
     name = "Midnight Sun 2"
 
-    @property
-    @classmethod
-    def init_mud(cls):
-        yield from super().init_mud
+    def init_mud(self):
+        yield from super().init_mud()
         yield "brief on"
         yield "request"
         

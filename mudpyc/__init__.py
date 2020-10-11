@@ -1,4 +1,4 @@
-from .server import Server, run_in_task, PostEvent
+from .server import Server, WebServer, run_in_task, PostEvent
 from .alias import Alias, with_alias
 
 __all__ = ["Server","run_in_task","Alias","with_alias","PostEvent"]

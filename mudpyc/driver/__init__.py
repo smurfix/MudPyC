@@ -37,12 +37,6 @@ class ExitMatcher:
         if self.last:
             cb()
 
-    @property
-    @staticmethod
-    def init_mud():
-        if False:
-            yield ""
-
     @classmethod
     def first_line(cls, msg, colors=None):
         """
@@ -171,6 +165,10 @@ function initGUI()
     print("Note: you don't have any MUD specific Mudlet code")
 end
 """]
+
+    def init_mud(self):
+        if False:
+            yield ""
 
     async def show_room_label(self, room):
         """
@@ -373,7 +371,7 @@ end
         """
         return self.ExitMatcher.first_line(msg, colors)
 
-    def __init__(self, server, cfg:dict):
+    def __init__(self, server):
         self._server = weakref.ref(server)
         self.init_std_dirs()
         self.init_short2loc()
@@ -398,12 +396,14 @@ end
         txt = msg.msg.rstrip("\n")
         if txt.startswith(prefix):
             txt = txt.replace(prefix,"").replace("\n"," ").replace("  "," ").strip()
-            await s.print(prefix+txt.rstrip("\n"))  # TODO color
+            txt = prefix+txt.rstrip("\n")
         else:
             prefix = f"[{msg.chan}:{msg.player} "
             if txt.startswith(prefix) and txt.endswith("]"):
                 txt = txt[len(prefix):-1]
-            await s.print(prefix+txt.rstrip("\n")+"]")  # TODO color
+            txt = prefix+txt.rstrip("\n")+"]"
+        await s.print(txt)  # TODO color
+        await s.log_text(txt)
 
     def clean_shortname(self, name):
         """

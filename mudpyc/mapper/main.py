@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from mudpyc import Server, Alias, with_alias, run_in_task, PostEvent
+from mudpyc import Server, WebServer, Alias, with_alias, run_in_task, PostEvent
 import trio
 from mudpyc.util import ValueEvent, attrdict, combine_dict
 from functools import partial
@@ -825,6 +825,7 @@ class NoteProcessor(Command):
 class S(Server):
 
     _input_grab = None
+    logfile = None
 
     blocked_commands = set(("lang","kurz","ultrakurz"))
 
@@ -838,19 +839,16 @@ class S(Server):
     _prompt_state = None
     _send_recheck = None
 
-    def __init__(self, cfg):
-        super().__init__(cfg)
-        self.dr = import_module(cfg['driver']).Driver(self, cfg)
+    def __init__(self, name, cfg):
+        super().__init__(name, cfg)
+        self.dr = import_module(self.cfg['driver']).Driver(self)
+        self.__logger = logging.getLogger(self.name)
 
-    async def setup(self, evt, db):
-        self.db = db
-        await evt.wait()
-        db.setup(self)
-
+    async def setup(self):
+        db = self.db
         self.send_command_lock = trio.Lock()
         self.me = attrdict(blink_hp=None)
 
-        self.logger = logging.getLogger(self.cfg['name'])
         self.trigger_sender = trio.Event()
         self.exit_matcher = None
         self.start_rooms = deque()
@@ -901,8 +899,6 @@ class S(Server):
         await self.init_gui()
         await self.init_mud()
 
-        self._wait_move = trio.Event()
-
         self._area_name2area = {}
         self._area_id2area = {}
         await self.sync_areas()
@@ -922,11 +918,6 @@ class S(Server):
         else:
             conf = {}
         self.conf = combine_dict(conf, self.cfg['settings'])
-
-        if await self.mud.GUI.angezeigt._nil:
-            await self.print("<b>No GUI!</b>")
-        elif not await self.mud.GUI.angezeigt:
-            await self.mud.initGUI(self.cfg["name"])
 
         await self.dr.gmcp_initial(await self.mud.gmcp)
 
@@ -1000,14 +991,14 @@ class S(Server):
         n = 0
         for s in self.dr.lua_setup:
             n += 1
-            await self.lua_eval(self.dr.lua_setup, f"setup {n}")
+            await self.lua_eval(s, f"setup {n}")
         await self.mud.initGUI()
 
     async def init_mud(self):
         """
         Send mud specific commands to set the thing to something we understand
         """
-        for cmd in self.dr.init_mud:
+        for cmd in self.dr.init_mud():
             self.send_command(cmd)
 
     async def post_error(self):
@@ -1032,10 +1023,10 @@ class S(Server):
             except Exception as exc:
                 try:
                     msg = f"{msg}: {exc!r}, {kw!r}"
-                    logger.exception("Format %r with %r", msg,kw)
+                    self.__logger.exception("Format %r with %r", msg,kw)
                 except Exception:
                     msg = f"{msg}: {exc!r} [data not printable]"
-                    logger.exception("Format %r", msg)
+                    self.__logger.exception("Format %r", msg)
         return msg
 
     @property
@@ -1086,7 +1077,7 @@ class S(Server):
                 seen.remove(k)
                 continue
             # areas in the mud but not in the database
-            self.logger.info(_("SYNC: add area {v} to DB").format(v=v))
+            self.__logger.info(_("SYNC: add area {v} to DB").format(v=v))
             area = db.Area(id=k, name=v)
             db.add(area)
             self._area_name2area[area.name.lower()] = area
@@ -1094,14 +1085,16 @@ class S(Server):
         for k in sorted(seen):
             # areas in the database but not in the mud
             v = self._area_id2area[k].name
-            self.logger.info(_("SYNC: add area {v} to Mudlet").format(v=v))
+            self.__logger.info(_("SYNC: add area {v} to Mudlet").format(v=v))
             kk = (await self.mud.addAreaName(v))[0]
+            print("KK1",kk)
             if kk is None:
                 # ugh it's actually present but hasn't been returned
                 kk = (await self.mud.getRoomAreaName(v))[0]
+                print("KK2",kk)
             if kk != k:
                 # Ugh now we have to renumber it
-                self.logger.warning(_("SYNC: renumber area {v}: {k} > {kk}").format(kk=kk, k=k, v=v))
+                self.__logger.warning(_("SYNC: renumber area {v}: {k} > {kk}").format(kk=kk, k=k, v=v))
                 del self._area_id2area[k]
                 self._area_name2area[area.name.lower()] = area
                 self._area_id2area[kk] = area
@@ -3317,7 +3310,7 @@ class S(Server):
         area_rev = {}
         for k,v in area_names.items():
             area_rev[v] = k
-        logger.debug("AREAS:%r",area_names)
+        self.__logger.debug("AREAS:%r",area_names)
         await self.print(_("Start syncing. Please be patient."))
 
         if clear:
@@ -3354,7 +3347,7 @@ class S(Server):
                 y = await r.mud_exits
             except NoData:
                 # didn't go there yet?
-                logger.debug("EXPLORE %s %s",r.id_str,r.name)
+                self.__logger.debug("EXPLORE %s %s",r.id_str,r.name)
                 explore.add(r.id_old)
                 continue
 
@@ -3537,7 +3530,7 @@ class S(Server):
         Called by Mudlet when the MUD sends a Telnet GA
         signalling readiness for the next line
         """
-        logger.debug("Queue GA")
+        self.__logger.debug("Queue GA")
         raise PostEvent("prompt")
 
     async def event_prompt(self,msg):
@@ -3574,6 +3567,10 @@ class S(Server):
         await self.mud.send("\n",False, noreply=True)
         return True
 
+    async def log_text(self, msg):
+        if self.logfile:
+            print(msg, file=self.logfile)
+
     async def called_text(self, msg, colors=None):
         """Incoming text from the MUD"""
         # TODO: store and interpret colors
@@ -3589,7 +3586,7 @@ class S(Server):
                 return
 
         msg = msg.rstrip()
-        logger.debug("IN  : %s", msg)
+        self.__logger.debug("IN  : %s", msg)
         if self.filter_text(msg) is False:
             return
 
@@ -3705,7 +3702,7 @@ class S(Server):
     async def _log_state(self):
         async def _logger(msg, **kw):
             msg = self._format(msg, kw)
-            logger.debug(msg)
+            self.__logger.debug(msg)
         await self._state_dumper(_logger)
 
     async def _state_dumper(self, printer, cmd=()):
@@ -3790,7 +3787,7 @@ class S(Server):
                     raise RuntimeError("No takedown")
             except Exception as exc:
                 await self.print(f"ERROR {p!r}: {exc!r}")
-                logger.exception(f"Takedown {p!r}")
+                self.__logger.exception(f"Takedown {p!r}")
                 self.process = None
         if self._prompt_evt:
             self._prompt_evt.set()
@@ -3833,7 +3830,7 @@ class S(Server):
                 if self.cmd1_q:
                     # Command transmitted by Mudlet.
                     cmd = self.cmd1_q.pop(0)
-                    logger.debug("Prompt saw %r",cmd)
+                    self.__logger.debug("Prompt saw %r",cmd)
                     xmit = False
                 elif self.cmd2_q:
                     # Command queued here.
@@ -3882,7 +3879,7 @@ class S(Server):
 
             except Exception as exc:
                 await self.print(f"*** internal error: {exc!r} ***")
-                logger.exception("internal error: %r", exc)
+                self.__logger.exception("internal error: %r", exc)
                 await self._reset_stack()
                 if self._prompt_evt:
                     # should not happen but be safe
@@ -4166,7 +4163,7 @@ class S(Server):
             return
         if msg[0] == "sysTelnetEvent":
             msg[3] = "".join("\\x%02x"%b if b<32 or b>126 else chr(b) for b in msg[3].encode("utf8"))
-        logger.debug("%r", msg)
+        self.__logger.debug("%r", msg)
 
     async def initGMCP(self):
         for s,d in self.dr.gmcp_setup_data():
@@ -4203,7 +4200,7 @@ class S(Server):
         when bypassing our macros.
         The latter isn't supposed to happen, but ...
         """
-        logger.debug("OUT : %s", msg[1])
+        self.__logger.debug("OUT : %s", msg[1])
         if not self.command or self.command.send_seen:
             pass
         elif self.command.command != msg[1]:
@@ -4220,7 +4217,7 @@ class S(Server):
         if c is not None:
             if not no_info or not c.info:
                 return c
-        logger.debug("*** IDLE ***")
+        self.__logger.debug("*** IDLE ***")
         c = IdleCommand(self)
         self.process.append(c)
         return c
@@ -4247,9 +4244,9 @@ class S(Server):
                     area = self._area_id2area[area]
             else:
                 if offset_from and offset_dir:
-                    self.logger.error(_("Not in mudlet? but we know mudlet# {id_mudlet} at {offset_room.id_str}/{offset_dir}").format(offset_room=offset_room, offset_dir=offset_dir, id_mudlet=id_mudlet))
+                    self.__logger.error(_("Not in mudlet? but we know mudlet# {id_mudlet} at {offset_room.id_str}/{offset_dir}").format(offset_room=offset_room, offset_dir=offset_dir, id_mudlet=id_mudlet))
                 else:
-                    self.logger.error(_("Not in mudlet? but we know mudlet# {id_mudlet}").format(id_mudlet=id_mudlet))
+                    self.__logger.error(_("Not in mudlet? but we know mudlet# {id_mudlet}").format(id_mudlet=id_mudlet))
                 return None
 
         if id_gmcp:
@@ -4258,7 +4255,7 @@ class S(Server):
             except NoData:
                 pass
             else:
-                self.logger.error(_("New room? but we know hash {hash} at {room.id_old}").format(room=room, hash=id_gmcp))
+                self.__logger.error(_("New room? but we know hash {hash} at {room.id_old}").format(room=room, hash=id_gmcp))
                 return None
             mid = await self.mud.getRoomIDbyHash(id_gmcp)
             if mid and mid[0] and mid[0] > 0:
@@ -4269,7 +4266,7 @@ class S(Server):
                     return
 
         if offset_from is None and id_mudlet is None:
-            self.logger.warning("I don't know where to place the room!")
+            self.__logger.warning("I don't know where to place the room!")
             await self.print(_("I don't know where to place the room!"))
 
         room = self.db.Room(name=descr, id_mudlet=id_mudlet)
@@ -4287,7 +4284,7 @@ class S(Server):
             await room.set_area(area)
 
         self.db.commit()
-        logger.debug("ROOM NEW:%s/%s",room.id_old, room.id_mudlet)
+        self.__logger.debug("ROOM NEW:%s/%s",room.id_old, room.id_mudlet)
         return room
 
     async def maybe_assign_mudlet(self, room, id_mudlet=None):
@@ -4356,7 +4353,7 @@ class S(Server):
         # x,y,z = start.pos_x,start.pos_y,start.pos_z
         x,y,z = await self.mud.getRoomCoordinates(start.id_mudlet)
         dx,dy,dz = self.dir_off(dir)
-        logger.debug("Offset for %s is %r from %s",dir,(dx,dy,dz),start.idn_str)
+        self.__logger.debug("Offset for %s is %r from %s",dir,(dx,dy,dz),start.idn_str)
         x,y,z = x+dx, y+dy, z+dz
         room.pos_x, room.pos_y, room.pos_z = x,y,z
         await self.mud.setRoomCoordinates(room.id_mudlet, x,y,z)
@@ -4544,9 +4541,6 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
         if room.id_mudlet is not None:
             room.pos_x,room.pos_y,room.pos_z = await self.mud.getRoomCoordinates(room.id_mudlet)
             db.commit()
-        #await self.check_walk()
-        nr,self._wait_move = self._wait_move, trio.Event()
-        nr.set()
         await self.dr.show_room_data()
 
         if not self.last_room:
@@ -5394,34 +5388,43 @@ You're in {room.idn_str}.""").format(exit=x.dir,dst=x.dst,room=room))
 
     # ### main code ### #
 
-    async def run(self, db, logfile):
-        logger.debug("connected")
-        self.logfile = logfile
-        print(f"""
+    async def run(self):
+
+        if self.cfg.get("logfile") is not None:
+            self.logfile = open(self.cfg['logfile'], "a")
+
+        with SQL(self.cfg) as db:
+            self.db = db
+
+            migrate = self.cfg['sql'].get('migrate', False)
+            if migrate:
+                self.__logger.debug("checking database")
+                run_alembic(db, migrate)
+
+            self.__logger.debug("waiting for connection from Mudlet")
+            async with self:
+                db.setup(self)
+
+                if self.logfile is not None:
+                    print(f"""
 *** Start *** {datetime.now().strftime("%Y-%m-%d %H:%M")} ***
-""", file=logfile)
-        if logfile is not None:
-            logfile.flush()
+""", file=self.logfile)
+                    self.logfile.flush()
 
-        evt = trio.Event()
-        self.main.start_soon(self.setup, evt, db)
-
-        #await self.mud.centerview()
-
-        try:
-            async with self.event_monitor("*") as h:
-                evt.set()
-                async for msg in h:
-                    await self.handle_event(msg.get('args',()),msg.get("event",None))
-        except Exception as exc:
-            logger.exception("END")
-            raise
-        except BaseException as exc:
-            logger.exception("END")
-            raise
-        else:
-            logger.error("END")
-            pass
+                try:
+                    async with self.event_monitor("*") as h:
+                        await self.setup()
+                        async for msg in h:
+                            await self.handle_event(msg.get('args',()),msg.get("event",None))
+                except Exception as exc:
+                    self.__logger.exception("END")
+                    raise
+                except BaseException as exc:
+                    self.__logger.exception("END")
+                    raise
+                else:
+                    self.__logger.error("END")
+                    pass
 
 
 def run_alembic(db, migrate):
@@ -5463,10 +5466,9 @@ def run_alembic(db, migrate):
 
 @click.command()
 @click.option("-c","--config", type=click.File("r"), help="Config file")
-@click.option("-l","--log", type=click.File("a"), help="Log file")
 @click.option("-d","--debug", is_flag=True, help="Debug output")
 @click.option("-m","--migrate", count=True, help="do SQL migration? use -mm for deleting anything, -mmm for dropping tables")
-async def main(config,log,debug,migrate):
+async def main(config,debug,migrate):
     m={}
     if config is None:
         config = open("mapper.cfg","r")
@@ -5475,21 +5477,14 @@ async def main(config,log,debug,migrate):
 
     if 'logging' in cfg:
         from logging.config import dictConfig
+        if debug:
+            cfg['logging'].setdefault('root',{})['level'] = 'DEBUG'
         dictConfig(cfg['logging'])
     else:
         logging.basicConfig(level=logging.DEBUG if debug else getattr(logging,cfg.log['level'].upper()))
 
-
-    if not log and cfg.logfile is not None:
-        log = open(cfg.logfile, "a")
-    with SQL(cfg) as db:
-        logger.debug("checking database")
-        if migrate:
-            run_alembic(db, migrate)
-
-        logger.debug("waiting for connection from Mudlet")
-        async with S(cfg=cfg) as mud:
-            await mud.run(db=db, logfile=log)
+    s = WebServer(cfg, factory=S)
+    await s.run()
 
 if __name__ == "__main__":
     main()
