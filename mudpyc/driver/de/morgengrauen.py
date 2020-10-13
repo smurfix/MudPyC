@@ -209,6 +209,7 @@ end
     def init_mud(self):
         yield from super().init_mud()
         yield "kurz"
+        yield "telnegs aus"
         yield "report senden"
 
     def init_reversal(self):
