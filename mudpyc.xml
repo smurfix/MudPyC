@@ -1983,7 +1983,7 @@ py.dump_evt = registerAnonymousEventHandler("*", hdl)
 			<Key isActive="yes" isFolder="no">
 				<name>KP 6</name>
 				<packageName></packageName>
-				<script>py.fn(28,0)</script>
+				<script>py.fn(26,0)</script>
 				<command></command>
 				<keyCode>54</keyCode>
 				<keyModifier>536870912</keyModifier>
@@ -1991,7 +1991,7 @@ py.dump_evt = registerAnonymousEventHandler("*", hdl)
 			<Key isActive="yes" isFolder="no">
 				<name>Shift KP 6</name>
 				<packageName></packageName>
-				<script>py.fn(28,1)</script>
+				<script>py.fn(26,1)</script>
 				<command></command>
 				<keyCode>54</keyCode>
 				<keyModifier>570425344</keyModifier>
@@ -1999,7 +1999,7 @@ py.dump_evt = registerAnonymousEventHandler("*", hdl)
 			<Key isActive="yes" isFolder="no">
 				<name>Control KP 6</name>
 				<packageName></packageName>
-				<script>py.fn(28,2)</script>
+				<script>py.fn(26,2)</script>
 				<command></command>
 				<keyCode>54</keyCode>
 				<keyModifier>603979776</keyModifier>
@@ -2007,7 +2007,7 @@ py.dump_evt = registerAnonymousEventHandler("*", hdl)
 			<Key isActive="yes" isFolder="no">
 				<name>Control Shift KP 6</name>
 				<packageName></packageName>
-				<script>py.fn(28,3)</script>
+				<script>py.fn(26,3)</script>
 				<command></command>
 				<keyCode>54</keyCode>
 				<keyModifier>637534208</keyModifier>
@@ -2015,7 +2015,7 @@ py.dump_evt = registerAnonymousEventHandler("*", hdl)
 			<Key isActive="yes" isFolder="no">
 				<name>AltGr KP 6</name>
 				<packageName></packageName>
-				<script>py.fn(28,4)</script>
+				<script>py.fn(26,4)</script>
 				<command></command>
 				<keyCode>54</keyCode>
 				<keyModifier>1610612736</keyModifier>
@@ -2023,7 +2023,7 @@ py.dump_evt = registerAnonymousEventHandler("*", hdl)
 			<Key isActive="yes" isFolder="no">
 				<name>AltGr Shift KP 6</name>
 				<packageName></packageName>
-				<script>py.fn(28,5)</script>
+				<script>py.fn(26,5)</script>
 				<command></command>
 				<keyCode>54</keyCode>
 				<keyModifier>1644167168</keyModifier>
@@ -2031,7 +2031,7 @@ py.dump_evt = registerAnonymousEventHandler("*", hdl)
 			<Key isActive="yes" isFolder="no">
 				<name>AltGr Control KP 6</name>
 				<packageName></packageName>
-				<script>py.fn(28,6)</script>
+				<script>py.fn(26,6)</script>
 				<command></command>
 				<keyCode>54</keyCode>
 				<keyModifier>1677721600</keyModifier>
@@ -2039,7 +2039,7 @@ py.dump_evt = registerAnonymousEventHandler("*", hdl)
 			<Key isActive="yes" isFolder="no">
 				<name>AltGr Control Shift KP 6</name>
 				<packageName></packageName>
-				<script>py.fn(28,7)</script>
+				<script>py.fn(26,7)</script>
 				<command></command>
 				<keyCode>54</keyCode>
 				<keyModifier>1711276032</keyModifier>
