@@ -674,7 +674,7 @@ py.dump_evt = registerAnonymousEventHandler("*", hdl)
 				<script>py.shift_label(-1,0)</script>
 				<command></command>
 				<keyCode>16777234</keyCode>
-				<keyModifier>100663296</keyModifier>
+				<keyModifier>67108864</keyModifier>
 			</Key>
 			<Key isActive="yes" isFolder="no">
 				<name>Label right</name>
@@ -682,14 +682,14 @@ py.dump_evt = registerAnonymousEventHandler("*", hdl)
 				<script>py.shift_label(1,0)</script>
 				<command></command>
 				<keyCode>16777236</keyCode>
-				<keyModifier>100663296</keyModifier>
+				<keyModifier>67108864</keyModifier>
 			</Key>
 			<Key isActive="yes" isFolder="no">
 				<name>Label up</name>
 				<packageName></packageName>
 				<script>py.shift_label(0,-1)</script>
 				<command></command>
-				<keyCode>16777235</keyCode>
+				<keyCode>16777236</keyCode>
 				<keyModifier>100663296</keyModifier>
 			</Key>
 			<Key isActive="yes" isFolder="no">
@@ -697,7 +697,7 @@ py.dump_evt = registerAnonymousEventHandler("*", hdl)
 				<packageName></packageName>
 				<script>py.shift_label(0,1)</script>
 				<command></command>
-				<keyCode>16777237</keyCode>
+				<keyCode>16777234</keyCode>
 				<keyModifier>100663296</keyModifier>
 			</Key>
 			<Key isActive="yes" isFolder="no">
