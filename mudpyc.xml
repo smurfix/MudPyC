@@ -2620,6 +2620,22 @@ py.dump_evt = registerAnonymousEventHandler("*", hdl)
 				<keyCode>46</keyCode>
 				<keyModifier>1711276032</keyModifier>
 			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>Label Up 2</name>
+				<packageName></packageName>
+				<script>py.shift_label(0,-1)</script>
+				<command></command>
+				<keyCode>16777235</keyCode>
+				<keyModifier>33554432</keyModifier>
+			</Key>
+			<Key isActive="yes" isFolder="no">
+				<name>Label Down 2</name>
+				<packageName></packageName>
+				<script>py.shift_label(0,1)</script>
+				<command></command>
+				<keyCode>16777237</keyCode>
+				<keyModifier>33554432</keyModifier>
+			</Key>
 		</KeyGroup>
 	</KeyPackage>
 	<HelpPackage>
