@@ -29,7 +29,7 @@ setup(
     author_email="matthias@urlichs.de",
     license="GPLv3 or later",
     packages=find_packages(),
-    install_requires=["trio >= 0.16", "hypercorn >= 0.11", "quart-trio"],
+    install_requires=["trio >= 0.16", "hypercorn >= 0.11", "quart-trio", "pyyaml"],
     keywords=["async", "mudlet", "MUD"],
     python_requires=">=3.6",
     classifiers=[
