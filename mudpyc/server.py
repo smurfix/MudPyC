@@ -398,7 +398,7 @@ class Server:
                 if self._handlers:
                     async with trio.open_nursery() as nn:
                         for event in self._handlers.keys():
-                            await nn.start_soon(partial(self.rpc,action="handle", event=event))
+                            nn.start_soon(partial(self.rpc,action="handle", event=event))
                 self.do_register_aliases()
                 yield self
 
