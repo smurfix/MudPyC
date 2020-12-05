@@ -619,7 +619,7 @@ class WebServer:
             del self._server[s.name]
 
 
-    async def run(self) -> None:
+    async def run(self, * task_status=trio.TASK_STATUS_IGNORED) -> None:
         """
         Run this application.
 
@@ -644,6 +644,7 @@ class WebServer:
 
         async with trio.open_nursery() as n:
             n.start_soon(hyper_serve, self.app, config)
+            task_status.started()
             async for s in rdr:
                 n.start_soon(self.run_one, s)
             pass # end nursery
